@@ -428,3 +428,82 @@ freezes in each case.
 **Risk to verify on first use:** PCSX2's EE recompiler caches translated blocks. A PINE
 write into `.text` may not invalidate that cache, in which case live code patching will
 appear to do nothing and we fall back to pnach plus a restart per experiment.
+
+---
+
+## Live PINE session (2026-08-22)
+
+### The live channel works
+
+Attached to a running PCSX2 v2.5.274 with the game booted. Two facts established by
+experiment, both of which change how testing is done:
+
+**`patch=1` cheats are re-applied every frame.** Writing `24040002` over the deployed
+Probe 2 site read back as `24040002` immediately, then `24040001` 1.5s later - PCSX2 had
+rewritten it. So a live write cannot override an address a deployed cheat covers.
+
+**Live code patching does take effect** - the recompiler-cache risk noted earlier is not
+real. Writing `addiu $a0, $zero, 2` over `move $a0, $s0` at `001020BC` (an address no
+cheat touches) dropped the measured logic rate from 59.65 Hz to 29.99 Hz, and restoring
+the original brought it back to 59.99 Hz. PCSX2 invalidates on PINE writes.
+
+**Loading a save state wipes live writes**, since it restores EE RAM wholesale. Restart
+the fight from the in-game menu instead of reloading a state mid-experiment.
+
+Baseline measurement with Probe 2 active: **59.98 Hz**, confirming stride 1 is in force
+and the frame counter at `0x00331D64` is a trustworthy ground truth.
+
+### Test 1 - disable the simulation candidates (calls 19 and 20)
+
+NOPed `0012BCC4` (`jal 0012B9C0`) and `0012BCD8` (`jal 0012B7F8`) together.
+
+Result: **the 3D environment renders completely black**, but the HUD, the 1P PAUSE menu
+and the end-battle menu still draw over it, audio continues, and the fight still plays
+out to its conclusion - still at double speed.
+
+So `0012B9C0` / `0012B7F8` is the **3D scene renderer**, not the simulation. Its 2534
+float operations are geometry transforms and skinning. This inverts the earlier
+hypothesis, which had inferred "simulation" from float density alone.
+
+The valuable part of this result: **rendering and game logic are cleanly separable in
+this loop**, which is the precondition for any run-one-skip-one design.
+
+### Test 2 - disable call 8 (`001C2AA8`)
+
+Reported as "doubled if not tripled the speed, at 30fps, framerate lower than before,
+logic runs faster with no visual benefit, game still plays normally".
+
+Measured: **59.66 Hz with it disabled vs 60.00 Hz with it enabled** - the loop rate did
+not change. The simulation did not speed up; motion became coarser, which reads as faster
+and choppier. A subjective "it got faster" is not evidence of a rate change, and measuring
+caught it.
+
+Decompiled, `FUN_001C2AA8` is a one-shot guarded by bit 0 of `iGpffffa8a4 + 0x10`: it
+calls `FUN_001C2858` once and sets the bit. Not a per-frame timestep.
+
+### Dead ends from this session
+
+- **`FUN_001DA970(entity, 2)`**, reached from `001C2A28`'s per-entity loop, looked like a
+  stride. It is not: `param_2` is a **group id**, compared against a cached byte and
+  passed to `FUN_001DA8B8`, which walks a 317-entry table of group ids copying bitflags
+  between three bitmask arrays. Nothing to do with time.
+- **The `+2/frame` globals** (`002D33D8`, `002D341C`, `002DE53C`, `002E43FC`) and the
+  `+8/frame` one at `002D33C8` are counters inside `FUN_0027B6C0`, which ends in
+  `sceSifSetDma`. They are IOP/SIF audio packet counters, not game timing.
+- **An earlier heap scan** flagged values at `~0x006E3000` advancing +2/frame. That region
+  is a GIF/DMA display list rebuilt every frame (`0x10000000` GIFtags, `0x80808080` fill);
+  the matches were coincidence. Do not scan the heap for counters without a linearity
+  filter.
+
+### Two tooling bugs found and fixed
+
+- `Scan._region_offsets` masked an exclusive end of `0x02000000` down to 0 with the 32 MB
+  segment mask, silently producing an empty scan range and reporting "0 candidates" for
+  every query. Now `_offset_of(..., exclusive_end=True)` maps a wrapped-to-zero end to the
+  full RAM size, and an empty region raises instead of returning nothing.
+- A three-state capture was taken while **the game was paused** at the 1P PAUSE menu, so
+  nothing was animating and the scan found only global counters. Caught by extracting
+  `Screenshot.png` from the save state and looking at it. **Always confirm the captured
+  state is actually in gameplay** - the screenshot in every .p2s makes this free.
+  `work/autocapture.py` now watches for memory churn across `.data`/`.bss` and only
+  captures once real activity is detected.

@@ -71,12 +71,30 @@ class Scan:
     def _view(self, mem: EEMemory) -> np.ndarray:
         return np.frombuffer(mem.data, dtype=self.np_dtype)
 
+    @staticmethod
+    def _offset_of(addr: int, *, exclusive_end: bool = False) -> int:
+        """Map an EE address to an offset into the 32 MB image.
+
+        An exclusive end of 0x02000000 is the top of RAM, but masking it with
+        the 32 MB segment mask yields 0 and silently empties the scan range -
+        so treat a wrapped-to-zero end as the full size instead.
+        """
+        off = normalise(addr)
+        if exclusive_end and off == 0 and addr != 0:
+            return config.EE_RAM_SIZE
+        return off
+
     def _region_offsets(self) -> np.ndarray:
         """Element indices (not byte addresses) covered by the scan regions."""
         chunks = []
         for region in self.regions:
-            lo = normalise(region.start) // self.stride
-            hi = normalise(region.end) // self.stride
+            lo = self._offset_of(region.start) // self.stride
+            hi = self._offset_of(region.end, exclusive_end=True) // self.stride
+            if hi <= lo:
+                raise ValueError(
+                    f"region {region.name or ''} {region.start:08X}-{region.end:08X} "
+                    f"is empty after normalisation"
+                )
             chunks.append(np.arange(lo, hi, dtype=np.int64))
         return np.concatenate(chunks) if chunks else np.empty(0, dtype=np.int64)
 
@@ -118,7 +136,9 @@ class Scan:
     def in_range(self, start: int, end: int) -> "Scan":
         """Keep only candidates whose address falls in a byte range."""
         addrs = self._offsets * self.stride
-        return self._apply((addrs >= normalise(start)) & (addrs < normalise(end)))
+        lo = self._offset_of(start)
+        hi = self._offset_of(end, exclusive_end=True)
+        return self._apply((addrs >= lo) & (addrs < hi))
 
     # --- results -----------------------------------------------------------
 
