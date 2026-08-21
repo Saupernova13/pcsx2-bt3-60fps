@@ -280,3 +280,109 @@ Unscoped scan of `.text` for frame-pacing constants (`tools/radar.py`):
 
 Far too broad to act on directly, which is why the guide scopes the scoring pass to the
 main gameplay loop. Use `--near` and `--group`, or the Ghidra script's call-graph scoping.
+
+---
+
+## Test 1 - Probe 2 in game (2026-08-22)
+
+Deployed `Probe 2` (`0012BCE4` = `24040001`). User report:
+
+- Battle runs at 60fps.
+- **Everything in the fight is double speed** - fight logic and animations both.
+- Music is normal speed. Sound effects *seem* faster but that is almost certainly
+  because they are being triggered twice as often, not played faster.
+- Menus are normal. Quitting to the main menu gives completely normal speed,
+  animations and audio.
+
+This confirms the model exactly:
+
+1. The call-site stride is the right lever - the change is surgical and menus are
+   genuinely untouched, which the baseline patch could never achieve.
+2. Audio is SPU-driven and independent of the EE frame rate, so it needs no work.
+3. Everything the battle loop drives per iteration is now running twice per unit time.
+
+### What this rules out
+
+**Differential save-state scanning cannot find the bug.** Per-iteration state is
+identical at stride 1 and stride 2 - each iteration advances things by the same amount.
+The defect is purely that iterations happen twice as often per second. Comparing two
+states taken after the same number of iterations shows no difference at all, so the
+guide's Section 4 memory-search approach does not apply here as written.
+
+The work is therefore unavoidably: find every per-iteration delta the battle loop drives
+and halve it, or gate it to every other iteration.
+
+### Battle loop body
+
+```c
+void BattleLoop(void)                       // 0012BBD0
+{
+  do {
+    ctx = GetCtx();                         // 00126EC8
+    if (ctx->flags & 0x8000) { FUN_0012B570(); ctx->flags &= ~0x8000; }
+    FUN_00263508();
+    FUN_00102038();                         // -> 002630B0, 00248F38, 00252EC8
+    ctx = GetCtx();
+    if ((ctx->flags & 0x100) == 0) { FUN_00257A50(); FUN_00259030(); }
+    FUN_001C2AA8();
+    FUN_00122A38();
+    FUN_00124A70();
+    FUN_00125330();
+    FUN_00212990();
+    FUN_00126FB0();
+    FUN_001BB620();
+    FUN_001C2A28();
+    a = FUN_0012B6E0();  b = FUN_002129B0();  c = FUN_0012AB10();
+    if (c == 0 || a == 0) FUN_0012B7F8(); else FUN_0012B9C0();
+    FrameStep(2);                           // 0012BCE0, patched to 1
+    FUN_00100798();                         // GS display-list swap (pure render)
+  } while (b == 0);
+}
+```
+
+`FUN_00100798` is confirmed to be the GS double-buffer swap - rendering only, no timing.
+
+### Dead ends recorded so far
+
+- **`game_tick` (`0x002FEBC4`)** is 60fps-aware already (`FUN_0023D160` halves it at
+  stride 1), but the battle engine never reads it. Its only consumer is `FUN_0023C6C8`,
+  a keyframe-table helper with two callers. Not a lever.
+- **`f12` float arguments in the battle tree.** 123 sites load 0.5/1.0/2.0/3.0/4.0 into
+  `$f12` before a call, but the same callees (`00121F38`, `00121F50`, `001C44F8`) receive
+  all five values. These are animation *playback speed multipliers*, not frame deltas.
+  Halving them would slow animations down, not correct frame pacing.
+- **Blanket float 2.0 halving.** 29 `lui ..., 0x4000` sites sit in the battle tree, but
+  most are ordinary arithmetic. Not safe to halve without per-site evidence.
+
+The baseline patch's site `001DCB20` *is* reachable from the battle loop (depth 5), so it
+is a genuine battle-path constant - but on the evidence above it is one animation speed
+multiplier among many, which is why halving it alone never fixed the game.
+
+### Strategy from here
+
+Two classes of problem need different treatment:
+
+1. **Discrete game logic** - timers, stun, combo windows, gauge and ki fill, AI cadence.
+   These want gating to every other iteration. The game already maintains a per-frame
+   parity flag at **`0x00331D60`**, which is the natural primitive for a
+   run-one-skip-one gate and avoids allocating one in the safe zone.
+2. **Continuous motion** - animation and physics advance. These want their delta halved,
+   so motion is sampled twice as often at the correct speed. This is what actually buys
+   smoothness; gating these would just render 30fps twice.
+
+Next step is to determine which of the battle loop's direct calls advance simulation and
+which only render. With PINE that can be tested live by NOP-ing one call at a time and
+observing, with no emulator restart between experiments.
+
+### Radar output
+
+`PS2_Scoring_Radar` ran headless (positional script args, not a .properties file):
+
+    analyzeHeadless work/ghidra BT3 -process SLUS_216.78 -noanalysis \
+      -scriptPath ghidra/scripts -postScript PS2_Scoring_Radar.java \
+      no no 0012bbd0 skip 00264dbc <output path>
+
+2590 targets in `work/radar/radar.txt`, 1068 global hook points, grouped by caller count
+with the "0 direct JAL callers" group first as the guide describes. These are
+function-disable cheats for bisection, so they are a fallback if the targeted approach
+stalls, not the first tool to reach for.
