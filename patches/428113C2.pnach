@@ -1,0 +1,18 @@
+gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
+
+// 60fps patch for Budokai Tenkaichi 3 - battles.
+// Verified working 2026-08-22: correct game speed, smoother motion,
+// menus unaffected. See docs/findings.md for the full derivation.
+
+[60FPS - battle]
+description=60fps battle with halved animation rate. Menus untouched.
+patch=1,EE,0012BCE4,extended,24040001 // battle loop stride 2 -> 1 (call site 0012BCE0 into FrameStep)
+[60FPS - animation rate]
+description=Halve every animation rate written to entity+0xC80.
+patch=1,EE,001C450C,extended,0803C010 // swc1 -> j 000F0040 (delay slot 001C4510 ld $ra still runs)
+patch=1,EE,000F0040,extended,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0044,extended,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F0048,extended,4604A102 // mul.s $f4, $f20, $f4
+patch=1,EE,000F004C,extended,E4440C80 // swc1 $f4, 0xc80($v0)
+patch=1,EE,000F0050,extended,08071145 // j 0x1c4514
+patch=1,EE,000F0054,extended,00000000 // nop

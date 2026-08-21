@@ -507,3 +507,81 @@ calls `FUN_001C2858` once and sets the bit. Not a per-frame timestep.
   state is actually in gameplay** - the screenshot in every .p2s makes this free.
   `work/autocapture.py` now watches for memory churn across `.data`/`.bss` and only
   captures once real activity is detected.
+
+---
+
+## MILESTONE - working 60fps battle patch (2026-08-22)
+
+**Status: the game plays at correct speed at 60fps, with smoother motion, and menus
+behave normally.** Nothing is double speed. Saved as `patches/428113C2.pnach` and
+archived as `patches/exp/002-milestone-anim-rate.pnach`.
+
+Two changes, both one-liners in effect:
+
+    patch=1,EE,0012BCE4,extended,24040001    // battle loop stride 2 -> 1
+    patch=1,EE,001C450C,extended,0803C010    // animation-rate setter -> safe-zone hook
+    // + a six-word trampoline at 000F0040 that halves the value before storing it
+
+### How the animation fix was found
+
+`FUN_001C44F8` is a tiny setter:
+
+```c
+void SetAnimRate(float rate)          // 001C44F8
+{
+    entity = FUN_001DC280();          // current entity
+    entity->field_0xC80 = rate;       // swc1 $f20, 0xc80($v0)  @ 001C450C
+}
+```
+
+with a matching getter `FUN_001C4700`. **`entity + 0xC80` is the animation playback
+rate**, and the whole game funnels through those two functions - the offset is touched
+from only four instructions in all of `.text`.
+
+Callers pass literal rates: `001DCB40` passes 2.0, `001E3E20`/`001E3E48`/`001E40B0`/
+`001E4134` pass 3.0, and so on. Those constants exist because **BT3 animations are
+authored at 60Hz and the 30Hz game loop advances them 2 units per tick**. At stride 1 the
+loop ticks twice as often, so every rate needs halving.
+
+Rather than patch every caller, the fix hooks the single setter and halves whatever is
+written:
+
+    000F0040  3C083F00  lui   $t0, 0x3F00        ; 0.5f
+    000F0044  44882000  mtc1  $t0, $f4
+    000F0048  4604A102  mul.s $f4, $f20, $f4
+    000F004C  E4440C80  swc1  $f4, 0xc80($v0)
+    000F0050  08071145  j     0x001C4514
+    000F0054  00000000  nop
+
+The hook replaces the `swc1` at `001C450C`. Its delay slot (`001C4510`, `ld $ra, ($sp)`)
+still executes before the jump, which is why the trampoline resumes at `001C4514` rather
+than `001C4510`.
+
+This is why the original circulating patch never worked: it halved `001DCB40`, which is
+**one caller** of this setter, leaving every other animation rate at its 30Hz value.
+
+### Remaining issues, in priority order
+
+1. **Input responsiveness.** Presses are dropped or acknowledged late; sequences needing
+   quick succession fail, including a basic grab (double-tap X). The input latch is polled
+   once per loop iteration, so every frame-counted input window is now half as long in
+   real time. This is guide Section 3 / Example 6 territory. Note the guide's author
+   explicitly considers input the weakest part of this method.
+2. **Sprite / UV animation still double speed.** Mouth movement in intro sequences, and
+   the Kamehameha beam effect, finish early even though the skeletal motion is correct.
+   These are almost certainly texture/UV animations on a separate path from `0xC80`. The
+   guide warns off texture and UI animation explicitly - treat as lower priority and
+   timebox it.
+3. **Intermittent drops to 30fps** for a couple of seconds, then recovery, with no change
+   in game speed. Most likely inherent: at stride 1 the loop has one vblank to finish, and
+   any overrun costs a whole frame. The user reports the same behaviour emulating BT3 on
+   ARM hardware, which supports "inherent to running this engine at 60" rather than a
+   defect in the patch.
+
+### Register-naming hazard
+
+Keystone assembles MIPS in **n64 register naming**, where `$t1` is register **13**, not 9.
+Writing `$t0`/`$t1` in safe-zone code silently targets the wrong registers and produces a
+patch that assembles cleanly and behaves randomly. **All safe-zone assembly in this repo
+uses numbered registers (`$8`, `$9`, `$2`).** Always disassemble the result and check the
+register numbers before trusting a trampoline.
