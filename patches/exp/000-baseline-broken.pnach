@@ -1,0 +1,20 @@
+gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
+
+// The pre-existing 60fps code found in the user's PCSX2 cheats folder on
+// 2026-08-21, preserved verbatim as the starting point. It unlocks the frame
+// rate but only compensates ONE timestep constant, so every other per-frame
+// system in the game still advances at 2x. Kept for A/B comparison; not the
+// deliverable.
+//
+//   00264DBC  beqz $v0, 0x264DE0   ->  beq $zero,$zero,0x264DE0
+//             Forces the branch that skips the vblank wait loop in the frame
+//             pacing function at 00264D98, removing the limiter entirely.
+//
+//   001DCB40  lui $at, 0x4000 (float 2.0)  ->  lui $at, 0x3F80 (float 1.0)
+//             Halves the step multiplier passed in $f12 to the routine tail
+//             called at 001DCB4C, compensating for the doubled call rate.
+
+[60FPS - baseline (BROKEN, reference only)]
+description=Original unlock + single timestep halve. Game logic runs at 2x speed.
+patch=1,EE,20264DBC,extended,10000008
+patch=1,EE,201DCB40,extended,3C013F80

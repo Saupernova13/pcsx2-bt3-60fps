@@ -1,0 +1,19 @@
+# Game data - never commit
+work/
+*.iso
+*.cso
+*.bin
+*.elf
+SLUS_*
+*.p2s
+*.p2s.backup
+
+# Ghidra
+*.gpr
+*.rep/
+ghidra/project/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

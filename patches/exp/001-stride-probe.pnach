@@ -1,0 +1,24 @@
+gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
+
+// Stride probe. FrameStep (00102060) takes a vblank stride; each call site
+// hardcodes it in the delay slot. Flipping one 2 to a 1 converts exactly that
+// loop to 60fps and leaves the other seven alone.
+//
+// Enable ONE group at a time and report what became 60fps and what broke.
+//   python tools/deploy.py patches/exp/001-stride-probe.pnach --only "<group>"
+
+[Probe 1 - loop 00125CF0]
+description=stride 1 at call site 00125ECC (patches 00125ED0)
+patch=1,EE,00125ED0,extended,24040001 // addiu a0,zero,2 -> 1  (caller 00125CF0)
+[Probe 2 - loop 0012BBD0]
+description=stride 1 at call site 0012BCE0 (patches 0012BCE4)
+patch=1,EE,0012BCE4,extended,24040001 // addiu a0,zero,2 -> 1  (caller 0012BBD0)
+[Probe 3 - loop 002635B0]
+description=stride 1 at call site 002636A4 (patches 002636A8)
+patch=1,EE,002636A8,extended,24040001 // addiu a0,zero,2 -> 1  (caller 002635B0)
+[Probe 4 - loop 002649A4]
+description=stride 1 at call site 00264A00 (patches 00264A04)
+patch=1,EE,00264A04,extended,24040001 // addiu a0,zero,2 -> 1  (caller 002649A4)
+[Probe 5 - loop 002BEA44]
+description=stride 1 at call site 002BEAD0 (patches 002BEAD4)
+patch=1,EE,002BEAD4,extended,24040001 // addiu a0,zero,2 -> 1  (caller 002BEA44)
