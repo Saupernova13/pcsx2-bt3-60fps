@@ -386,3 +386,45 @@ observing, with no emulator restart between experiments.
 with the "0 direct JAL callers" group first as the guide describes. These are
 function-disable cheats for bisection, so they are a fallback if the targeted approach
 stalls, not the first tool to reach for.
+
+### Profile of the battle loop's direct calls
+
+Each safe-to-disable call profiled by its callee closure (depth 5), sorted by float
+density - a proxy for "does this advance continuous motion or just do bookkeeping".
+
+| # | Function | Fns | Bytes | FPU ops | FPU/KB |
+|---|---|---|---|---|---|
+| 8 | `001C2AA8` | 160 | 20,292 | 730 | 36.8 |
+| 14 | `001BB620` | 182 | 28,216 | 854 | 31.0 |
+| 20 | `0012B7F8` | 436 | 107,312 | 2534 | 24.2 |
+| 19 | `0012B9C0` | 438 | 107,472 | 2534 | 24.1 |
+| 9 | `00122A38` | 45 | 7,452 | 117 | 16.1 |
+| 12 | `00212990` | 132 | 15,496 | 101 | 6.7 |
+| 15 | `001C2A28` | 26 | 3,672 | 16 | 4.5 |
+| 3 | `00263508` | 3 | 160 | 0 | 0 |
+| 6 | `00257A50` | 23 | 1,920 | 0 | 0 |
+| 7 | `00259030` | 59 | 4,340 | 0 | 0 |
+| 10 | `00124A70` | 22 | 3,336 | 0 | 0 |
+| 11 | `00125330` | 18 | 2,096 | 0 | 0 |
+| 13 | `00126FB0` | 26 | 2,152 | 0 | 0 |
+
+`0012B9C0` and `0012B7F8` are the two arms of the loop's if/else and are nearly identical
+in size, so they share most of their tree - together they are the fight simulation.
+
+**Working hypothesis.** If `0012B9C0`/`0012B7F8` is discrete game logic and `001C2AA8` /
+`001BB620` advance continuous motion, the fix is:
+
+- gate the simulation call to every other iteration, using the game's own parity flag at
+  `0x00331D60` rather than a safe-zone toggle
+- halve the per-frame deltas inside the motion code
+
+That yields 30Hz logic with 60Hz animation, which is the outcome we want. Gating
+everything would just present 30fps twice; halving everything would desynchronise
+discrete timers.
+
+Three isolation tests decide it: disable call 19, then 8, then 14, and record what
+freezes in each case.
+
+**Risk to verify on first use:** PCSX2's EE recompiler caches translated blocks. A PINE
+write into `.text` may not invalidate that cache, in which case live code patching will
+appear to do nothing and we fall back to pnach plus a restart per experiment.
