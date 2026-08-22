@@ -47,13 +47,15 @@ def countdowns(frames: np.ndarray, values: np.ndarray, min_run: int, max_peak: i
             else:
                 if run >= min_run:
                     runs, longest = runs + 1, max(longest, run)
-                else:
-                    if peaks:
-                        peaks.pop()
+                elif run > 0:
+                    # A run too short to count takes its peak with it. Only a
+                    # run that actually ended may discard one - popping on
+                    # every idle frame would throw away the real runs' peaks.
+                    peaks.pop()
                 run = 0
         if run >= min_run:
             runs, longest = runs + 1, max(longest, run)
-        elif peaks:
+        elif run > 0:
             peaks.pop()
         if runs and peaks and max(peaks) <= max_peak:
             hits.append((int(lane), runs, longest, max(peaks)))

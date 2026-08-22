@@ -73,6 +73,25 @@ def _reg_name(n: int) -> str:
     return f"${_REG_NAMES[n]}" if 0 <= n < 32 else f"$r{n}"
 
 
+# Branches and jumps, by opcode. The *likely* forms execute their delay slot
+# only when the branch is taken, which a plain `j` cannot reproduce.
+_BRANCH_OPS = {0x01, 0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17}
+_LIKELY_OPS = {0x14, 0x15, 0x16, 0x17}
+_LIKELY_REGIMM = {0x02, 0x03, 0x12, 0x13}     # bltzl, bgezl, bltzall, bgezall
+_JUMP_OPS = {0x02, 0x03}
+
+
+def _is_likely_branch(word: int) -> bool:
+    op = word >> 26
+    if op in _LIKELY_OPS:
+        return True
+    if op == 0x01:
+        return ((word >> 16) & 0x1F) in _LIKELY_REGIMM
+    if op == 0x11 and ((word >> 21) & 0x1F) == 0x08:     # bc1tl / bc1fl
+        return bool(word & (1 << 17))
+    return False
+
+
 def delay_slot_hazard(displaced: int, delay: int, addr: int) -> str | None:
     """Why a plain `j` hook at this site would corrupt state, or None if safe.
 
@@ -85,6 +104,21 @@ def delay_slot_hazard(displaced: int, delay: int, addr: int) -> str | None:
     leaves `sd $ra, K($sp)` running against the old $sp, and if the trampoline
     then resumes at H+4 the store runs a second time as well.
     """
+    op = displaced >> 26
+    if _is_likely_branch(displaced):
+        return (
+            f"{addr:08X} is a *likely* branch: its delay slot at {addr+4:08X} runs "
+            f"only when the branch is taken. A plain `j` always runs it, so hooking "
+            f"here executes {addr+4:08X} unconditionally. Hook a later instruction."
+        )
+    if op in _BRANCH_OPS or op in _JUMP_OPS or (
+            op == 0x00 and (displaced & 0x3F) in (0x08, 0x09)):
+        return (
+            f"{addr:08X} is a branch or jump. Displacing it means it never happens, "
+            f"and replaying it from the safe zone would need its target re-computed. "
+            f"Hook a non-branching instruction instead."
+        )
+
     _, writes = _regs(displaced, addr)
     reads, _ = _regs(delay, addr + 4)
     clash = writes & reads
