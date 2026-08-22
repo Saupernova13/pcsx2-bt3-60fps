@@ -863,3 +863,46 @@ input block, whose update function ends in the history recorder.
   countdown in a whole minute for exactly that reason.
 - Save raw captures. Re-analysing offline beats asking the player to replay the
   session for every new hypothesis.
+
+## Effects at 2x - what has been ruled out (2026-08-22)
+
+Still wrong after the input fix: ki aura, air idle, ki blast and beam travel, beam
+duration, impact animations. Character skeletal animation, ground idle, grabs, rush
+blasts and general fighting are all correct.
+
+Three experiments, all reverted, none of which changed anything:
+
+1. **`0024D030`** - the only other writer of `+0xC80` in the binary, a two-instruction
+   leaf `jr $ra / swc1 $f12, 0xc80($a0)`. Replaced the whole function with a halving
+   trampoline. User: "I don't think anything changed... if anything the speed is less
+   consistent in movement now." Reverted. It is vtable-dispatched with zero direct
+   callers, so there was no way to predict what it drives - this was a guess and it lost.
+2. **`001C44E4` (`+0xC8C`) and `001C4594` (`+0xCB8`)** - the animation module has exactly
+   three float setters and only `+0xC80` was hooked. The other two are structurally
+   identical (same prologue, same `jal 0x1dc280`, same `swc1 $f20`). Hooked both.
+   User: "no change at all." Reverted.
+3. **Object pools.** Scanning for the `lw rA, off($gp); jr $ra; lw $v0, 0(rA)` count
+   accessor that identified the fighter pool finds only three in the whole binary:
+   `002FEB14` (fighters, count 2), `002FEB38` (count 3, but `+4` holds a *code* address
+   so the layout differs - and its only user computes `count == 3`), and `002FF160`
+   (null during battle). **There is no effect entity pool reachable this way.**
+
+Also already ruled out, from earlier sessions: calls 19/20 of the battle loop are the
+3D scene renderer, not simulation; call 8 is a one-shot, not a timestep.
+
+### Where the evidence actually points
+
+From the saved capture `work/captures/grabs.npz`, fields advancing **+2 per frame** -
+the signature of a counter authored for 30Hz - are `fighter+0x964`/`+0x968`
+(range 0..197), `+0x910`/`+0x914` (0..7) and `+0x132C` (0..29). `+0x968` is the best
+candidate for an effect or sub-animation frame index: it is still stepping 2 per frame
+after the animation fix, which is exactly the reported symptom.
+
+Confirming it needs a live watch while the aura is active. Finding its *writer* is the
+hard part - PINE has no write breakpoints, and offset-scanning `.text` is unreliable
+because struct offsets are not unique (`0x1470` resolved to an unrelated global holding
+`0x80808080`).
+
+**Note the split:** aura and sprite animation are cosmetic, but blast *travel* speed is
+position integrated per frame and changes dodge timing, so it is a gameplay issue and
+the higher priority of the two.
