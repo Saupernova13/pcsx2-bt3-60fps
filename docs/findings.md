@@ -784,3 +784,82 @@ boot. Live-tested is not deployed-tested.
 **Rule: after every deploy, read the patch sites back over PINE and compare to
 the file.** `Pnach.validate()` now refuses this class of bug outright, and the
 deliverable uses type `word`, whose semantics do not depend on the address.
+
+## SOLVED - combat input timing is 128 frame counters (2026-08-22)
+
+Confirmed by the user: "it works! input is better".
+
+Combat never reads the shared input globals at `0x00333988` - it keeps its own
+per-fighter copy. `FUN_001D4A70` maintains it at **`fighter+0x570`**:
+
+| offset | meaning |
+|---|---|
+| `INPUT+0x000` | raw pad buttons, copied from `pad+0x148` |
+| `INPUT+0x1CC` / `+0x1DC` | current mask A / B |
+| `INPUT+0x1D0` / `+0x1E0` | previous mask A / B |
+| `INPUT+0x1D4` / `+0x1E4` | newpress = `cur & ~prev` |
+| `INPUT+0x1D8` / `+0x1E8` | released = `prev & ~cur` |
+
+That is why every reader found on the shared globals turned out to be UI.
+
+### The timing system
+
+`FUN_001D4A70` ends by calling `FUN_001D3C40(ring, cur, newpress, released)`
+twice - `fighter+0x780` for button set A, `fighter+0x820` for set B. Each ring
+is 4 x 32 bytes, and `FUN_001D3C40` loops over all 32 button bits calling
+`FUN_001D3C10` four times per bit:
+
+| ring slot | condition | meaning |
+|---|---|---|
+| `+0x00+bit` | `cur & bit` | frames held |
+| `+0x20+bit` | `!(cur & bit)` | frames released |
+| `+0x40+bit` | `!(newpress & bit)` | **frames since last press - the double-tap window** |
+| `+0x60+bit` | `!(released & bit)` | frames since last release |
+
+```c
+void FUN_001D3C10(int cond, signed char *counter)   // 12 instructions
+{
+    if (cond == 0) { *counter = 0; return; }        // beql, reset in the delay slot
+    if (*counter < 100) *counter += 1;              // saturating
+}
+```
+
+**128 counters, all counting frames.** At 60fps every button window - double
+taps, charges, hold detection, combo links - expired in half its real time.
+That is why input felt uniformly unresponsive rather than one move being
+broken, and it is exactly the frame-window theory, confirmed.
+
+### The fix
+
+One hook. `FUN_001D3C10`'s increment path only runs on even frames, restoring
+the original 30Hz counting rate. The **reset is deliberately left alone** so
+"pressed this frame" still reads zero immediately - halving that too would have
+added a frame of input latency.
+
+Hook at `001D3C18` (`lb $v0, ($a1)`), resume at `001D3C20`.
+
+**Do not hook `001D3C10` itself.** It opens with `beql $a0, zero` whose delay
+slot is `sb $zero, ($a1)`. A likely branch executes its delay slot only when
+taken; a plain `j` always executes it, so hooking the entry would zero every
+counter on every call instead of halving it. `live.delay_slot_hazard()` now
+refuses this, and refuses displacing any branch or jump.
+
+### How it was found
+
+Offset-scanning `.text` for struct field offsets produced only false matches -
+`0x1470` resolved to a global at `0x002FEC20` holding `0x80808080`, nothing to
+do with the fighter. **Offsets are not unique across structs.** What worked was
+following the code: `FUN_001DC2A0` (`GetPadForFighter`) led to the fighter's own
+input block, whose update function ends in the history recorder.
+
+### Capture technique notes
+
+- A whole-struct read is **1408 words and not atomic**. Samples tagged frame N
+  can contain data from N+1, which showed up as nine impossible "two X presses
+  one frame apart". Frame-precise conclusions need the narrow `--watch` mode
+  (a handful of words per sample); the wide trace is for finding candidates.
+- Arm a capture on a real button press. A fixed-timer capture is half over
+  before the instructions have been read - the first 60-second trace caught one
+  countdown in a whole minute for exactly that reason.
+- Save raw captures. Re-analysing offline beats asking the player to replay the
+  session for every new hypothesis.
