@@ -132,8 +132,11 @@ def main() -> int:
                         help="fraction of samples that must agree")
     parser.add_argument("--trace", action="store_true",
                         help="find countdown timers in a byte range of the fighter")
-    parser.add_argument("--range", default="570-900", metavar="LO-HI",
-                        help="hex byte range within the fighter (default the input block)")
+    parser.add_argument("--range", default="0-1600", metavar="LO-HI",
+                        help="hex byte range within the fighter (default the whole struct)")
+    parser.add_argument("--armed", action="store_true",
+                        help="wait for the first button press before recording")
+    parser.add_argument("--arm-timeout", type=float, default=300.0)
     parser.add_argument("--min-run", type=int, default=3,
                         help="frames a field must tick down to count as a timer")
     parser.add_argument("--snap", metavar="TAG", help="save every fighter's struct")
@@ -174,13 +177,34 @@ def main() -> int:
         if args.trace:
             lo, hi = (int(x, 16) for x in args.range.split("-"))
             base = fx.bases(pine)[args.fighter]
-            samples = []
-            deadline = time.monotonic() + args.seconds
             print(f"tracing {base + lo:08X}-{base + hi:08X} "
-                  f"(fighter +{lo:03X}..+{hi:03X}) for {args.seconds}s ...")
+                  f"(fighter +{lo:03X}..+{hi:03X}) for {args.seconds}s")
+
+            if args.armed:
+                # Recording on a fixed timer means the capture is already half
+                # over by the time anyone has read the instructions. Wait for a
+                # real press instead, so the window belongs to the player.
+                print(f"  armed - waiting up to {args.arm_timeout:.0f}s for a "
+                      f"button press ...", flush=True)
+                give_up = time.monotonic() + args.arm_timeout
+                while time.monotonic() < give_up:
+                    if (pine.read(base + fx.NEWPRESS_A)
+                            or pine.read(base + fx.NEWPRESS_B)):
+                        break
+                else:
+                    print("  no press seen - is this the right fighter index?")
+                    return 1
+                print("  press seen, recording", flush=True)
+
+            samples = []
+            presses = 0
+            deadline = time.monotonic() + args.seconds
             while time.monotonic() < deadline:
                 frame = pine.read(fx.FRAME_COUNTER)
-                samples.append((frame, pine.read_block(base + lo, (hi - lo) // 4)))
+                words = pine.read_block(base + lo, (hi - lo) // 4)
+                samples.append((frame, words))
+                if lo <= fx.NEWPRESS_A < hi and words[(fx.NEWPRESS_A - lo) // 4]:
+                    presses += 1
             frames, _ = by_frame(samples)
             hits = find_countdowns(samples, args.min_run)
             print(f"\n# {len(samples)} samples over {len(frames)} distinct frames")
