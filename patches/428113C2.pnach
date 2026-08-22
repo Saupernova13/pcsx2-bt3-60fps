@@ -94,3 +94,15 @@ patch=1,EE,000F01D0,word,0807126B // j 0x1c49ac
 patch=1,EE,000F01D4,word,00000000 // nop
 patch=1,EE,001C4838,word,0803C068 // lwc1 -> j 000F01A0 (FUN_001C47A4 play-once step)
 patch=1,EE,001C49A8,word,0803C070 // lwc1 -> j 000F01C0 (FUN_001C4920 looping step)
+
+// Effect rotation phases: FUN_00251A48 advances three angles per effect slot by
+// a fixed amount per tick and wraps them at +/-pi, so at 60fps every aura, glow
+// and swirl rotates at double real speed. The rates are plain data words and each
+// is read by exactly one instruction in the binary, so halving them is safe and
+// needs no trampoline. Halving a positive float = subtract 0x00800000.
+[60FPS - effect rotation]
+description=Halve the per-tick rotation rates behind auras and effect swirls.
+patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
+patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
+patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
+patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
