@@ -140,7 +140,8 @@ def main() -> int:
     parser.add_argument("--min-run", type=int, default=3,
                         help="frames a field must tick down to count as a timer")
     parser.add_argument("--watch", metavar="OFFSETS",
-                        help="comma-separated hex offsets to sample at full rate")
+                        help="comma-separated hex fighter offsets to sample at full "
+                             "rate; prefix one with @ for an absolute EE address")
     parser.add_argument("--snap", metavar="TAG", help="save every fighter's struct")
     parser.add_argument("--against", metavar="TAG", help="diff --snap against this one")
     parser.add_argument("--limit", type=int, default=60)
@@ -217,10 +218,15 @@ def main() -> int:
                       f"{runs:>3} countdowns  peak {peak:>5}  range {mn} .. {mx}")
 
         if args.watch:
-            offs = [int(x, 16) for x in args.watch.split(",")]
             base = fx.bases(pine)[args.fighter]
-            addrs = [base + o for o in offs]
-            print("watching " + "  ".join(f"+{o:04X}" for o in offs))
+            spec = [x.strip() for x in args.watch.split(",")]
+            # An absolute address lets the physical pad be watched next to the
+            # fighter's copy of it, which separates "the press never arrived"
+            # from "it arrived and nothing opened".
+            addrs = [int(x[1:], 16) if x.startswith("@") else base + int(x, 16)
+                     for x in spec]
+            labels = [x if x.startswith("@") else f"+{int(x, 16):04X}" for x in spec]
+            print("watching " + "  ".join(labels))
             if args.armed:
                 print(f"  armed - waiting up to {args.arm_timeout:.0f}s for a press ...",
                       flush=True)
@@ -247,7 +253,7 @@ def main() -> int:
                     last = values
 
             print(f"\n# {len(seen)} changes over {frame - first} frames\n")
-            header = "  frame  " + "  ".join(f"+{o:04X}   " for o in offs)
+            header = "  frame  " + "  ".join(f"{l:<9}" for l in labels)
             print(header)
             for rel, values in seen[:args.limit * 4]:
                 print(f"  {rel:>5}  " + "  ".join(f"{v:08X}" for v in values))
