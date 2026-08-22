@@ -14,6 +14,7 @@ so the list it prints is the list of things the patch has to compensate for.
 
 import argparse
 import json
+import pathlib
 import time
 
 import _bootstrap  # noqa: F401
@@ -139,6 +140,9 @@ def main() -> int:
     parser.add_argument("--arm-timeout", type=float, default=300.0)
     parser.add_argument("--min-run", type=int, default=3,
                         help="frames a field must tick down to count as a timer")
+    parser.add_argument("--save", metavar="FILE",
+                        help="write the raw trace samples so they can be re-analysed "
+                             "offline instead of asking the player for another run")
     parser.add_argument("--watch", metavar="OFFSETS",
                         help="comma-separated hex fighter offsets to sample at full "
                              "rate; prefix one with @ for an absolute EE address")
@@ -208,6 +212,19 @@ def main() -> int:
                 samples.append((frame, words))
                 if lo <= fx.NEWPRESS_A < hi and words[(fx.NEWPRESS_A - lo) // 4]:
                     presses += 1
+            if args.save:
+                import numpy as np
+                out = pathlib.Path(args.save)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                np.savez_compressed(
+                    out,
+                    frames=np.array([f for f, _ in samples], dtype=np.int64),
+                    words=np.array([w for _, w in samples], dtype=np.uint32),
+                    base=np.array([base], dtype=np.uint32),
+                    lo=np.array([lo], dtype=np.uint32),
+                )
+                print(f"  saved {len(samples)} samples to {out}")
+
             frames, _ = by_frame(samples)
             hits = find_countdowns(samples, args.min_run)
             print(f"\n# {len(samples)} samples over {len(frames)} distinct frames")
