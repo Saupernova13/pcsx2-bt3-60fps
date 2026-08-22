@@ -23,3 +23,16 @@ patch=1,EE,000F0084,word,00052840 // sll $a1, $a1, 1
 patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
 patch=1,EE,000F008C,word,08095E00 // j 0x257800
 patch=1,EE,000F0090,word,00000000 // nop
+[60FPS - input timing]
+description=Halve the rate of the 128 per-button frame counters so double taps, holds and combo links keep their real-time windows.
+patch=1,EE,000F00C0,word,80A20000 // lb $v0, ($a1)          replay displaced
+patch=1,EE,000F00C4,word,3C080033 // lui $t0, 0x33
+patch=1,EE,000F00C8,word,8D081D64 // lw $t0, 0x1d64($t0)    frame counter
+patch=1,EE,000F00CC,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F00D0,word,15000003 // bnez $t0, 000F00E0     odd frame: do not count
+patch=1,EE,000F00D4,word,00000000 // nop
+patch=1,EE,000F00D8,word,08074F08 // j 0x1d3c20             even frame: count as normal
+patch=1,EE,000F00DC,word,00000000 // nop
+patch=1,EE,000F00E0,word,08074F0E // j 0x1d3c38             return without counting
+patch=1,EE,000F00E4,word,00000000 // nop
+patch=1,EE,001D3C18,word,0803C030 // lb -> j 000F00C0 (FUN_001D3C10 increment path)
