@@ -105,10 +105,9 @@ def main() -> int:
             print(f"manager {root:08X}   {len(all_bases)} fighters   "
                   f"stride {fx.STRIDE:#x}")
             for i, base in enumerate(all_bases):
-                f = fx.read(pine, base, i, size=0x0C90)
-                rate = f.u32(fx.ANIM_RATE)
+                f = fx.read(pine, base, i, size=0x0100)
                 print(f"  [{i}] {base:08X}  pad={f.i32(fx.PAD_INDEX)}  "
-                      f"slot={f.i32(fx.SLOT_ID)}  animrate={rate:08X}")
+                      f"slot={f.i32(fx.SLOT_ID)}  model={f.u32(fx.MODEL_PTR):08X}")
 
         if args.timers:
             base, pairs, n, hits = find_timers(

@@ -26,7 +26,12 @@ SIZE = STRIDE            # the readable extent of one fighter
 
 PAD_INDEX = 0x0004       # which controller slot drives this fighter
 SLOT_ID = 0x0008         # the id FUN_001DC210 searches on
-ANIM_RATE = 0x0C80       # float, halved by the 60fps patch
+MODEL_PTR = 0x000C       # FUN_001DC280 reads this, then FUN_002499B0 maps it
+
+# The animation rate the 60fps patch halves is +0xC80 on the object
+# FUN_001DC280 returns, NOT on the fighter - resolving it needs FUN_002499B0,
+# so it cannot be read by offsetting the fighter base.
+ANIM_RATE_ON_MODEL = 0x0C80
 
 FRAME_COUNTER = 0x00331D64   # advances once per FrameStep
 
