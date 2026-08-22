@@ -25,6 +25,21 @@ from ps2ee.pine import Pine, PineNotRunning
 
 JR_RA = 0x03E00008
 FRAME_COUNTER = 0x00331D64
+
+# Skipping a call that feeds the VIF/GIF DMA leaves the EE reading an empty
+# FIFO, and PCSX2 aborts with "FQC = 0 on VIF FIFO READ". Restoring the
+# instruction does not undo the desync - the emulator has to be restarted.
+# These are the battle-loop subsystems that push display lists, so they are
+# never nopped, and neither is anything reached only through them.
+DMA_UNSAFE = {
+    0x00102038,   # present / flush
+    0x00102060,   # end of frame, vblank wait
+    0x001BB620,   # draws, reaches the effect renderer
+    0x00212990,   # draws
+    0x002129B0,   # draws
+    0x00126FB0,   # draws
+    0x00263508,
+}
 f32 = lambda w: struct.unpack("<f", struct.pack("<I", w))[0]
 
 
@@ -52,7 +67,7 @@ def call_sites(mem: EEMemory, entry: int, limit: int = 0x6000):
         if word >> 26 == 0x03:
             target = jump_target(word, at)
             if target and config.TEXT_BASE <= target < config.TEXT_END:
-                if not _result_used(mem, at):
+                if target not in DMA_UNSAFE and not _result_used(mem, at):
                     out.append((at, target))
         at += 4
     return out
@@ -121,9 +136,17 @@ def main() -> int:
     ap.add_argument("addrs", nargs="+", help="hex EE addresses to watch")
     ap.add_argument("--from", dest="entry", default="12B6E0")
     ap.add_argument("--depth", type=int, default=4)
-    ap.add_argument("--seconds", type=float, default=0.7)
+    ap.add_argument("--seconds", type=float, default=0.25,
+                    help="how long each call stays nopped; keep it short, a "
+                         "long gap in a subsystem desyncs more than the value "
+                         "being watched")
+    ap.add_argument("--allow-dma", action="store_true",
+                    help="also test the display-list subsystems - this can "
+                         "abort the emulator with a VIF FIFO assertion")
     args = ap.parse_args()
 
+    if args.allow_dma:
+        DMA_UNSAFE.clear()
     mem = load_elf()
     try:
         pine = Pine().connect()
