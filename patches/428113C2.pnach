@@ -36,3 +36,47 @@ patch=1,EE,000F00DC,word,00000000 // nop
 patch=1,EE,000F00E0,word,08074F0E // j 0x1d3c38             return without counting
 patch=1,EE,000F00E4,word,00000000 // nop
 patch=1,EE,001D3C18,word,0803C030 // lb -> j 000F00C0 (FUN_001D3C10 increment path)
+
+// --- alternative to [60FPS - animation rate]: enable one or the other, never both ---
+// The rate setter only catches models something explicitly calls SetAnimRate on.
+// FUN_0024D410 is where animation time actually advances (time += rate at
+// model+0xB40+0x138), so halving there covers every animated model in the game -
+// including effect entities that never set a rate. The two getter hooks keep the
+// observable rate at its old halved value for the three call sites that read it.
+[60FPS - animation clock]
+description=Halve the animation clock itself rather than the rate setter, so effects and auras are covered too.
+patch=1,EE,000F0100,word,C4800140 // lwc1 $f0, 0x140($a0)   replay displaced
+patch=1,EE,000F0104,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0108,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F010C,word,46040002 // mul.s $f0, $f0, $f4
+patch=1,EE,000F0110,word,08093511 // j 0x24d444
+patch=1,EE,000F0114,word,00000000 // nop
+patch=1,EE,000F0120,word,C4810140 // lwc1 $f1, 0x140($a0)   replay displaced
+patch=1,EE,000F0124,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0128,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F012C,word,46040842 // mul.s $f1, $f1, $f4
+patch=1,EE,000F0130,word,0809351D // j 0x24d474
+patch=1,EE,000F0134,word,00000000 // nop
+patch=1,EE,000F0140,word,C4400140 // lwc1 $f0, 0x140($v0)   replay displaced
+patch=1,EE,000F0144,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0148,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F014C,word,46040002 // mul.s $f0, $f0, $f4
+patch=1,EE,000F0150,word,08074DF1 // j 0x1d37c4
+patch=1,EE,000F0154,word,00000000 // nop
+patch=1,EE,000F0160,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0164,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F0168,word,46040002 // mul.s $f0, $f0, $f4
+patch=1,EE,000F016C,word,DFBF0000 // ld $ra, ($sp)          replay displaced
+patch=1,EE,000F0170,word,080711C6 // j 0x1c4718
+patch=1,EE,000F0174,word,00000000 // nop
+patch=1,EE,000F0180,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0184,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F0188,word,46040002 // mul.s $f0, $f0, $f4
+patch=1,EE,000F018C,word,DFBF0000 // ld $ra, ($sp)          replay displaced
+patch=1,EE,000F0190,word,08081F2A // j 0x207ca8
+patch=1,EE,000F0194,word,00000000 // nop
+patch=1,EE,0024D440,word,0803C040 // lwc1 -> j 000F0100 (FUN_0024D410 play-once step)
+patch=1,EE,0024D470,word,0803C048 // lwc1 -> j 000F0120 (FUN_0024D410 loop step)
+patch=1,EE,001D37C0,word,0803C050 // lwc1 -> j 000F0140 (FUN_001D378C step)
+patch=1,EE,001C4714,word,0803C058 // ld   -> j 000F0160 (FUN_001C4700 getter)
+patch=1,EE,00207CA4,word,0803C060 // ld   -> j 000F0180 (FUN_00207C88 getter)

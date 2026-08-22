@@ -12,13 +12,17 @@ and confirmed by the user:**
 | group | what it does |
 |---|---|
 | `60FPS - battle` | battle loop stride 2 -> 1 at `0012BCE4`. The whole 60fps change |
-| `60FPS - animation rate` | halves every rate written through `FUN_001C44F8` to `entity+0xC80` |
+| `60FPS - animation clock` | halves the animation clock itself in `FUN_0024D410` (supersedes `60FPS - animation rate`, which only halved rates written through `FUN_001C44F8`) |
 | `60FPS - input repeat timing` | doubles the menu auto-repeat delay/rate via `FUN_002577F8` |
 | `60FPS - input timing` | halves the 128 per-button frame counters in `FUN_001D3C10` |
 
 Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
 
-**The one remaining defect: airborne motion runs at 2x.** Air idle, knockback, falling
+**Read "The engine has no timestep" further down before anything else.** The
+game has no delta anywhere; it is a fixed 30Hz tick loop now ticking at 60Hz, so
+*everything* is 2x until it is individually halved. Nothing self-corrects.
+
+**Remaining defects: all procedural motion runs at 2x.** Air idle, knockback, falling
 after a stun, ki blast and beam travel. Everything grounded is correct. See "Airborne
 motion - the full investigation" near the bottom of this file: the object chain is
 mapped, eight approaches are ruled out, and the next concrete step is a write breakpoint
@@ -1150,3 +1154,121 @@ Other hard-won rules:
 - **Revert anything the user has not confirmed.** Three effect experiments and the
   smoothing constant were all backed out; `tools/apply-live.py --check` plus a stock-value
   check on the experiment sites is how the tree was left clean.
+
+## The engine has no timestep - what "2x" actually means (2026-08-22)
+
+This supersedes the earlier framing of `0012BCE4` as a "battle loop stride".
+
+`0012BCE4` is not a stride. It is the **delay slot of `jal 0x102060`**:
+
+```
+0012BCE0  jal   0x102060
+0012BCE4  addiu $a0, $zero, 2      <- our patch makes this 1
+```
+
+`FUN_00102060(n)` is the end-of-frame routine: it presents, waits **n vblanks**
+(passing `n` on to `FUN_0023D160` and `FUN_00264D98` - the same `0x00264DBC`
+the circulating patch pokes), and bumps the frame counter at `0x00331D64`.
+
+So the change is purely "wait one field instead of two". **Nothing in the game
+receives a timestep.** Proof: the data segment contains no `1/30`, `1/60`,
+`30.0` or `60.0` float anywhere (`work/findconst.py`). `FUN_0012BBD0` is a flat
+list of about twenty subsystem `jal`s with no delta argument between them.
+
+**Therefore every per-tick quantity in the game runs at 2x real speed, and the
+only things that are correct are the ones we have explicitly halved.** Nothing
+self-corrects. This is the single most important fact for anyone continuing.
+
+### What that makes the remaining work
+
+| symptom | class | fixed by |
+|---|---|---|
+| overall pacing | vblank wait | shipped |
+| skeletal animation | `time += rate` | shipped |
+| input windows | `n++` per tick | shipped |
+| menu auto-repeat | `n++` per tick | shipped |
+| aura, impact effects | animation clock on non-fighter models | `60FPS - animation clock` |
+| ki blast + beam travel | procedural motion | open |
+| beam duration | `n--` per tick | open |
+| airborne motion, knockback, falling | procedural motion | open |
+| camera convergence (`FUN_00122168`) | per-tick lerp | open, nobody has complained |
+
+### Battle-loop subsystem map
+
+`work/subsystems.py` walks the call tree under each top-level `jal`:
+
+| call | fns | contains |
+|---|---|---|
+| `0012B570` | 737 | input, camera, 3 effect fns |
+| `001C2AA8` | 251 | input, camera, 3 effect fns |
+| `00212990` | 230 | Vec4Add, 1 effect fn |
+| `001BB620` | 213 | Vec4Add, 6 effect fns |
+| **`0012B6E0`** | **1005** | **physics, input, camera, 20 effect fns - the gameplay update** |
+| `0012B9C0` / `0012B7F8` | 487 / 438 | the two branches of the round-state check |
+| `00102060` | 198 | present + vblank wait |
+
+## The animation system, fully mapped
+
+The controller lives at **`model + 0xB40`**:
+
+| field | meaning |
+|---|---|
+| `+0x004` | length, in animation frames (float) |
+| `+0x134` | mode: 0 stopped, 1 play-once, 2 loop |
+| `+0x138` | current time (float) |
+| `+0x13C` | previous time (float) |
+| `+0x140` | rate, frames advanced per tick - this is `model+0xC80` |
+
+**BT3's animations are authored at 60Hz and the stock rate is `2.0`.** Live proof
+with the shipped patch on: `time=20.0 prev=19.0 rate=1.0` - our setter hook has
+already turned the stock 2.0 into 1.0, and the step really is one frame per tick.
+
+`FUN_0024D410(model)` is the clock. Three `time += rate` sites exist in the whole
+binary and there are no others:
+
+| site | which |
+|---|---|
+| `0024D448` | play-once (clamps to length, then sets mode 0) |
+| `0024D478` | loop (wraps to 0) |
+| `001D37C8` | the `entity+0x1330` channel, `FUN_001D378C` |
+
+Only four instructions touch `+0xC80` at all: the setter `001C450C` (what we
+hooked), a second setter at `0024D034`, and two getters `001C4710` / `00207CA0`.
+
+### Why the clock beats the setter
+
+`[60FPS - animation rate]` only halves rates that something explicitly writes
+through `FUN_001C44F8`. A model whose rate is defaulted, or written by the other
+setter, keeps its stock value and runs at 2x - which is the likely cause of
+"the aura is always double speed even when the character animates correctly".
+
+Halving at the clock is correct **whatever the authored rate is**: a 2.0 model
+runs 120 anim-frames/s at 60Hz instead of 60, and a 1.0 model runs 60 instead of
+30. Both are exactly 2x, so both want the same halved step.
+
+`[60FPS - animation clock]` hooks all three step sites, plus both getters so the
+three call sites that read the rate still observe the old halved value.
+**Enable one group or the other, never both** - together they give quarter speed.
+
+## Bounding the motion search
+
+Two scans that had not been done, both of which shrink the remaining problem:
+
+- `work/vecacc.py` - `Vec4Add`/`Vec3Add` calls where destination == first source,
+  i.e. the `x += y` idiom, scoped to the 1042 functions under `0012B6E0`.
+  **Only 17 exist**, in `001C6920`, `001D6580`, `001D6C08`, `001DF210`,
+  `0024A4B8`, `00250DE8` (5) and `00251A48` (6). The ones checked so far
+  accumulate into stack temporaries via the matrix library, so they are camera
+  or spline code, not entity motion.
+- `work/vuacc.py` - a hand-written R5900 COP2 decoder looking for in-place
+  `lqc2 ... sqc2` on the same struct field. **There are none.** All twelve hits
+  are the 4x4 matrix load/store helpers at `00120B80`, `001212D8`, `0012136C`
+  and `00121404`. So no motion is integrated in inline SIMD; it all goes through
+  the six-function vector library by pointer, and capstone's COP2 blind spot
+  does not hide an integrator after all.
+
+`model+0x970` is never written by a `sw`/`sqc2` in gameplay code - the only
+`addiu rX, rY, 0x970` sites that pass it as a destination are the model
+initialiser `FUN_0024E238` and the copy at `FUN_001D7414`. It is written through
+a pointer handed to the vector library, so a runtime write breakpoint is still
+the only way to catch the writer.
