@@ -4,6 +4,35 @@ Running record of everything established about Dragon Ball Z: Budokai Tenkaichi 
 (SLUS-21678, CRC 428113C2). Shared memory between the Analyst and Interpreter roles.
 Newest sections at the bottom.
 
+## STATE OF PLAY - read this first
+
+**Working, shipped in `patches/428113C2.pnach`, all four groups verified live over PINE
+and confirmed by the user:**
+
+| group | what it does |
+|---|---|
+| `60FPS - battle` | battle loop stride 2 -> 1 at `0012BCE4`. The whole 60fps change |
+| `60FPS - animation rate` | halves every rate written through `FUN_001C44F8` to `entity+0xC80` |
+| `60FPS - input repeat timing` | doubles the menu auto-repeat delay/rate via `FUN_002577F8` |
+| `60FPS - input timing` | halves the 128 per-button frame counters in `FUN_001D3C10` |
+
+Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
+
+**The one remaining defect: airborne motion runs at 2x.** Air idle, knockback, falling
+after a stun, ki blast and beam travel. Everything grounded is correct. See "Airborne
+motion - the full investigation" near the bottom of this file: the object chain is
+mapped, eight approaches are ruled out, and the next concrete step is a write breakpoint
+on `model+0x974` with its call stack.
+
+**Before doing anything, read "Instrument notes for future agents" at the very bottom.**
+Two measurement traps in this codebase produce confident wrong answers.
+
+**Never trust a deploy you have not read back.** The pnach silently wrote one byte per
+line for its entire existence because `extended` takes its size from the address's top
+nibble. `python tools/apply-live.py --check` is the verification step.
+
+---
+
 Scope agreed 2026-08-21: **battles only**. Movement, ki, combos, dashes, blast timing,
 stun, gauges and AI must be correct at 60fps. Menus, world map and non-battle cutscenes
 may stay at 30fps or be locked back to 30 with E-codes.
@@ -972,3 +1001,152 @@ Callers that materialise the pointer: `001D6454`, `001D64B4`, `001D6598`,
 A **write breakpoint** on `fighter+0x15A4` in the PCSX2 debugger. That names the
 writing instruction directly, which is the one thing static analysis cannot
 supply here. Everything else is guesswork.
+
+## Airborne motion - the full investigation, and where it stopped (2026-08-22)
+
+The last unsolved symptom. **Everything airborne runs at 2x; everything grounded is
+correct.** Air idle, knockback flight after a heavy smash, falling after a stun, ki blast
+and beam travel, beam duration. Ground idle, general fighting, grabs, rush blasts and
+ground dash are all right.
+
+Ground movement is root motion driven by the animation clock, which the `+0xC80` fix
+already halves. Airborne movement is not, so it is a separate integrator somewhere.
+
+### What the write breakpoint found (the technique that works)
+
+PINE cannot set write breakpoints. The PCSX2 debugger can, and it answered in one shot
+what hours of static analysis could not. The procedure, for whoever picks this up:
+
+1. `python tools/fighter.py --info` for the live fighter bases.
+2. Debug -> Open Debugger, Breakpoints -> New, Type **Memory**, **Write**, size 4, at the
+   address of interest.
+3. When it trips, read the **Stack** tab. It gives the full call chain with PCs.
+
+Doing that on `fighter+0x15A4` (position Y) produced:
+
+```
+0012BBD0   battle loop
+  0012B6E0
+    001C2C80
+      001D64A0                       <- the writer
+        001D6550  jal 00121EA8       <- pos += delta
+```
+
+### The EE vector math library (worth knowing, decoded by hand)
+
+capstone has **no R5900 COP2 support**, so these decode as garbage (`bbit032`, `.word`)
+in every tool in this repo. PCSX2's debugger decodes them correctly. This is a permanent
+blind spot for `ps2ee/disasm.py` and it is precisely where BT3's motion code lives.
+
+| address | signature |
+|---|---|
+| `00121EA8` | `Vec4Add(dst, a, b)` - `lqc2/lqc2/vadd.xyzw/sqc2` |
+| `00121EC0` | `Vec3Add(dst, a, b)` - `vadd.xyz` |
+| `00121ED8` | `Vec4Sub(dst, a, b)` - `vsub.xyzw` |
+| `00121EF0` | `Vec3Sub(dst, a, b)` - `vsub.xyz` |
+| `00121F38` | `Vec4Scale(dst, src, f12)` |
+| `00121E90` | `VecSwap(a, b)` - `lq/lq/sq/sq` |
+
+`Vec4Add` alone has **hundreds of callers**, so a static xref cannot identify a caller.
+Only the runtime stack can.
+
+### FUN_001D64A0 is a FOLLOWER, not the driver - the mistake that cost the most
+
+```c
+target = model[0x970] - bone[0x40];
+pos   += (target - pos) * k;          // k = 0.2, from gp-0x6fc4 = 0x002FD2AC
+```
+
+This is exponential smoothing that makes the fighter's logical position chase the
+rendered model. It looked exactly like the physics integrator and it is not.
+
+`k` was halved to the exact half-step equivalent `1 - sqrt(1-k)` = `0.105573`
+(`0x3DD8368F`), which preserves the convergence curve rather than approximating it with
+`k/2`. **The constant is read by exactly one instruction in the whole binary**
+(`001D6508`), so there was no collateral risk. Result: **no visible change whatsoever.**
+Reverted to `0x3E4CCCCD`.
+
+The lesson: a field that moves smoothly every frame and looks like position may be a
+*smoothed copy* of the real thing. Check whether anything upstream feeds it before
+patching. `pos += (target - pos) * k` is a follower; `pos += velocity` is an integrator.
+They look identical in a memory watch.
+
+### The object chain, for whoever continues
+
+```
+manager    = *(u32*)0x002FEB14
+count      = *(u32*)(manager + 0)               // 2 in a normal battle
+fighter[i] = *(u32*)(manager + 4) + i*0x1600
+model_id   = fighter[0x0C]                      // 0 and 1, an index not a pointer
+model      = *(u32*)(0x0031C640 + model_id*4)   // = FUN_002499B0
+```
+
+| what | where | note |
+|---|---|---|
+| fighter position XYZ | `fighter+0x15A0/A4/A8` | smoothed follower, NOT the driver |
+| fighter facing | `fighter+0x15B0..B8` | unit vector |
+| **model position XYZ** | **`model+0x970/974/978`** | different coordinate space, and it moves - this is upstream |
+
+Live sample: fighter pos `(-0.63, 11.84, 3.04)` while model `+0x970` read
+`(294.11, 26.63, 878.25)`. Both move; the model is the driver.
+
+**The next step is a write breakpoint on `model+0x974`** and its call stack. That was
+requested but the session ended first. Expect it to be a hot breakpoint - skinning and
+rendering may also write there, so keep hitting Run until a stack containing `0012BBD0`
+(the battle loop) appears, which is the gameplay path rather than the renderer.
+
+### Everything ruled out for the airborne symptom
+
+| attempt | result |
+|---|---|
+| `0024D030`, the only other `+0xC80` writer in the binary | no change; "speed less consistent in movement". Reverted |
+| `001C44E4` (`+0xC8C`) and `001C4594` (`+0xCB8`), the two unhooked sibling animation-rate setters | "no change at all". Reverted |
+| Object-pool scan for an effect entity system | only 3 pools exist (`002FEB14` fighters, `002FEB38` count==3 with a code pointer at +4, `002FF160` null). No effect pool |
+| `FUN_001E16BC`'s 30-frame periodic trigger at `001E188C` | applied 30->60; never confirmed by the user, so reverted rather than shipped |
+| `001DCB40`, the circulating patch's second code | `lui $at, 0x4000` (2.0) tail-calling our hooked setter - already yields 1.0 with our fix. Redundant, not missing |
+| `FUN_001D64A0`'s smoothing constant `k` | no visible change. Reverted |
+| Static scans for `swc1`/`sq`/`sw` to `0x15A0/A4/A8` | **zero hits** - position is passed by pointer into the vector library |
+| `pos[t+1] - pos[t] == V[t]` search over a 1426-frame airborne capture | no exact match, because the update is a lerp not a plain integrator |
+
+Also still open but lower priority: `FUN_00122168(rate, cur, target, out)` in the
+camera/aim path lerps toward a target with a fixed per-frame rate from `$gp`, so the
+camera also converges twice as fast. Nobody has complained about it.
+
+There are **429 periodic frame counters** in 310 functions binary-wide, found by scanning
+for `addiu rX, rX, 1` followed by `slti rZ, rX, N`. Nine are in the effects module
+(`001E0F54` period 2, `001E02F0`/`001E7ACC` period 4, `001E769C` 21, `001E7AEC` 24,
+`001E188C` 30, `001E8148` 31, `001EEBB4` 91). They are a real class of 30Hz-authored
+timers, but they cannot be doubled blindly - most are correct as they stand.
+
+## Instrument notes for future agents
+
+**Two measurement traps cost real time in this session. Both produce confident wrong
+answers.**
+
+1. **Whole-struct captures tear.** A fighter is 1408 words and PINE cannot read it
+   atomically, so a sample tagged frame N can contain data from N+1. This produced
+   (a) nine impossible "two X presses one frame apart", and (b) a completely bogus
+   "+2 per frame" reading on counters that actually step +1 - dropped frames made
+   consecutive samples two game frames apart. **Frame-precise conclusions require the
+   narrow `--watch` mode** (a handful of words per sample). The wide `--trace` is for
+   finding candidates only.
+2. **Offsets are not unique across structs.** Scanning `.text` for `lw rX, 0x1470(rY)`
+   found a global at `0x002FEC20` holding `0x80808080`, nothing to do with the fighter.
+   Match the whole *idiom* instead (load / add immediate / store back to the same
+   offset), or confirm the base register's provenance.
+
+Other hard-won rules:
+
+- **Arm captures on a real button press** (`--armed`). A fixed-timer capture is half over
+  before the instructions have been read; the first 60-second trace caught one countdown
+  in an entire minute for exactly that reason.
+- **Save raw captures** (`--save`, then `tools/countdown.py`). Re-analysing offline beats
+  asking the player to replay a session for every new hypothesis.
+- **Verify a deploy by reading it back over PINE.** See the `extended` byte-write section:
+  the patch was silently writing one byte per line for its entire existence.
+- **`ps2ee/live.py` refuses branches and likely-branch delay slots.** Trust it. Hooking
+  `FUN_001D3C10`'s `beql` entry would have zeroed every input counter instead of halving
+  them, and hooking function prologues at random is what crashed the emulator earlier.
+- **Revert anything the user has not confirmed.** Three effect experiments and the
+  smoothing constant were all backed out; `tools/apply-live.py --check` plus a stock-value
+  check on the experiment sites is how the tree was left clean.
