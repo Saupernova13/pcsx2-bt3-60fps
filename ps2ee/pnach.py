@@ -18,12 +18,22 @@ WIDTHS = {
     "short": 2,
     "word": 4,
     "double": 8,
-    "extended": 4,   # 'extended' is a word write with raw-code semantics
+    "extended": 4,   # nominal only - see EXTENDED_WIDTHS
     "leshort": 2,
     "leword": 4,
     "beshort": 2,
     "beword": 4,
 }
+
+# 'extended' does not mean "32-bit". It selects the raw PS2 cheat-code format,
+# where the TOP NIBBLE OF THE ADDRESS is the size and is not part of the
+# address at all: 0 = byte, 1 = halfword, 2 = word. So a natural-looking
+# 'patch=1,EE,0012BCE4,extended,24040001' writes a single byte, and a
+# trampoline deployed that way is silently never assembled into memory while
+# the hook site's low byte is corrupted. Prefix the address with 2, or just use
+# type 'word'.
+EXTENDED_WIDTHS = {0x0: 1, 0x1: 2, 0x2: 4}
+
 
 PATCH_RE = re.compile(
     r"^patch\s*=\s*(?P<place>[01])\s*,\s*(?P<cpu>EE|IOP)\s*,\s*"
@@ -46,6 +56,20 @@ class Line:
     def is_condition(self) -> bool:
         """E-codes gate the line that follows them (guide Section 5)."""
         return (self.addr >> 28) == 0xE
+
+    @property
+    def width(self) -> int:
+        """Bytes this line actually writes."""
+        if self.type.lower() == "extended":
+            return EXTENDED_WIDTHS.get(self.addr >> 28, 4)
+        return WIDTHS.get(self.type.lower(), 4)
+
+    @property
+    def target(self) -> int:
+        """The address written, with any raw-code size nibble stripped off."""
+        if self.type.lower() == "extended" and not self.is_condition:
+            return self.addr & 0x0FFFFFFF
+        return self.addr
 
     def render(self) -> str:
         width = WIDTHS.get(self.type.lower(), 4)
@@ -142,8 +166,21 @@ class Pnach:
                 if line.is_condition:
                     pending_condition = True
                     continue
+                if line.type.lower() == "extended":
+                    nibble = line.addr >> 28
+                    if nibble not in EXTENDED_WIDTHS:
+                        problems.append(
+                            f"{where}: 'extended' size nibble {nibble:X} is not 0, 1 or 2"
+                        )
+                    elif line.value >> (line.width * 8):
+                        problems.append(
+                            f"{where}: 'extended' with a leading {nibble:X} writes only "
+                            f"{line.width} byte(s), truncating {line.value:08X} to "
+                            f"{line.value & ((1 << line.width * 8) - 1):02X}. Use type "
+                            f"'word', or prefix the address with 2."
+                        )
                 if line.cpu == "EE":
-                    addr = line.addr & 0x01FFFFFF
+                    addr = line.target & 0x01FFFFFF
                     if addr >= config.EE_RAM_SIZE:
                         problems.append(f"{where}: address beyond 32 MB of EE RAM")
                     in_text = config.TEXT_BASE <= addr < config.TEXT_END
@@ -157,10 +194,12 @@ class Pnach:
                         problems.append(
                             f"{where}: {addr:08X} is outside .text, .data and the safe zone"
                         )
-                    if addr % 4 and line.type.lower() in ("word", "extended"):
-                        problems.append(f"{where}: unaligned word write")
+                    if addr % line.width:
+                        problems.append(
+                            f"{where}: {line.width}-byte write to an unaligned address"
+                        )
                 # A conditional line consumes the condition above it.
-                key = (line.cpu, line.addr)
+                key = (line.cpu, line.target)
                 if not pending_condition and key in seen:
                     problems.append(
                         f"{where}: overwrites an earlier write from {seen[key]}"

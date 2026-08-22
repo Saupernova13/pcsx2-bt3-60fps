@@ -1,7 +1,9 @@
 gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 
 // 60fps patch for Budokai Tenkaichi 3 - battles.
-// Verified working 2026-08-22: correct game speed, smoother motion,
+// SUPERSEDED - these 'extended' lines write one byte each and this
+// file never worked from a cold boot. See docs/findings.md.
+// Validated over PINE only, 2026-08-22: correct game speed, smoother motion,
 // menus unaffected. See docs/findings.md for the full derivation.
 
 [60FPS - battle]

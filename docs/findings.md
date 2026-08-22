@@ -732,3 +732,55 @@ Next approach if this is picked up again: put the logging trampoline on the game
 readers to find which one runs during a fight, then look for a countdown in the character
 struct that resets on a press - the same shape as the `+0x158` repeat counter, but
 per-fighter.
+
+## The patch was never actually applied - `extended` writes ONE BYTE (2026-08-22)
+
+Every line of the shipped pnach had been writing a single byte since the day it
+was written. Found by reading the patch sites back over PINE on a cold boot and
+comparing them to what the file asks for:
+
+| site | wanted | actually in RAM | |
+|---|---|---|---|
+| `0012BCE4` | `24040001` | `24040001` | correct **by luck** - only the low byte differs from the original |
+| `001C450C` | `0803C010` | `E4540C10` | original `E4540C80` with its low byte overwritten by `10` |
+| `002577F8` | `0803C020` | `3C020020` | original `3C020033`, low byte overwritten by `20` |
+| `000F0048` | `4604A102` | `00000002` | only `02` landed |
+| `000F004C` | `E4440C80` | `00000080` | only `80` landed |
+
+### Why
+
+`extended` does not mean "32-bit write". It selects the raw PS2 cheat-code
+format, in which **the top nibble of the address is a size selector and is not
+part of the address**: `0` = byte, `1` = halfword, `2` = word. Every address in
+this project is a bare EE address beginning with `0`, so every line became a
+byte write.
+
+The user's own pre-existing 60fps code had it right all along -
+`patch=1,EE,20264DBC,extended,10000008` - and that leading `2` is the whole
+difference. It was read as part of the address rather than as a size prefix.
+
+### What that actually did to the game
+
+- **The stride patch worked by coincidence.** `24040002` -> `24040001` differs
+  only in the low byte, so the battle loop really did run at 60fps. That is why
+  the patch looked half-alive.
+- **Neither trampoline ever existed.** The safe zone held a handful of stray
+  bytes, never instructions, so the animation halving and the repeat fix were
+  simply absent. Hence "everything is 2x" on a cold boot.
+- **The byte write corrupted the two hook sites.** `001C450C` went from
+  `swc1 $f20, 0xC80($v0)` to `swc1 $f20, 0xC10($v0)`: the animation-rate setter
+  was storing into the wrong field of the fighter. Animations that were re-set
+  by a cutscene came back right, which is exactly the partial self-correction
+  the user described. `002577F8` went from `lui $v0, 0x33` to `lui $v0, 0x20`,
+  pointing the repeat setter at the wrong megabyte of RAM - the likely cause of
+  the hang after the intro video.
+
+### Why it looked like it worked yesterday
+
+The milestone was validated over **PINE**, which issues genuine 32-bit writes.
+The pnach was generated afterwards and deployed, but never verified from a cold
+boot. Live-tested is not deployed-tested.
+
+**Rule: after every deploy, read the patch sites back over PINE and compare to
+the file.** `Pnach.validate()` now refuses this class of bug outright, and the
+deliverable uses type `word`, whose semantics do not depend on the address.

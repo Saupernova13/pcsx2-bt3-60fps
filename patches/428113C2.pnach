@@ -5,21 +5,21 @@ gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 
 [60FPS - battle]
 description=Run the battle loop at 60fps. Menus and other modes untouched.
-patch=1,EE,0012BCE4,extended,24040001 // battle loop stride 2 -> 1
+patch=1,EE,0012BCE4,word,24040001 // battle loop stride 2 -> 1
 [60FPS - animation rate]
 description=Halve every animation rate written to entity+0xC80.
-patch=1,EE,001C450C,extended,0803C010 // swc1 -> j 000F0040
-patch=1,EE,000F0040,extended,3C083F00 // lui $t0, 0x3f00
-patch=1,EE,000F0044,extended,44882000 // mtc1 $t0, $f4
-patch=1,EE,000F0048,extended,4604A102 // mul.s $f4, $f20, $f4
-patch=1,EE,000F004C,extended,E4440C80 // swc1 $f4, 0xc80($v0)
-patch=1,EE,000F0050,extended,08071145 // j 0x1c4514
-patch=1,EE,000F0054,extended,00000000 // nop
+patch=1,EE,001C450C,word,0803C010 // swc1 -> j 000F0040
+patch=1,EE,000F0040,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F0044,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F0048,word,4604A102 // mul.s $f4, $f20, $f4
+patch=1,EE,000F004C,word,E4440C80 // swc1 $f4, 0xc80($v0)
+patch=1,EE,000F0050,word,08071145 // j 0x1c4514
+patch=1,EE,000F0054,word,00000000 // nop
 [60FPS - input repeat timing]
 description=Double the auto-repeat delay and rate so menus scroll at the right speed.
-patch=1,EE,002577F8,extended,0803C020 // lui -> j 000F0080
-patch=1,EE,000F0080,extended,00042040 // sll $a0, $a0, 1
-patch=1,EE,000F0084,extended,00052840 // sll $a1, $a1, 1
-patch=1,EE,000F0088,extended,3C020033 // lui $v0, 0x33
-patch=1,EE,000F008C,extended,08095E00 // j 0x257800
-patch=1,EE,000F0090,extended,00000000 // nop
+patch=1,EE,002577F8,word,0803C020 // lui -> j 000F0080
+patch=1,EE,000F0080,word,00042040 // sll $a0, $a0, 1
+patch=1,EE,000F0084,word,00052840 // sll $a1, $a1, 1
+patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
+patch=1,EE,000F008C,word,08095E00 // j 0x257800
+patch=1,EE,000F0090,word,00000000 // nop
