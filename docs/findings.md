@@ -1272,3 +1272,72 @@ Two scans that had not been done, both of which shrink the remaining problem:
 initialiser `FUN_0024E238` and the copy at `FUN_001D7414`. It is written through
 a pointer handed to the vector library, so a runtime write breakpoint is still
 the only way to catch the writer.
+
+## The effect system, and the aura at 2x (2026-08-22)
+
+Found by measurement, not static analysis, after four static attempts failed.
+
+### How it was found - the method that worked
+
+1. **A live 30/60 fps toggle.** `FUN_00264D98` copies its vblank-count argument
+   into `$s1` at **`00264DA4`**, and that address is not a pnach line, so a
+   single PINE write pins the frame rate from outside the patch:
+   `24110002` = 30fps, `24110001` = 60fps, `0080882D` = stock. Verified
+   60.0 -> 30.0 -> 60.0.
+   **Caveat that cost a cycle:** our fixes halve per *tick*, so they apply at
+   30fps too. A fixed field and a broken field therefore both show the same
+   movement per frame at both rates. The ratio in `tools/ratecheck.py` cannot
+   separate them without an unpatched reference. It is still useful for
+   "is this field time-driven at all".
+2. **A RAM-wide sweep for per-frame state** (`tools/findmotion.py`): read every
+   chunk twice back to back, keep the words that differ, then re-sample just
+   those at frame precision. 28 MB in about 6 seconds. Effects are not in the
+   model table - **only two models exist, the two fighters** - so this is the
+   only way to find them.
+3. **A write breakpoint on the address the sweep produced.** One shot, again.
+
+### What the aura is
+
+Nine slots of 0x40 bytes at **`model + 0x1010`**, each carrying three rotation
+phases at slot `+0x28`, `+0x2C`, `+0x30`. They ramp and wrap at +/-pi:
+
+```
+frame N     +28 -1.92840   +2C  3.10462   +30 -0.17988
+frame N+1   +28 -1.82840   +2C -2.94857   +30  0.09012     <- 2C wrapped
+per-frame delta (0.10, 0.23, 0.27) on 109 of 111 frames, wrap = -6.28319 = -2pi
+```
+
+`FUN_00251A48` updates them; `FUN_00251A10` is the +/-pi normaliser. The rates
+and the normaliser bounds are `$gp` constants, and **each is read by exactly one
+instruction in the whole binary**, so halving them carries no collateral risk:
+
+| address | gp offset | value | read by | meaning |
+|---|---|---|---|---|
+| `002FE708` | `-0x5b68` | -3.1415925 | `00251A10` | normalise lower bound |
+| `002FE70C` | `-0x5b64` | +6.2831850 | `00251A20` | normalise add 2pi |
+| `002FE710` | `-0x5b60` | +3.1415925 | `00251A28` | normalise upper bound |
+| `002FE714` | `-0x5b5c` | +6.2831850 | `00251A38` | normalise subtract 2pi |
+| **`002FE72C`** | `-0x5b44` | **+0.10** | `00251E5C` | phase rate, slot `+0x28` |
+| **`002FE730`** | `-0x5b40` | **+0.23** | `00251E74` | phase rate, slot `+0x2C` |
+| **`002FE734`** | `-0x5b3c` | **+0.27** | `00251E90` | phase rate, slot `+0x30` |
+| **`002FE738`** | `-0x5b38` | **+0.90** | `00251EB0` | phase rate, inherited-parent branch |
+
+These are data, not code, so they can be halved with plain pnach word writes -
+no trampoline. Halving a positive normal float is exactly one decrement of the
+exponent field, i.e. subtract `0x00800000` from the bit pattern.
+
+**Neither the rates nor 2pi appear anywhere in the ELF as literals** - they are
+`.data`/`.bss` words, which is why four static searches for them found nothing.
+That is the lesson: a constant that is not an immediate and not in the ELF
+image is still findable, but only from the running game.
+
+### Things this rules out, and what is still open
+
+The hover bob is **not** a defect. It is the air-idle animation's root motion:
+autocorrelation of `fighter+0x15A4` peaks at lag 107 frames against a 108-frame
+animation, with the clock stepping exactly 1.0/frame. Correct at 60fps. What
+looks wrong while hovering is the aura drawn on top of it.
+
+Still open: ki blast and beam travel, beam duration, knockback and fall speed.
+Those are motion, not rotation phases, and `FUN_00251A48` is the effect
+updater - the same sweep run while a beam is in flight is the way in.
