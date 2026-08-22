@@ -28,6 +28,20 @@ PAD_INDEX = 0x0004       # which controller slot drives this fighter
 SLOT_ID = 0x0008         # the id FUN_001DC210 searches on
 MODEL_ID = 0x000C        # an index, not a pointer: FUN_002499B0 maps it to the model
 
+# The fighter's own input block, maintained by FUN_001D4A70/FUN_001D4A00.
+# Combat keeps edge state here rather than reading the shared globals at
+# 0x00333988, which is why the shared ones have no gameplay readers.
+INPUT = 0x0570
+RAW_BUTTONS = INPUT + 0x000
+CUR_A = INPUT + 0x1CC
+PREV_A = INPUT + 0x1D0
+NEWPRESS_A = INPUT + 0x1D4
+RELEASED_A = INPUT + 0x1D8
+CUR_B = INPUT + 0x1DC
+PREV_B = INPUT + 0x1E0
+NEWPRESS_B = INPUT + 0x1E4
+RELEASED_B = INPUT + 0x1E8
+
 # The animation rate the 60fps patch halves is +0xC80 on the object
 # FUN_001DC280 returns, NOT on the fighter - resolving it needs FUN_002499B0,
 # so it cannot be read by offsetting the fighter base.
