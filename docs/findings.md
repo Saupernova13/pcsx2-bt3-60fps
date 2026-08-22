@@ -669,3 +669,66 @@ move-buffer, or hooking `FUN_001230A8` and logging callers via `$ra`.
   `FUN_002577F4` setter. Worth doing as a standalone improvement.
 - **Sprite / UV animation** (mouth movement, Kamehameha beam) still runs at double speed.
 - **Intermittent 30fps dips**, believed inherent to the frame budget.
+
+### Input API, traced by runtime caller logging
+
+Static xrefs were useless here (the accessors have zero direct callers), so a logging
+trampoline was hooked into each accessor: it writes `$ra` into a 64-entry ring at
+`0x000F0210`, replays the displaced instruction and jumps back. Reading the ring over
+PINE after a couple of seconds names the real callers. `tools/probe-loop.py` style, but
+for call sites rather than call gating.
+
+Three sibling accessors, each tail-calling `FUN_001230A8` (`return (mask & test) != 0`):
+
+| Function | Reads | Meaning | Callers observed |
+|---|---|---|---|
+| `00122DB0` | `+0x148` | `IsHeld(pad, mask)` | **25**, all inside `FUN_002574F0` |
+| `00122DE0` | `+0x150` | `IsNewPress(pad, mask)` | **0** |
+| `00122E10` | `+0x154` | `IsRepeat(pad, mask)` | **0** |
+
+So the two edge-detecting wrappers are dead code. Everything goes through `IsHeld`, and
+only `FUN_002574F0` calls it.
+
+`FUN_002574F0(pad)` is the **input remapper**: it queries ~25 raw bits and folds them into
+the game's own action bitmask (CROSS `0x4000` -> internal bit 9 `0x200`, and so on,
+including the four analog-stick directions at `0x100000`-`0x800000`). It then maintains
+the internal input state at `0x00333988 + pad*0x38`:
+
+```c
+prev = internal_cur[pad];
+internal_cur[pad]      = cur;
+internal_newpress[pad] = cur & ~prev;
+internal_repeat[pad]   = AutoRepeat(cur, cur & ~prev, &counter, &prev2, delay, rate);
+```
+
+| Address | Meaning | Readers |
+|---|---|---|
+| `00333988` | internal current | 3 |
+| `0033398C` | internal newly-pressed | **42** |
+| `00333990` | internal auto-repeat | 3 |
+| `0033399C` / `003339A0` | repeat delay (20) / rate (1) | the repeat timer |
+
+### FIXED - menu auto-repeat
+
+`FUN_002577F8` is `SetRepeat(delay, rate)`. Hooking its entry to double both arguments
+restores menu scrolling to its real-time speed at 60fps. Confirmed by the user: "whatever
+you did last fixed the menu". Now shipped in the patch as the third group.
+
+### Still unsolved - combat input
+
+Quick-succession moves (double-tap X grab, combo strings) remain unreliable. What is now
+ruled out:
+
+- It is **not** the pad read rate - gating that made things worse, not better.
+- It is **not** `IsNewPress`/`IsRepeat` - those wrappers are never called.
+- It is **not** the auto-repeat timer - that is fixed and only affected menus.
+
+The 42 readers of `internal_newpress` are mostly UI code (`00119FB4`-`0011E1E8`), with a
+few in gameplay ranges (`002145D4`, `0022F9F8`, `0025B1DC`, `002BE348`). None of them
+consult a frame-counted history at the point of read, so the double-tap window must live
+further in, in per-character move state rather than the shared input block.
+
+Next approach if this is picked up again: put the logging trampoline on the gameplay-range
+readers to find which one runs during a fight, then look for a countdown in the character
+struct that resets on a press - the same shape as the `+0x158` repeat counter, but
+per-fighter.
