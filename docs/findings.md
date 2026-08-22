@@ -906,3 +906,69 @@ because struct offsets are not unique (`0x1470` resolved to an unrelated global 
 **Note the split:** aura and sprite animation are cosmetic, but blast *travel* speed is
 position integrated per frame and changes dodge timing, so it is a gameplay issue and
 the higher priority of the two.
+
+## The remaining 2x is AIRBORNE PHYSICS, not effects (2026-08-22)
+
+The user's observation that reframed it: **everything wrong is in the air.**
+
+| correct | wrong |
+|---|---|
+| ground idle | air idle |
+| general fighting, grabs, rush blasts | knockback flight after a heavy smash |
+| ground dash | falling after a stun |
+| | ki blast and beam travel |
+
+Ground movement in BT3 is root motion driven by the animation clock, which the
+`+0xC80` fix already halves - so it is correct. Airborne movement is position
+integrated per loop iteration with no delta-time term, so at 60fps it covers
+twice the distance per second. Projectiles use the same path, which is why
+beams behave identically. This is one bug, not the two ("effects" and
+"projectiles") previously assumed.
+
+### The fighter's world position
+
+Found by capturing a fighter while flying (`work/captures/airborne.npz`) and
+looking for smooth, every-frame float motion:
+
+| offset | meaning |
+|---|---|
+| `fighter+0x15A0` | position X |
+| `fighter+0x15A4` | position Y (seen climbing 4.25 -> 15.9 during a flight) |
+| `fighter+0x15A8` | position Z |
+| `fighter+0x15B0..B8` | facing, a unit vector (norm 1.0) |
+| `fighter+0x15C0` | mirrors Y; initialised in `FUN_001D6438` |
+
+### Why the integrator is hard to find
+
+**Nothing stores to those offsets directly.** Scanning every `swc1`/`sq`/`sw`
+against `0x15A0`/`0x15A4`/`0x15A8` returns zero hits. The position is passed
+*by pointer* (`addiu rX, fighter, 0x15a0`) into a vector math library
+(`FUN_001208xx`/`FUN_00121Exx`/`FUN_00122168`), so the write happens inside
+generic vector code shared by everything in the game. Offset scanning cannot
+find it and PINE has no write breakpoints.
+
+Callers that materialise the pointer: `001D6454`, `001D64B4`, `001D6598`,
+`001D6C18`, `001DB9CC`, and a cluster at `00285C6C`-`00286518`.
+
+### Ruled out along the way
+
+- `FUN_001D6580` / `FUN_001D6C08` take both the position and facing pointers but
+  are the **camera/aim** system. Worth noting: `FUN_00122168(rate, cur, target,
+  out)` lerps toward a target with a fixed per-frame rate read from `$gp`, so it
+  converges twice as fast at 60fps - a real but separate 2x bug.
+- **`001DCB40`, the second code in the circulating patch.** It is
+  `lui $at, 0x4000` (2.0) -> `mtc1 $f12` -> tail call to `001C44F8`, our hooked
+  animation-rate setter. That caller already yields 1.0 with our fix; halving it
+  again would give 0.5. Redundant, not a missing fix.
+- **`FUN_001E16BC`'s 30-frame periodic trigger** (`001E188C`, `slti $v1, $v0,
+  0x1e`). Changed to 60 frames live; the user never confirmed any change, so it
+  was reverted rather than shipped. The broader scan found **429 periodic frame
+  counters in 310 functions**, nine of them in the effects module - a real class
+  of 30Hz-authored timers, but they cannot be doubled blindly because most are
+  correct as they stand.
+
+### Next step that would actually crack it
+
+A **write breakpoint** on `fighter+0x15A4` in the PCSX2 debugger. That names the
+writing instruction directly, which is the one thing static analysis cannot
+supply here. Everything else is guesswork.
