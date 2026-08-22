@@ -26,7 +26,7 @@ SIZE = STRIDE            # the readable extent of one fighter
 
 PAD_INDEX = 0x0004       # which controller slot drives this fighter
 SLOT_ID = 0x0008         # the id FUN_001DC210 searches on
-MODEL_PTR = 0x000C       # FUN_001DC280 reads this, then FUN_002499B0 maps it
+MODEL_ID = 0x000C        # an index, not a pointer: FUN_002499B0 maps it to the model
 
 # The animation rate the 60fps patch halves is +0xC80 on the object
 # FUN_001DC280 returns, NOT on the fighter - resolving it needs FUN_002499B0,

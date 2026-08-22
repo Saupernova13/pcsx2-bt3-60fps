@@ -107,7 +107,7 @@ def main() -> int:
             for i, base in enumerate(all_bases):
                 f = fx.read(pine, base, i, size=0x0100)
                 print(f"  [{i}] {base:08X}  pad={f.i32(fx.PAD_INDEX)}  "
-                      f"slot={f.i32(fx.SLOT_ID)}  model={f.u32(fx.MODEL_PTR):08X}")
+                      f"slot={f.i32(fx.SLOT_ID)}  model_id={f.i32(fx.MODEL_ID)}")
 
         if args.timers:
             base, pairs, n, hits = find_timers(
