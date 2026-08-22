@@ -585,3 +585,87 @@ Writing `$t0`/`$t1` in safe-zone code silently targets the wrong registers and p
 patch that assembles cleanly and behaves randomly. **All safe-zone assembly in this repo
 uses numbered registers (`$8`, `$9`, `$2`).** Always disassemble the result and check the
 register numbers before trusting a trampoline.
+
+---
+
+## Input subsystem map (2026-08-22)
+
+Located by save-state diffing with the game **paused** while holding X - pausing was the
+user's suggestion and it is much cleaner than diffing during play, because almost nothing
+else drifts between captures.
+
+### The pad block
+
+Base `0x00333800`, two pad slots at stride `0x1C0`:
+
+| Offset | Address (slot 0) | Held X | Released | Meaning |
+|---|---|---|---|---|
+| `+0x01C` | `0033381C` | `817FBFFF` | `817FFFFF` | raw libpad word, **active low** (CROSS = `0x4000`) |
+| `+0x028` | `00333828` | `000000FF` | `00000000` | pressure / pressed flag |
+| `+0x148` | `00333948` | `00004000` | `0` | current buttons, active high |
+| `+0x14C` | `0033394C` | `00004000` | `0` | previous buttons |
+| `+0x150` | `00333950` | - | - | newly pressed = `current & ~previous` |
+| `+0x154` | `00333954` | `00004000` | `0` | auto-repeat result |
+| `+0x158` | `00333958` | `1` | `20` | auto-repeat countdown |
+| `+0x19C` | `0033399C` | `20` | `20` | initial repeat delay, in frames |
+| `+0x1A0` | `003339A0` | - | - | repeat rate, in frames |
+
+`FUN_00122A38` (battle loop call **[9]**) is the pad update: it calls the libpad wrappers
+`FUN_00296090` / `FUN_00295FB8`, normalises both analog sticks, folds stick directions
+into the button mask as bits `0x10000`-`0x800000`, then computes the edge and repeat
+state. It loops over both pads (`i < 2`, `puVar5 += 0x1C0`).
+
+`FUN_002577B0` is the **auto-repeat timer**, not a double-tap detector:
+
+```c
+int AutoRepeat(int cur, int newpress, int *counter, int *prev, int delay, int rate)
+{
+    int out = 0;
+    if (cur == *prev) {
+        if (cur != 0) {
+            if (--(*counter) < 0) { *counter = rate; out = cur; }
+            goto end;
+        }
+        *prev = 0;
+    } else *prev = cur;
+    *counter = delay;              // 20 frames
+end:
+    return newpress ? newpress : out;
+}
+```
+
+Both `delay` and `rate` are frame counts read from memory (`+0x19C`, `+0x1A0`), so menu
+repeat runs twice as fast at 60fps. They are set through a setter at `FUN_002577F4`
+(`sw $a0, -4($v0)`), which is a clean hook point if we choose to double them.
+
+### FAILED EXPERIMENT - gating the pad update every other frame
+
+Hooked call [9] (`0012BC64`) through a safe-zone trampoline so `FUN_00122A38` ran on
+alternate frames only, leaving everything else at 60Hz.
+
+**Result: no improvement to fighting input, and the pause menu became worse - double
+speed and unusable.** Reverted.
+
+Why it fails: skipping the update leaves `+0x150` (newly pressed) latched at its previous
+value, so a single press is visible as a fresh edge on two consecutive frames and the
+60Hz consumer acts on it twice. Slowing the *read* also cannot help a consumer that
+counts frames itself - the parser still runs at 60Hz over a now-stale view.
+
+**Conclusion: the input defect is in the consumers, not the pad read.** Any fix must
+either slow the consumers' frame counting or widen their frame windows; it must not slow
+the pad read.
+
+`FUN_00122DB0` is the accessor other code uses (`FUN_001230A8(pad, DAT_00333948[pad*0x70], out)`),
+and it has **zero direct callers** - dispatched indirectly, so the consumers cannot be
+found by static xref. Finding them needs a different approach: a write-watch on the
+move-buffer, or hooking `FUN_001230A8` and logging callers via `$ra`.
+
+### Still open
+
+- **Double-tap grab and quick sequences.** The move parser is frame-counted and has not
+  been located yet. Next step: hook `FUN_001230A8` in the safe zone to record `$ra` into
+  a scratch buffer, read it back over PINE, and identify the real consumers.
+- **Menu auto-repeat.** Tractable right now by doubling `+0x19C` / `+0x1A0` via the
+  `FUN_002577F4` setter. Worth doing as a standalone improvement.
+- **Sprite / UV animation** (mouth movement, Kamehameha beam) still runs at double speed.
+- **Intermittent 30fps dips**, believed inherent to the frame budget.
