@@ -13,7 +13,17 @@ from datetime import datetime
 import _bootstrap  # noqa: F401
 
 from ps2ee import config
+from ps2ee.pine import Pine, PineNotRunning
 from ps2ee.pnach import Pnach, _set_enabled_cheats, deploy
+
+
+def emulator_running() -> bool:
+    """True if a PCSX2 with PINE enabled is answering right now."""
+    try:
+        with Pine().connect():
+            return True
+    except (PineNotRunning, OSError):
+        return False
 
 
 def show_status() -> int:
@@ -85,6 +95,18 @@ def main() -> int:
     print(f"  installed  {written}")
     print(f"  enabled    {', '.join(enabled) if enabled else '(none)'}")
     print(f"  ini        {config.game_ini()}")
+
+    # PCSX2 reads the cheat file and the per-game ini once, at boot. Deploying
+    # under a running emulator therefore changes nothing the player can see,
+    # and the next test reports "no difference" for a patch that was never
+    # loaded. Say so loudly rather than let that be found by playing.
+    if emulator_running():
+        print("")
+        print("  !! PCSX2 IS RUNNING - it will not see any of this.")
+        print("     Quit PCSX2 completely and relaunch. A reset or a")
+        print("     save-state load is NOT enough: the cheat file is read")
+        print("     at boot. Then check with tools/apply-live.py --check")
+        return 0
     print("\nReady - launch PCSX2, boot BT3, load your save state.")
     return 0
 
