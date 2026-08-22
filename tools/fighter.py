@@ -72,6 +72,49 @@ def find_timers(pine: Pine, index: int, seconds: float, threshold: float):
     return base, pairs, len(samples), hits
 
 
+def by_frame(samples):
+    """Collapse over-sampling into one value per game frame."""
+    out = {}
+    for frame, words in samples:
+        out[frame] = words
+    return [out[f] for f in sorted(out)], sorted(out)
+
+
+def find_countdowns(samples, min_run: int):
+    """Fields that step down one per frame and then reset.
+
+    That is the shape of a timing window: something sets it to N on an event
+    and it ticks to zero. The peak value is the window length in frames, which
+    at 60fps is half the real time it was authored for - so the peaks this
+    prints are the numbers a fix has to double.
+    """
+    frames, order = by_frame(samples)
+    if len(frames) < min_run + 1:
+        return []
+    n_words = min(len(w) for w in frames)
+    hits = []
+    for i in range(n_words):
+        series = [w[i] for w in frames]
+        if not all(-0x10000 < v < 0x10000 for v in series):
+            continue
+        runs, peaks, run, peak = 0, [], 0, series[0]
+        for a, b, fa, fb in zip(series, series[1:], order, order[1:]):
+            if fb - fa == 1 and b == a - 1:
+                if run == 0:
+                    peak = a
+                run += 1
+            else:
+                if run >= min_run:
+                    runs += 1
+                    peaks.append(peak)
+                run = 0
+        if run >= min_run:
+            runs, peaks = runs + 1, peaks + [peak]
+        if runs:
+            hits.append((i * 4, runs, max(peaks), min(series), max(series)))
+    return hits
+
+
 def snap_path(tag: str):
     return SNAPS / f"{tag}.json"
 
@@ -87,6 +130,12 @@ def main() -> int:
     parser.add_argument("--seconds", type=float, default=4.0)
     parser.add_argument("--threshold", type=float, default=0.7,
                         help="fraction of samples that must agree")
+    parser.add_argument("--trace", action="store_true",
+                        help="find countdown timers in a byte range of the fighter")
+    parser.add_argument("--range", default="570-900", metavar="LO-HI",
+                        help="hex byte range within the fighter (default the input block)")
+    parser.add_argument("--min-run", type=int, default=3,
+                        help="frames a field must tick down to count as a timer")
     parser.add_argument("--snap", metavar="TAG", help="save every fighter's struct")
     parser.add_argument("--against", metavar="TAG", help="diff --snap against this one")
     parser.add_argument("--limit", type=int, default=60)
@@ -121,6 +170,25 @@ def main() -> int:
                       f"range {lo} .. {hi}")
             if len(hits) > args.limit:
                 print(f"  ... {len(hits) - args.limit} more")
+
+        if args.trace:
+            lo, hi = (int(x, 16) for x in args.range.split("-"))
+            base = fx.bases(pine)[args.fighter]
+            samples = []
+            deadline = time.monotonic() + args.seconds
+            print(f"tracing {base + lo:08X}-{base + hi:08X} "
+                  f"(fighter +{lo:03X}..+{hi:03X}) for {args.seconds}s ...")
+            while time.monotonic() < deadline:
+                frame = pine.read(fx.FRAME_COUNTER)
+                samples.append((frame, pine.read_block(base + lo, (hi - lo) // 4)))
+            frames, _ = by_frame(samples)
+            hits = find_countdowns(samples, args.min_run)
+            print(f"\n# {len(samples)} samples over {len(frames)} distinct frames")
+            print(f"# {len(hits)} fields tick down at least {args.min_run} frames "
+                  f"in a row\n")
+            for off, runs, peak, mn, mx in sorted(hits, key=lambda h: -h[1])[:args.limit]:
+                print(f"  {base + lo + off:08X}  fighter+{lo + off:03X}  "
+                      f"{runs:>3} countdowns  peak {peak:>5}  range {mn} .. {mx}")
 
         if args.snap:
             SNAPS.mkdir(parents=True, exist_ok=True)
