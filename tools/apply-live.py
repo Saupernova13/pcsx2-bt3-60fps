@@ -12,6 +12,11 @@ import _bootstrap  # noqa: F401
 from ps2ee import config, Pine, PineNotRunning
 from ps2ee.pnach import Pnach
 
+
+def in_safe_zone(addr: int) -> bool:
+    return config.SAFE_ZONE <= addr < config.SAFE_ZONE + config.SAFE_ZONE_SIZE
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -33,27 +38,36 @@ def main() -> int:
         print(exc)
         return 2
 
+    # Trampoline bodies before the hooks that jump to them. Applying in file
+    # order arms a jump into whatever the safe zone happened to contain, which
+    # is a crash rather than a failed experiment.
+    todo = [(g.name, line) for g in pnach.groups for line in g.lines
+            if not line.is_condition and line.cpu == "EE"]
+    todo.sort(key=lambda item: not in_safe_zone(item[1].target))
+
     applied = wrong = 0
     with pine:
-        for g in pnach.groups:
-            print(f"[{g.name}]")
-            for line in g.lines:
-                if line.is_condition or line.cpu != "EE":
-                    continue
-                cur = pine.read(line.addr)
-                ok = cur == line.value
-                if args.check:
-                    print(f"  {line.addr:08X}  {cur:08X}  {'ok' if ok else 'MISSING'}")
-                    wrong += 0 if ok else 1
-                    continue
-                if not ok:
-                    pine.write(line.addr, line.value)
-                    now = pine.read(line.addr)
-                    print(f"  {line.addr:08X}  {cur:08X} -> {now:08X}"
-                          f"{'' if now == line.value else '   WRITE FAILED'}")
-                    applied += 1
-                else:
-                    print(f"  {line.addr:08X}  already correct")
+        section = None
+        for name, line in todo:
+            zone = "safe zone" if in_safe_zone(line.target) else "hooks"
+            if zone != section:
+                section = zone
+                print(f"\n# {zone}")
+            cur = pine.read(line.target)
+            ok = cur == line.value
+            if args.check:
+                print(f"  {line.target:08X}  {cur:08X}  {'ok' if ok else 'MISSING'}"
+                      f"   [{name}]")
+                wrong += 0 if ok else 1
+                continue
+            if not ok:
+                pine.write(line.target, line.value)
+                now = pine.read(line.target)
+                print(f"  {line.target:08X}  {cur:08X} -> {now:08X}"
+                      f"{'' if now == line.value else '   WRITE FAILED'}   [{name}]")
+                applied += 1
+            else:
+                print(f"  {line.target:08X}  already correct   [{name}]")
     print(f"\n{'missing: '+str(wrong) if args.check else 'wrote '+str(applied)+' words'}")
     return 0
 
