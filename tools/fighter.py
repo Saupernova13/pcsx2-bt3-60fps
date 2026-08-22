@@ -139,6 +139,8 @@ def main() -> int:
     parser.add_argument("--arm-timeout", type=float, default=300.0)
     parser.add_argument("--min-run", type=int, default=3,
                         help="frames a field must tick down to count as a timer")
+    parser.add_argument("--watch", metavar="OFFSETS",
+                        help="comma-separated hex offsets to sample at full rate")
     parser.add_argument("--snap", metavar="TAG", help="save every fighter's struct")
     parser.add_argument("--against", metavar="TAG", help="diff --snap against this one")
     parser.add_argument("--limit", type=int, default=60)
@@ -213,6 +215,44 @@ def main() -> int:
             for off, runs, peak, mn, mx in sorted(hits, key=lambda h: -h[1])[:args.limit]:
                 print(f"  {base + lo + off:08X}  fighter+{lo + off:03X}  "
                       f"{runs:>3} countdowns  peak {peak:>5}  range {mn} .. {mx}")
+
+        if args.watch:
+            offs = [int(x, 16) for x in args.watch.split(",")]
+            base = fx.bases(pine)[args.fighter]
+            addrs = [base + o for o in offs]
+            print("watching " + "  ".join(f"+{o:04X}" for o in offs))
+            if args.armed:
+                print(f"  armed - waiting up to {args.arm_timeout:.0f}s for a press ...",
+                      flush=True)
+                give_up = time.monotonic() + args.arm_timeout
+                while time.monotonic() < give_up:
+                    if (pine.read(base + fx.NEWPRESS_A)
+                            or pine.read(base + fx.NEWPRESS_B)):
+                        break
+                else:
+                    print("  no press seen")
+                    return 1
+                print("  press seen, recording", flush=True)
+
+            seen, last, first = [], None, None
+            deadline = time.monotonic() + args.seconds
+            while time.monotonic() < deadline:
+                values = pine.read_many([fx.FRAME_COUNTER] + addrs)
+                frame, values = values[0], values[1:]
+                if first is None:
+                    first = frame
+                # Only changes matter; a full log at this rate is unreadable.
+                if values != last:
+                    seen.append((frame - first, values))
+                    last = values
+
+            print(f"\n# {len(seen)} changes over {frame - first} frames\n")
+            header = "  frame  " + "  ".join(f"+{o:04X}   " for o in offs)
+            print(header)
+            for rel, values in seen[:args.limit * 4]:
+                print(f"  {rel:>5}  " + "  ".join(f"{v:08X}" for v in values))
+            if len(seen) > args.limit * 4:
+                print(f"  ... {len(seen) - args.limit * 4} more changes")
 
         if args.snap:
             SNAPS.mkdir(parents=True, exist_ok=True)
