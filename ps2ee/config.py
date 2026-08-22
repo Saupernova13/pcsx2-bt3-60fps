@@ -33,6 +33,10 @@ TEXT_END = 0x002C33C0
 DATA_BASE = 0x002C3400
 BSS_END = 0x00334BF8
 
+# $gp is set once at boot and never changes, so gp-relative loads resolve to
+# fixed addresses. Read out of a live save state.
+GP_BASE = 0x00304270
+
 # Guide Section 7 safe zone. Verified zero-filled in a mid-battle save state.
 SAFE_ZONE = 0x000F0000
 SAFE_ZONE_SIZE = 0x8000

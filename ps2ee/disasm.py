@@ -184,3 +184,126 @@ def scan_immediates(
         if found in values:
             hits.append((addr, found, values[found], decode(word, addr)))
     return hits
+
+
+# Memory-access opcodes: {opcode: (mnemonic, is_store)}.
+_MEM_OPS = {
+    0x20: ("lb", False), 0x21: ("lh", False), 0x22: ("lwl", False),
+    0x23: ("lw", False), 0x24: ("lbu", False), 0x25: ("lhu", False),
+    0x26: ("lwr", False), 0x27: ("lwu", False), 0x37: ("ld", False),
+    0x31: ("lwc1", False), 0x35: ("ldc1", False), 0x1E: ("lq", False),
+    0x28: ("sb", True), 0x29: ("sh", True), 0x2A: ("swl", True),
+    0x2B: ("sw", True), 0x2C: ("sdl", True), 0x2D: ("sdr", True),
+    0x2E: ("swr", True), 0x3F: ("sd", True), 0x39: ("swc1", True),
+    0x3D: ("sdc1", True), 0x1F: ("sq", True),
+}
+
+# Registers a called function may not preserve, so an address held in one of
+# them cannot be trusted across a jal.
+_CALLER_SAVED = set(range(2, 16)) | {24, 25, 31}
+
+_GP = 28
+
+
+def _signed16(imm: int) -> int:
+    return imm - 0x10000 if imm & 0x8000 else imm
+
+
+def _dest_gpr(word: int) -> int | None:
+    """The general register an instruction writes, if any.
+
+    Deliberately pessimistic: anything unrecognised is treated as writing its
+    rd field, because over-invalidating only costs a missed reference whereas
+    under-invalidating invents one.
+    """
+    op, rs, rt, rd = word >> 26, (word >> 21) & 0x1F, (word >> 16) & 0x1F, (word >> 11) & 0x1F
+    func = word & 0x3F
+    if op == 0x00:
+        if func in (0x08, 0x18, 0x19, 0x1A, 0x1B) or func in (0x0C, 0x0D, 0x0F):
+            return None                     # jr, mult/div, syscall/break/sync
+        return rd
+    if op == 0x01:                          # REGIMM: only the ...al forms write
+        return 31 if rt in (0x10, 0x11, 0x12, 0x13) else None
+    if op in (0x02,):                       # j
+        return None
+    if op in (0x03,):                       # jal
+        return 31
+    if op in (0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17):
+        return None                         # branches
+    if op == 0x11:                          # COP1: only mfc1/cfc1 write a GPR
+        return rt if rs in (0x00, 0x02) else None
+    if op in _MEM_OPS:
+        mnemonic, is_store = _MEM_OPS[op]
+        if is_store or mnemonic in ("lwc1", "ldc1"):
+            return None
+        return rt
+    if op in (0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x18, 0x19):
+        return rt
+    if op == 0x1C:                          # MMI
+        return rd
+    return rd
+
+
+@dataclass
+class DataRef:
+    site: int
+    kind: str          # load mnemonic, store mnemonic, or "&" for an address taken
+    target: int
+    text: str
+
+
+def data_refs(
+    mem: EEMemory,
+    lo: int,
+    hi: int,
+    start: int = config.TEXT_BASE,
+    end: int = config.TEXT_END,
+) -> list[DataRef]:
+    """Every instruction that reads, writes or takes the address of [lo, hi).
+
+    MIPS has no absolute addressing, so a global is reached either through
+    ``lui``/offset pairs or gp-relative. Both are reconstructed here by tracking
+    what each register holds. This is the missing half of ``callers()``: for
+    globals that are dispatched through function pointers, following the *data*
+    is the only way to find the code that uses them.
+    """
+    lo, hi = normalise(lo), normalise(hi)
+    tracked: dict[int, int] = {}
+    out: list[DataRef] = []
+
+    def record(site: int, kind: str, target: int, word: int) -> None:
+        if lo <= normalise(target) < hi:
+            out.append(DataRef(site, kind, target, decode(word, site)))
+
+    for addr in range(normalise(start), normalise(end), 4):
+        word = mem.u32(addr)
+        op, rs, rt = word >> 26, (word >> 21) & 0x1F, (word >> 16) & 0x1F
+        imm = word & 0xFFFF
+        produced: int | None = None
+
+        if op in _MEM_OPS:
+            base = tracked.get(rs, config.GP_BASE if rs == _GP else None)
+            if base is not None:
+                record(addr, _MEM_OPS[op][0], base + _signed16(imm), word)
+        elif op in (0x09, 0x19) and rs in tracked:          # addiu / daddiu
+            produced = tracked[rs] + _signed16(imm)
+            record(addr, "&", produced, word)
+        elif op == 0x0D and rs in tracked:                  # ori
+            produced = tracked[rs] | imm
+            record(addr, "&", produced, word)
+
+        if op == 0x0F:                                      # lui
+            tracked[rt] = imm << 16
+            continue
+        dest = _dest_gpr(word)
+        if dest is not None:
+            # An addiu/ori off a tracked base carries the address forward, so
+            # the load that follows still resolves.
+            if produced is not None:
+                tracked[dest] = produced
+            else:
+                tracked.pop(dest, None)
+        if op == 0x03 or (op == 0x00 and (word & 0x3F) == 0x09):   # jal / jalr
+            for reg in _CALLER_SAVED:
+                tracked.pop(reg, None)
+    return out
