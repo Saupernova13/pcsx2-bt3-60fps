@@ -18,6 +18,13 @@ and confirmed by the user:**
 
 Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
 
+**A fifth group, `60FPS - effect rotation`, is also shipped and enabled - and it is
+wrong. Revert it.** It was deployed 2026-08-22 without ever being confirmed by the user.
+On 2026-08-24 its target was frozen outright (all ten phase stores nopped, phases verified
+motionless for 150 frames) and the user reported **no visible change at all**, so it
+compensates something invisible. It is also incomplete on its own terms - four of the
+eleven per-tick constants in that function. See "The ki aura at 2x" at the bottom.
+
 **Read "The engine has no timestep" further down before anything else.** The
 game has no delta anywhere; it is a fixed 30Hz tick loop now ticking at 60Hz, so
 *everything* is 2x until it is individually halved. Nothing self-corrects.
@@ -27,6 +34,18 @@ after a stun, ki blast and beam travel. Everything grounded is correct. See "Air
 motion - the full investigation" near the bottom of this file: the object chain is
 mapped, eight approaches are ruled out, and the next concrete step is a write breakpoint
 on `model+0x974` with its call stack.
+
+**Also unfixed: the ki aura plays at 2x** - the user's oldest open report, and the one
+previous sessions kept mis-answering with `60FPS - effect rotation`. Proven to be an
+uncompensated per-tick quantity by the 30fps oracle; five candidate systems have now been
+eliminated by direct visual test. Read "The ki aura at 2x" at the bottom before touching
+it, and **do not trust `tools/findmotion.py`** - its sweep detector was blind (see the
+same section).
+
+**Two claims elsewhere in this file are now known to be wrong.** "There is no master
+framerate variable" - the effect system has a per-model 60fps flag at `model+0xA40` bit 24,
+which is never set. "Three `time += rate` sites exist in the whole binary" - there are 620
+in-place float accumulates, 74 of them per-tick countdowns.
 
 **Before doing anything, read "Instrument notes for future agents" at the very bottom.**
 Two measurement traps in this codebase produce confident wrong answers.
@@ -1341,3 +1360,291 @@ looks wrong while hovering is the aura drawn on top of it.
 Still open: ki blast and beam travel, beam duration, knockback and fall speed.
 Those are motion, not rotation phases, and `FUN_00251A48` is the effect
 updater - the same sweep run while a beam is in flight is the way in.
+
+## The ki aura at 2x - five eliminations, and the oracle that makes them trustworthy (2026-08-24)
+
+The user's long-standing report: **"the ki aura around the characters plays at double
+speed."** Earlier sessions repeatedly answered this with `[60FPS - effect rotation]` and
+treated it as fixed. It was never confirmed by the user, and it is now proven **not** to be
+the defect. This section records what was established and - more importantly - everything
+definitively ruled out, so nobody re-walks these paths.
+
+### The symptom, stated precisely
+
+Established with the user, not assumed:
+
+- The aura is the character's ki aura - the flame streaks radiating off the body.
+- It is present in **both** base and Super Saiyan form; SSJ's is gold, base is blue-white.
+- **Intensity scales with ki, and at 0 ki there is no aura at all.** That is the only clean
+  on/off control that exists, and it is the one measurement this session never managed to
+  take uncontaminated.
+- Skeletal animation, grounded movement, grabs and combos all look correct. Only the aura.
+
+### The 30fps oracle - the most useful single test in this project
+
+The rate pin at `00264DA4` (from `tools/ratecheck.py`) is far more than a ratio tool.
+Pinning the game to 30fps produces a **falsifiable prediction**, because our fixes halve
+per tick unconditionally:
+
+| at 30fps | quantity |
+|---|---|
+| runs at HALF speed | anything we have halved (animation clock, input counters) |
+| runs at CORRECT speed | anything uncompensated |
+
+Predicted before looking: *Goku's body animates in slow motion while the aura looks
+normal.* The user confirmed exactly that.
+
+**Therefore the aura is a plain per-tick quantity that nothing in the patch halves.** This
+is the firmest fact in the investigation, it cost one write, and it should be the first
+test applied to any future "X is at 2x" report.
+
+    30fps: p.write(0x00264DA4, 0x24110002)
+    60fps: p.write(0x00264DA4, 0x24110001)
+    stock: p.write(0x00264DA4, 0x0080882D)
+
+### Eliminated by direct visual test - not by inference
+
+Every row below was confirmed by the user looking at the screen. This is the important part
+of this session: inference has a poor record in this codebase, and each of these was a
+plausible theory that turned out wrong.
+
+| candidate | how it was tested | result |
+|---|---|---|
+| `model+0x1010` rotation phases - what `[60FPS - effect rotation]` patches | nopped all 10 phase stores in `FUN_00251A48`; verified 18 phase values across 3 slots moved **0.00000** over 150 frames | **no visible change at all** |
+| the dormant 60fps effect mode (`model+0xA40` bit 24) | nopped the two gating branches so both effect updaters always take the 60fps path | no visible change |
+| `FUN_00166E28` aura-adjacent particle system | halved BOTH the `life -= 1.0` per-tick decrement AND the per-tick motion step | no visible change |
+| `FUN_00250DE8`, the sibling effect updater | writes the identical `+0x28..+0x3C` offsets as `FUN_00251A48`, already disproven above | ruled out by construction |
+| the **entire scene-graph render tree** (`FUN_001AD150`) | gated the whole walk to even frames only | environment, explosions, Kamehameha and the special-attack camera all flickered - **aura unchanged, still 2x** |
+
+That last one is the most valuable negative result here. It rules out a very large branch
+in one test, and it establishes that `FUN_001AD150` is the **render submission** tree:
+skipping it for one frame drops those draws entirely rather than slowing them.
+
+### `[60FPS - effect rotation]` is wrong - revert it
+
+Two independent reasons:
+
+1. **It fixes something invisible.** Freezing those phases outright produced no visible
+   change whatsoever. Whatever `model+0x1010`'s six phases drive, the player cannot see it,
+   so halving their rates cannot have fixed a visible symptom.
+2. **It is incomplete even on its own terms.** `FUN_00251A48` advances *two* rotation
+   triples. The patch halves the four `$gp` constants behind the first
+   (`002FE72C`/`730`/`734`/`738`); the second triple at slot `+0x34/+0x38/+0x3C` is driven
+   by `002FE73C`-`002FE754` (0.30, 0.90, 0.10, 0.70, 1.30, 1.5708, 0.10) and was never
+   touched.
+
+The group was deployed 2026-08-22 20:42 and the session moved straight on to beams without
+ever asking the user. The `STATE OF PLAY` table listing four confirmed groups was right;
+the fifth was never confirmed.
+
+Verified live that the group really is in force, so this is not a deployment failure: the
+phases step at exactly `+0.05 / +0.115 / +0.135` per frame - the halved values - at a
+measured 60Hz.
+
+### The engine DOES have a framerate flag - this file was wrong about that
+
+"There is no master framerate variable" is false for the effect system. Both big effect
+updaters open with:
+
+    00251A4C  lui  $v1, 0x100            ; mask 0x01000000
+    00251AB8  lw   $v0, 0xa40($s5)       ; model flags
+    00251AC8  and  $v0, $v0, $v1
+    00251ACC  lui  $at, 0x41f0           ; 30.0   default
+    00251AD8  beqz $v0, 0x251AF8
+    00251AE0  lui  $at, 0x4270           ; 60.0   flag set
+    00251AE8  lui  $at, 0x4000           ; 2.0
+    00251AF0  lui  $at, 0x3f00           ; 0.5    <- halves its own per-tick deltas
+
+| constants | function | gating branch |
+|---|---|---|
+| `00251ACC` / `00251AE0` | `FUN_00251A48` | `beqz` at `00251AD8` |
+| `00250E6C` / `00250E7C` | `FUN_00250DE8` | `beqz` at `00250E74` |
+
+`model+0xA40` reads `0x10020016` / `0x1001001E` - **bit 24 clear** - both in the battle
+save state and live in a real fight. The path is dormant. Enabling it changed nothing
+visible, so it is not the aura lever, but it is real: if it is ever enabled, the four
+halved rotation constants must be restored to stock or they run at quarter speed.
+
+Binary-wide there are exactly **six** places pairing a 30.0 with a 60.0 constant:
+`001E5EA0`, `001E5F24`, `001F2FEC`, `001F307C`, `00250E6C`, `00251ACC`. The first four are
+unconditional `rate * 30.0 / 60.0` conversions, not switches.
+
+### The scene graph, mapped
+
+Worth keeping - it dispatches most of the game's per-frame work, and it is invisible to
+static xref because every update is an indirect call.
+
+    ptr  = *(u32*)0x002FE9A0        // gp-0x58D0
+    root = *(u32*)ptr
+    FUN_001AD150(root)              // called from 0012CB84
+
+| field | meaning |
+|---|---|
+| `node+0x00` | flags byte; bit 0 = leaf, handled by `FUN_001ADA80` |
+| `node+0x04` | first child (the walker reads `param+4`) |
+| `node+0x24` | **child list pointer** - recursion passes this, not the node itself |
+| `node+0x28` | vtable; `vtable[0]` is the per-frame update |
+| `node+0x30` | next sibling |
+
+The dispatch is `jalr $v1` at `001AD188`, and `gp-0x5780` (`0x002FEAF0`) holds the node
+currently being updated. Typically **73-75 nodes, 55-58 distinct update functions** in a
+fight.
+
+**`FUN_0012D9A0` is a bare `jr ra`.** Pointing a vtable's slot 0 at it disables that node
+type without modifying any code - a clean, reversible way to bisect by data. It is still
+destabilising in bulk (see the method notes).
+
+### The aura-adjacent particle system - mapped, but NOT the aura
+
+Reached by activity diff, then node ownership by pointer, giving update fn `FUN_00168088`:
+
+    node with vtable[0] == 00168088    // the owner
+    data = *(u32*)(node + 0x38)        // the particle object
+
+Two particle arrays, both confirmed against measured strides:
+
+| array | slots | stride | element check |
+|---|---|---|---|
+| A | 10 | `0x90` (`iVar5*0x24` words) | `data[iVar5*0x24 + 7]` |
+| B | 20 | `0x70` (`iVar5*0x1c` words) | `data[iVar5*0x1c + 0x16c]` |
+
+`FUN_00166E28` updates array A. Per-particle fields:
+
+| offset | meaning |
+|---|---|
+| `+0x14` / `+0x18` | integer progress and its limit |
+| `+0x1C` | flags; bit 0 alive, bit 1 finished, bit 2 dead |
+| `+0x2C` | **lifetime, `-= 1.0` per tick** (`lui $at,0x3f80` at `00166F98`, store at `00166FB0`) |
+| `+0x30` | **per-tick motion step** (loaded at `00166EA4`) |
+| `+0x40/44/48` | position, integrated `pos += vel * step` with no delta-time |
+
+Both are genuinely uncompensated per-tick quantities, and halving both produced **no visible
+change**, so this system is not what the player sees. Do not spend time here again without
+first proving it is on screen.
+
+`00166FB0` sits in the delay slot of a `bc1f`, so it must not be displaced by a hook. The
+clean lever is the constant at `00166F98` (`3C013F80` -> `3C013F00`).
+
+### New bug found in passing - a HUD animation at 2x
+
+`0x01877F18` steps **exactly +/-2.0 per frame** through a 30-frame range, and is the *only*
+value in all of EE RAM with that signature. Bisected to:
+
+    0012BBD0 -> 0012B7F8 -> 002129C8 -> FUN_00219710
+
+`FUN_00219710` dispatches the HUD/UI draw calls (`FUN_00218848`, `FUN_002188B8`), so this is
+a 30-frame HUD animation running at double speed - real, minor, unrelated to the aura. Also
+note **`0012B7F8` is not purely the "3D scene renderer"** as recorded earlier; it contains
+the HUD as well.
+
+### INSTRUMENT BUG - the RAM sweep was mostly blind
+
+This invalidates an unknown amount of earlier scanning work, including anything that used
+`tools/findmotion.py`.
+
+The sweep reads each chunk **twice back-to-back** and keeps words that differ. Those two
+reads take microseconds; a frame is 16.7 ms. So both reads almost always land inside the
+same frame and nothing appears to have changed - unless a frame boundary happens to fall
+between them, in which case everything does. Measured across successive passes at one
+moment: 7573, 1001, 169, 38571 words "changing". Set intersections across passes came out
+empty every time, which is what exposed it.
+
+**Fix: gate the second read on the frame counter.**
+
+    a = pine.read_block(base, n)
+    f = pine.read(FRAME_COUNTER)
+    while pine.read(FRAME_COUNTER) == f:
+        pass
+    b = pine.read_block(base, n)
+
+Same sweep, same moment: **169 -> 16,539** words correctly identified as changing every
+frame. `tools/findmotion.py` still carries the old design and should be fixed before it is
+trusted again.
+
+### Two bugs fixed in tools/bisect.py
+
+Both produce confident false positives, and one fabricated a 22-entry result table during
+this session.
+
+1. **No resume check.** If the watched value stopped for any reason other than the nop - the
+   effect ended, the slot was recycled, the game died - the first affected test was reported
+   as a hit and *every subsequent test inherited it*. `descend` now re-measures after
+   restoring and refuses to call it a hit unless the value resumes.
+2. **`all(result)` instead of a baseline comparison.** An address already still at baseline
+   made `not all(result)` true on every test, so the **first call site tested always won**.
+   `descend` now takes the baseline and only lets addresses that were actually moving
+   testify. (`main()` already guarded this with an `all(base)` check; calling `descend`
+   directly bypassed it - which is exactly how the bogus table was produced.)
+
+### Static asset - every in-place float accumulate in the binary
+
+This file previously claimed "three `time += rate` sites exist in the whole binary and there
+are no others". That was already wrong once - commit `dadda4f` added two more. An exhaustive
+scan for the `lwc1 fT,off(rB) ... add/sub.s fT ... swc1 fT,off(rB)` idiom finds:
+
+| count | what |
+|---|---|
+| **620** | in-place float accumulates in `.text` |
+| 166 | of those whose operand is a literal 1.0 |
+| 74 | of those that **subtract** 1.0 - the per-tick countdown shape |
+
+None of the 74 sits inside a live scene-node update function; they are all in callees.
+
+### Leads from the previous session that were never written down
+
+Recorded here because they existed only in commit messages (`93e5900`, `ad436c5`):
+
+- `01B1F038` - effect clock, +2.0/frame, loop of 138, owned by `FUN_0012B6E0`. Unresolved.
+- `01A301C0` - position vec4 with a unit direction, owned by `FUN_001BB620`. Unresolved.
+- **PCSX2 write breakpoints do not trip on the effect clocks.** A Write breakpoint on
+  `01B1F038` never fired even though the value ticks every frame, so those writes are not
+  plain cached EE stores. This is why `bisect.py` exists - do not burn time setting
+  breakpoints on this class of value.
+- Nopping a display-list subsystem for even a fraction of a second aborts the emulator with
+  `FQC = 0 on VIF FIFO READ`, and restoring the instruction does not undo it.
+
+### Where the aura's memory probably lives
+
+From an activity diff of max-ki against 0-ki - contaminated by a respawn between captures,
+so treat as a hint rather than a result. 7277 words were active only with the aura up:
+
+| region | words | reading |
+|---|---|---|
+| `007E0000` | 4045 | the GIF/DMA display list - the aura being **drawn**. `work/beamscan3.py` already skips this range deliberately |
+| `00900000` | 1818 | the most promising unexplored candidate for aura state |
+| `007D0000` | 865 | likely more display list |
+| `0199xxxx` / `008Cxxxx` | ~280 | the particle system above, now ruled out |
+
+### What to do next
+
+The one measurement that would settle it, and the only one this session failed to get
+cleanly: **a 0-ki (no aura) versus max-ki (full aura) activity diff on a single stable
+character, standing still for both halves, using the frame-gated sweep.**
+
+Guard it properly this time - capture the fighter manager, fighter bases and model pointers
+alongside each half, and **abort if any of them changed between captures**. A death and
+respawn silently invalidated the first attempt, and mid-fight character swaps invalidated
+several others. Run it against an opponent that cannot fight back.
+
+With the aura's memory isolated, `bisect.py` - now that it no longer lies - names the owning
+call, and the fix takes the same shape as every other fix in this patch: halve the per-tick
+constant.
+
+### Method notes worth keeping
+
+- **Make a falsifiable prediction, then test it.** The 30fps oracle worked because the
+  outcome would have disproven the model if it were wrong. "It looks different" is not
+  evidence; "the body goes slow-motion and the aura does not" is.
+- **A freeze is a better probe than a fix.** Nopping a store to freeze a value changes no
+  control flow and answers "is this the thing I am looking at?" in one round trip. Halving
+  answers a much narrower question at the same cost.
+- **Never disable many things in sequence without re-baselining.** Swapping ~22 vtable
+  entries one after another crashed the emulator and produced a table of 22 identical false
+  hits. One change, verify it reverted, re-measure, then the next.
+- **Confirm the control actually controls something.** "Detransform so the aura goes away"
+  failed because base form has an aura too. The user caught it; the capture would otherwise
+  have been silently meaningless.
+- **Gating a subsystem to even frames is a strong, cheap probe.** It answers "does this
+  subtree drive the symptom?" for a whole branch at once, and the failure mode is
+  informative too: things that *flicker* rather than slow down are render submission, not
+  simulation.
