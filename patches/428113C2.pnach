@@ -106,3 +106,28 @@ patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
 patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
 patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
 patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
+
+// The ki aura. FUN_00164860 is the aura node's vtable[0] method, and in this
+// engine vtable[0] is update AND draw in one call - which is why gating the
+// call could never work: skipping it deletes a frame of the effect instead of
+// slowing it. The function updates first and ends in a tail call that draws
+// (FUN_00164268, or FUN_001ADA58 when flags&2), both reached from 00164A9C.
+// So the hook lets the prologue establish $s2/$s6, then on odd frames jumps
+// straight to 00164A9C: the aura advances at its authored 30Hz while still
+// being drawn every frame. Found by measurement - a guarded 0-ki vs max-ki
+// activity diff isolated the aura's memory, and a pointer-ownership scan
+// named the node that owns it. See docs/findings.md.
+[60FPS - aura update rate]
+description=Advance the ki aura every other frame so it plays at its real-time speed, while still drawing it at 60fps.
+patch=1,EE,000F0740,word,8ED20038 // lw    $s2, 0x38($s6)     replay displaced
+patch=1,EE,000F0744,word,26530064 // addiu $s3, $s2, 0x64     replay the delay slot
+patch=1,EE,000F0748,word,3C080033 // lui   $8, 0x33
+patch=1,EE,000F074C,word,8D081D64 // lw    $8, 0x1d64($8)     frame counter
+patch=1,EE,000F0750,word,31080001 // andi  $8, $8, 1
+patch=1,EE,000F0754,word,15000003 // bnez  $8, 000F0764       odd frame
+patch=1,EE,000F0758,word,00000000 // nop
+patch=1,EE,000F075C,word,08059224 // j     0x00164890         even frame: full update
+patch=1,EE,000F0760,word,00000000 // nop
+patch=1,EE,000F0764,word,080592A7 // j     0x00164A9C         odd frame: draw only
+patch=1,EE,000F0768,word,00000000 // nop
+patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
