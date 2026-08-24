@@ -28,10 +28,24 @@ from ps2ee.pine import Pine, PineNotRunning
 
 
 def sweep(pine: Pine, lo: int, hi: int, chunk: int) -> list[int]:
+    """Words that changed across exactly one game frame.
+
+    The two reads must straddle a frame boundary. Back to back they do not:
+    a chunk read takes microseconds and a frame is 16.7 ms, so both samples
+    land inside the same frame and almost nothing looks like it moved - until
+    a boundary happens to fall between them and everything does. That made
+    the sweep report anywhere from 169 to 38,571 changing words at one moment,
+    and made set intersections across passes come out empty every time.
+    Waiting for the frame counter to tick costs one frame per chunk and makes
+    the answer deterministic.
+    """
     hits = []
     for base in range(lo, hi, chunk * 4):
         n = min(chunk, (hi - base) // 4)
         a = pine.read_block(base, n)
+        frame = pine.read(fx.FRAME_COUNTER)
+        while pine.read(fx.FRAME_COUNTER) == frame:
+            pass
         b = pine.read_block(base, n)
         hits += [base + i * 4 for i in range(n) if a[i] != b[i]]
     return hits
