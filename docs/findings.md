@@ -1757,3 +1757,109 @@ Keep these three, and A/B/C between them rather than asking "does this look righ
 C is the ground truth the user already validated. "Normal speed" is ambiguous phrasing and
 cost this session a whole chain of wrong eliminations - ask explicitly whether B matches C
 or matches A.
+
+## The aura is advanced TWICE per frame - why every single-call test failed (2026-08-24)
+
+Continuation of the section above. This resolves the contradiction that made the previous
+round's results look impossible, and it changes the shape of the fix.
+
+### The contradiction
+
+Three gate states, all user-confirmed against the 30fps reference:
+
+| gated | aura speed | other effects |
+|---|---|---|
+| all of `FUN_0012CB60` | **correct** | flicker; beam duration restored; model appears duplicated; rush animations flickery; some beams linger slightly long |
+| everything in it **except** `FUN_001AD150` | double | no flicker; **beams short, damage broken** - Gohan takes one light hit, no flinch |
+| `FUN_001AD150` alone | double | heavy flicker across environment, explosions, Kamehameha, special-attack camera |
+
+The second and third states together cover exactly what the first state covers. Yet only
+the first fixes the aura.
+
+### The resolution
+
+**The aura's animation is advanced in two different passes in the same frame.** Halving
+only one leaves roughly 1.5x, which reads as "still fast" and not as a clean halving.
+Halving both gives exactly 1.0.
+
+This is why nine separate single-call tests all came back negative while the combined gate
+worked, and it is the single most important structural fact about this symptom.
+
+### `vtable[0]` is update AND draw in one method
+
+The decisive evidence: gating `FUN_001AD150` for *all* node types (via the range probe
+below) did not merely make things flicker - **beams stopped dealing damage entirely**,
+characters posed with nothing leaving their hands, the hand shine effect stuck on after the
+animation ended, and camera angles broke.
+
+A pure render pass cannot do that. So the `vtable[0]` method each node exposes both
+advances its own state and submits its draw. That has two consequences:
+
+- Gating the call can never be the fix. Skipping it does not slow a node down, it **deletes
+  a frame of that node's existence** - no draw, no collision, no state advance.
+- The fix must go **inside** the aura node's `vtable[0]`, halving only the animation
+  advance and leaving the draw untouched.
+
+### The dispatch-range probe - useful, but too destructive at full range
+
+Rather than swapping vtables (which crashed the emulator earlier) or pairing calls off one
+at a time, the dispatcher itself can be made selective. Hook `001AD17C`
+(`sw $s0, -0x5780($gp)`, whose delay slot loads `$v0` with the vtable pointer), read
+`vtable[0]` into `$v1`, and skip the call only when **`$v1` falls inside an address range
+held in two safe-zone words** and the frame is odd:
+
+    000F0600  LO          000F0604  HI
+    000F0620  sw $s0,-0x5780($gp)   ; replay displaced
+    000F0624  lw $v1, 0($v0)        ; vtable[0]
+              ... parity check, then LO <= $v1 < HI ...
+    000F0668  jalr $v1 / move $a0,$s0
+    000F0670  j 0x001AD190
+
+The range is changed by writing two words, so a binary search over node types costs no
+reassembly and no vtable writes. It installs and runs cleanly (verified: game still ticking
+at 60Hz afterwards).
+
+**But at full range it produces the worst state seen in this project**, for the
+update-and-draw reason above. Any future use must start from a narrow range, not a wide
+one. Keep a liveness check in the installer - read the frame counter after hooking and
+auto-revert if it stalls; that is in the applied script and it is cheap insurance.
+
+### Every gate state tried, and what it proved
+
+Recorded so nobody repeats them:
+
+| gated | result |
+|---|---|
+| `FUN_001AD150` (render/update walk) | flicker everywhere, aura speed unchanged |
+| `FUN_001AD200` (`vtable+0x0C`) | no flicker, no speed change |
+| `FUN_001AD280` (`vtable+0x10`, animate) | no flicker, no speed change alone |
+| whole scene-graph walk, early attempt | environment/explosions/beams flicker, aura unchanged |
+| `FUN_0012B6E0` (whole gameplay update) | whole game slow-motion, aura slowed **with** it - a confound, not evidence |
+| first half of `0012B6E0`'s calls | game slowed, aura still 2x |
+| second half of `0012B6E0`'s calls | Goku's model flickers, Gohan's does not, aura still 2x |
+| `FUN_0012E040` + `0012DD08` | aura still 2x - but contaminated, `0012DD08` is in another function |
+| `0012F720` + `0012D868` + `0012EB10` | aura still 2x, no flicker |
+| all four non-render calls of `0012CB60` | aura still 2x, **beams short and damage broken** |
+| all of `FUN_0012CB60` | **aura correct**, flicker |
+| all node updates via the range probe | worst state - beams do no damage, cameras break |
+
+### Next steps, in order
+
+1. **Identify the aura node, read-only.** Re-run the identity-guarded 0-ki -> max-ki
+   activity diff (the guarded version worked: 691 words, no display-list contamination).
+   Then map those addresses to the scene node that owns them with the pointer-ownership
+   scan - the same technique that correctly identified `FUN_00168088` for the particle
+   system. That names the node and its `vtable[0]` without redirecting a single instruction.
+   **Exclude the HUD.** At max ki the ki gauge is full and animating, so gauge state will
+   appear in the diff; the earlier HUD stepper at `0x01877F18` (`FUN_00219710`) is the
+   marker for that region.
+2. **Confirm the node visually with a narrow range probe** - set `LO`/`HI` to just that one
+   update function. Expect the aura alone to flicker and slow, with nothing else affected.
+   That is the confirmation that costs one round trip and no breakage.
+3. **Find the animation advance inside that function** and halve it, leaving the draw. The
+   620-entry in-place float accumulate table is the place to look first, scoped to that
+   function's address range.
+4. **Find the second advance.** The two-pass finding says there will be another one - most
+   likely in the `vtable+0x10` animate method of the same node, dispatched by
+   `FUN_001AD280`. Halving one alone will read as "still fast"; both must be halved before
+   asking the user to judge.
