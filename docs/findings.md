@@ -15,6 +15,7 @@ and confirmed by the user:**
 | `60FPS - animation clock` | halves the animation clock itself in `FUN_0024D410` (supersedes `60FPS - animation rate`, which only halved rates written through `FUN_001C44F8`) |
 | `60FPS - input repeat timing` | doubles the menu auto-repeat delay/rate via `FUN_002577F8` |
 | `60FPS - input timing` | halves the 128 per-button frame counters in `FUN_001D3C10` |
+| `60FPS - aura update rate` | runs the ki aura's update on even frames only while still drawing it every frame, at `FUN_00164860` |
 
 Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
 
@@ -35,7 +36,11 @@ motion - the full investigation" near the bottom of this file: the object chain 
 mapped, eight approaches are ruled out, and the next concrete step is a write breakpoint
 on `model+0x974` with its call stack.
 
-**Also unfixed: the ki aura plays at 2x** - the user's oldest open report, and the one
+**FIXED 2026-08-24: the ki aura.** See the milestone at the bottom. The lever was a
+pass that runs too often, not a constant - `vtable[0]` in this engine is update AND draw,
+so the hook skips the update half on odd frames and falls through to the draw.
+
+**Superseded:** - the user's oldest open report, and the one
 previous sessions kept mis-answering with `60FPS - effect rotation`. Proven to be an
 uncompensated per-tick quantity by the 30fps oracle; five candidate systems have now been
 eliminated by direct visual test. Read "The ki aura at 2x" at the bottom before touching
@@ -1863,3 +1868,93 @@ Recorded so nobody repeats them:
    likely in the `vtable+0x10` animate method of the same node, dispatched by
    `FUN_001AD280`. Halving one alone will read as "still fast"; both must be halved before
    asking the user to judge.
+
+## MILESTONE - the ki aura is fixed (2026-08-24)
+
+**User-confirmed: "finally, the aura is at normal speed, no flicker."**
+
+Shipped as `[60FPS - aura update rate]`. The oldest open symptom in this project, and the
+one previous sessions repeatedly mis-answered with `[60FPS - effect rotation]`.
+
+### The fix
+
+    patch=1,EE,00164888,word,0803C1D0    // FUN_00164860 entry -> trampoline
+    // + an 11-word trampoline at 000F0740
+
+`FUN_00164860` is the aura node's `vtable[0]`. It updates first and ends in a **tail call
+that draws** - `FUN_00164268`, or `FUN_001ADA58` when `flags & 2` - and both are reached
+from `00164A9C`. The hook lets the prologue run (it must: the tail needs `$s2` and `$s6`),
+replays the displaced `lw $s2, 0x38($s6)` and its delay slot `addiu $s3, $s2, 0x64`, then:
+
+- **even frame** - jump to `00164890` and run the whole update as normal
+- **odd frame** - jump straight to `00164A9C`, skipping every update and going to the draw
+
+Result: the aura advances at its authored 30Hz while still being presented at 60fps.
+Measured live, the aura's own frame counter at `data+0x30` drops from 60/sec to 30/sec
+while the game stays at 60Hz.
+
+### Why nothing else worked - `vtable[0]` is update AND draw
+
+This is the fact that had defeated every earlier attempt. Gating the *call* can never fix
+an effect in this engine, because skipping `vtable[0]` does not slow a node down, it
+**deletes a frame of that node's existence**: no state advance, no draw, and - as the
+range probe proved - no collision either. Beams stopped doing damage entirely.
+
+The fix has to go *inside* the method, between the update and the draw. That is only
+possible because this particular function happens to update first and draw last, with a
+single convergence point at `00164A9C`.
+
+### The method that actually found it, after nine failed narrowings
+
+Every static approach failed. What worked, in order:
+
+1. **The 30fps oracle** established the class of defect with a falsifiable prediction:
+   pin to 30fps, and if the body goes slow-motion while the symptom looks correct, the
+   symptom is an uncompensated per-tick quantity. It held.
+2. **A frame-gated activity diff** isolated the aura's memory: 0-ki (no aura) versus
+   max-ki (full aura), same character, standing still, with the fighter and model pointers
+   captured on both sides and the capture discarded if anything reallocated. That produced
+   **529 words, 481 of them in one 64KB region**, with no HUD and almost no display-list
+   contamination. The unguarded version of this same diff had been useless.
+3. **A pointer-ownership scan** named the owner: walk the scene graph, then find the node
+   whose own storage contains those words. One node, unambiguously - `019965C0`, holding
+   161 of them directly.
+
+| slot | function |
+|---|---|
+| `vtable[0x00]` update **and** draw | `FUN_00164860` |
+| `vtable[0x0C]` | `FUN_00164B08` |
+| `vtable[0x10]` animate | `FUN_00164B28` - only a tail call to `FUN_001ADA58` |
+
+### Dead ends inside the right function, worth recording
+
+Even with the correct function identified, two obvious targets were wrong:
+
+- **`data+0x30` is a free-running frame counter** incremented at `00164A90`. Halving it
+  (verified live: 60/sec -> 30/sec) changed **nothing visible**. It counts frames; it does
+  not drive the visuals.
+- **There is no in-place float accumulate anywhere in `00164000`-`00166000`.** The aura has
+  no clock and no rate constant. It is rebuilt from twelve sampled bone positions every
+  frame, which is why every scan for a `time += rate` idiom missed it, in this session and
+  in every previous one.
+
+### Correction to the "advanced twice per frame" conclusion
+
+The previous section inferred from gate states that the aura must be advanced in two
+passes. **That inference was wrong.** It rested on `FUN_0012CB60`'s call list, which
+`bisect.call_sites` had over-reported by running past a tail call, so the subsets being
+compared were not the subsets being tested. There is one advance, in `FUN_00164860`.
+
+The general lesson stands and is worth more than the specific claim: **when subsets of a
+set do not reproduce what the whole set does, suspect the set enumeration before inventing
+a mechanism.**
+
+### Still open
+
+- `0x01877F18` - a 30-frame HUD animation stepping 2.0/frame, driven from `FUN_00219710`.
+  The only +/-2.0 stepper in RAM. Minor.
+- Airborne motion, knockback, falling, ki blast and beam travel - the older open items.
+  Worth retrying with `tools/gate.py` now that gating is an established probe, and with the
+  guarded activity diff now that it is known to work.
+- `[60FPS - effect rotation]` should be **removed**. Freezing its target outright produced
+  no visible change, so it compensates nothing observable.
