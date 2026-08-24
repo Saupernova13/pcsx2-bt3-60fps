@@ -1648,3 +1648,112 @@ constant.
   subtree drive the symptom?" for a whole branch at once, and the failure mode is
   informative too: things that *flicker* rather than slow down are render submission, not
   simulation.
+
+## BREAKTHROUGH - the aura runs at correct speed when FUN_0012CB60 is gated (2026-08-24)
+
+**User-confirmed: "This is definitely the correct speed, it just has the flicker."**
+
+Gating the call at `0012B700` (`jal 0012CB60`) so it runs on even frames only puts the ki
+aura at its correct real-time speed at 60fps. This is the first thing in the entire
+investigation that has moved the symptom, after five systems were eliminated.
+
+The remaining defect in that state is a **flicker** - the aura is drawn on even frames and
+absent on odd ones - which is a separate, understood problem with an obvious shape (see
+below).
+
+### Why gating beat every previous approach
+
+Every fix in this patch so far - and every failed attempt at the aura - went after an
+individual clock, constant or field. The aura is not driven that way. It is ticked by a
+**generic per-frame pass over the scene tree**, and the thing to halve is the pass, not
+any value inside it.
+
+### Three walkers over the same scene tree, three vtable slots
+
+This is the structural fact that explains the whole investigation:
+
+| walker | dispatches | gating it does |
+|---|---|---|
+| `FUN_001AD150` | `vtable[0x00]` | things **flicker**; no speed changes - this is **render submission** |
+| `FUN_001AD200` | `vtable[0x0C]` | no flicker, no speed change |
+| `FUN_001AD280` | `vtable[0x10]` | no flicker, no speed change on its own - this is an **animate** pass |
+
+`FUN_0012CB60` calls the render walk directly. Its true body is short and ends in a tail
+call:
+
+    0012CB60  addiu $sp, $sp, -0x10
+    0012CB64  sd    $ra, ($sp)
+    0012CB68  jal   0x0012E040
+    0012CB70  jal   0x0012F720
+    0012CB78  jal   0x0012D868
+    0012CB80  lw    $v0, -0x58d0($gp)
+    0012CB84  jal   0x001AD150          ; the render walk - source of the flicker
+    0012CB88  lw    $a0, ($v0)          ; delay slot
+    0012CB8C  ld    $ra, ($sp)
+    0012CB90  j     0x0012EB10          ; TAIL CALL
+    0012CB94  addiu $sp, $sp, 0x10      ; delay slot
+
+**The driver is one of `FUN_0012F720`, `FUN_0012D868` or `FUN_0012EB10`.** `FUN_0012E040`
+and `FUN_001AD150` were both tested individually and neither changes the aura's speed.
+
+### METHOD TRAP - `call_sites` walks past a tail call
+
+`bisect.call_sites` scans forward until it hits `jr ra`. A function that ends in a **tail
+call** (`j target` rather than `jal`) has no `jr ra`, so the scan runs straight on into
+whatever function follows and reports its call sites as belonging to the first one.
+
+That is exactly what happened here: gating "`FUN_0012CB60`'s" indices 2, 3 and 4
+(`001AD200`, `0012DD08`, `001AD280`) actually gated a *different* function's calls, and the
+real contents of `FUN_0012CB60` - `0012F720`, `0012D868`, `0012EB10` - were never tested at
+all. Several confident negative results in this session are worth nothing for that reason.
+
+**Check for a terminating tail call before trusting any `call_sites` output.**
+
+### Gating is the right probe for a 60fps patch, and its failure modes are informative
+
+Nopping asks "does this subsystem exist"; gating to even frames asks "does this subsystem
+drive the SPEED of what I am looking at", which is the actual question here. Read the
+outcome like this:
+
+| what you see when you gate it | what it means |
+|---|---|
+| it **slows down** | simulation / animation - this subtree drives the timing |
+| it **flickers** on and off | render submission - the draw is simply skipped |
+| nothing changes | not involved |
+
+`work/gate.py` implements this. It builds a 9-word trampoline per call site
+(`lui/lw/andi/bnez/jal target/j resume`), takes `--root`, and restores everything on the
+next run from `work/gate-state.json`.
+
+**Confound to control for:** gating a large subtree can slow the *whole game*, in which
+case the aura appearing to slow says nothing about its own driver - it is just following a
+character whose state now updates at half rate. Gating `FUN_0012B6E0` did exactly this. Ask
+the user to judge the aura against an absolute reference, not against the rest of the game.
+
+### The flicker, and the shape of the real fix
+
+The flicker is not a mystery: `FUN_0012CB60` gets skipped entirely on odd frames, and the
+render walk `FUN_001AD150` is inside it, so nothing is submitted on those frames.
+
+The fix follows directly - **halve the update, keep the draw**:
+
+- run whatever drives the aura's animation (one of `0012F720` / `0012D868` / `0012EB10`) on
+  even frames only
+- let `FUN_001AD150` run **every** frame so the aura is drawn at 60fps
+
+That gives 30Hz animation with 60Hz presentation, which is the correct outcome for
+30Hz-authored content and is what the guide's run-one-skip-one design is for.
+
+### Reference states for judging aura speed
+
+Keep these three, and A/B/C between them rather than asking "does this look right":
+
+| state | how |
+|---|---|
+| **A** broken 2x | nothing applied |
+| **B** candidate | the gate under test |
+| **C** known correct | pin to 30fps: `write(0x00264DA4, 0x24110002)` |
+
+C is the ground truth the user already validated. "Normal speed" is ambiguous phrasing and
+cost this session a whole chain of wrong eliminations - ask explicitly whether B matches C
+or matches A.
