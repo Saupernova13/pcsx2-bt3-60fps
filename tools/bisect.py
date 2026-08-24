@@ -111,7 +111,19 @@ class Probe:
                 raise RuntimeError(f"could not restore {site:08X}")
 
 
-def descend(mem, probe, entry, depth, indent=""):
+def descend(mem, probe, entry, depth, indent="", base=None):
+    """Find the call that owns the watched values.
+
+    `base` is which addresses were moving before any nopping. Only those can
+    testify: an address that was already still says nothing about the call
+    under test, and counting it turns the first site tested into a false hit.
+    """
+    if base is None:
+        base, _ = probe.moving()
+    watched = [i for i, m in enumerate(base or []) if m]
+    if not watched:
+        print(f"{indent}nothing is moving - cannot bisect")
+        return False
     sites = call_sites(mem, entry)
     print(f"{indent}{entry:08X}: {len(sites)} testable calls")
     for site, target in sites:
@@ -119,12 +131,21 @@ def descend(mem, probe, entry, depth, indent=""):
         if result is None:
             print(f"{indent}  {site:08X} -> {target:08X}  (game stalled, skipped)")
             continue
-        if not all(result):
-            stopped = [f"{probe.addrs[i]:08X}"
-                       for i, ok in enumerate(result) if not ok]
-            print(f"{indent}  {site:08X} -> {target:08X}  STOPS {stopped}")
+        if not all(result[i] for i in watched):
+            # A value can stop for reasons that have nothing to do with this
+            # call - the effect ended, the slot was recycled, the game died.
+            # Without this check the first such stop is reported as a hit and
+            # every later test inherits it, which reads as dozens of owners.
+            again, _ = probe.moving()
+            if again is None or not any(again[i] for i in watched):
+                print(f"{indent}  {site:08X} -> {target:08X}  stopped, but it did "
+                      f"NOT resume after restoring - not this call.")
+                print(f"{indent}  the value died on its own; re-locate it and start over")
+                return False
+            stopped = [f"{probe.addrs[i]:08X}" for i in watched if not result[i]]
+            print(f"{indent}  {site:08X} -> {target:08X}  STOPS {stopped}  (resumed after restore)")
             if depth > 1:
-                descend(mem, probe, target, depth - 1, indent + "    ")
+                descend(mem, probe, target, depth - 1, indent + "    ", base=again)
             return True
     print(f"{indent}  no single call owns it - written here, or by several")
     return False
