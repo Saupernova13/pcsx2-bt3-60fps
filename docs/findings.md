@@ -1958,3 +1958,45 @@ a mechanism.**
   guarded activity diff now that it is known to work.
 - `[60FPS - effect rotation]` should be **removed**. Freezing its target outright produced
   no visible change, so it compensates nothing observable.
+
+## A/B-ing a shipped `patch=1` group on a live game (2026-08-25)
+
+The aura fix is now confirmed by direct comparison, not just by "it looks right": with the
+patch neutralised the user saw the 2x aura return, and restoring it brought the correct
+speed back. **User-confirmed: "the patch definitely worked."**
+
+Getting there needed a technique worth keeping, because the obvious approach does not work.
+
+### You cannot disable a `patch=1` group by poking memory
+
+`patch=1` means PCSX2 re-applies the group **every frame**. Writing the stock instruction
+back over `00164888` succeeds - and is overwritten within two frames. Measured, not assumed.
+Editing the pnach does not help either without a patch reload, which costs the battle.
+
+### Jump over the hook from an address the cheat engine does not own
+
+The cheat engine only rewrites the words the group lists. Everything else is ours. So hook
+*earlier* in the same function and jump past the patched instruction entirely:
+
+    00164880  j 000F0800          (was: sd $s5, 0x28($sp))
+    00164884  sd $ra, 0x38($sp)   delay slot, runs as normal
+    000F0800  sd $s5, 0x28($sp)   replay displaced
+    000F0804  lw $s2, 0x38($s6)   what 00164888 held before the patch
+    000F0808  addiu $s3,$s2,0x64  0016488C
+    000F080C  ...bump a pass counter at 000F0830...
+    000F081C  j 00164890          full update, unconditionally
+
+`00164888` stays patched and keeps being re-applied; it is simply never reached.
+`work/aurabypass.py` does this with `--off` / `--on`.
+
+**The displaced instruction runs after the delay slot, not before it.** That reorder is only
+safe here because `00164880`/`00164884` are independent register saves. Check that before
+picking a hook site.
+
+### Make the probe self-verifying
+
+The trampoline bumps a counter so the state is a measurement, not an opinion:
+**120 passes/sec at 60Hz** with the bypass in - two aura nodes, one per fighter, each
+advancing every frame, which is exactly the original bug. With the patch in force it is 60.
+A reading of 0 means the aura is not on screen and the test is telling you nothing - worth
+checking before asking the user to judge anything.
