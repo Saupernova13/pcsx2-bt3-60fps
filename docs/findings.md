@@ -2175,3 +2175,43 @@ Other useful facts from this round:
   `00120B98` `StoreMatrix(dst)` writing `vf16..vf19` to `dst+0x00/10/20/30`.
 - Do NOT print a full binary-wide xref dump into the transcript; cap it. One such scan in
   this session produced several hundred lines for no benefit.
+
+### FAILED: halving (model+0x970 - model+0x950) is NOT the movement channel (2026-09-02)
+
+The experiment `[60FPS - EXPERIMENT halve root motion]` hooked the step-4 read-back at
+`001D7118` and substituted the midpoint of `model+0x950` and `model+0x970`, which by the
+algebra above should have halved every per-frame displacement.
+
+**Result, user-observed:**
+
+| | predicted | actual |
+|---|---|---|
+| airborne | becomes correct | **still 2x - unchanged** |
+| grounded | becomes half speed | **still correct - unchanged** |
+| attacks | *(not predicted)* | **every punch drives the character metres BACKWARDS**; only the first punch connects |
+
+The hook was verified in force before judging (`001D7118 = 0803C200`), so this is a real
+negative, not a deployment failure.
+
+**What it means.** Neither locomotion channel changed speed, so
+`model+0x970 - model+0x950` does **not** carry general movement - if it did, halving it
+would have halved walking and flight. What it does carry is **animation root motion**
+(attack lunges), and halving that produced net *backwards* travel rather than a shorter
+lunge. That signature - negative residue proportional to the root delta - is what you get
+when the engine also **subtracts the full root delta somewhere else** to reset the root
+bone. Applying only half leaves the other half as backwards drift every frame.
+
+**The broken assumption.** The derivation `fighter+0x10 += (model+0x970 - model+0x950)`
+assumed `model+0x950` still holds `fighter+0x10 + fighter+0x30` when step 4 runs. That was
+**inferred from a single call site, never verified**. `model+0x954` was never breakpointed -
+the only address in the chain that wasn't - and the static scan found **14 different sites**
+that materialise a pointer to `model+0x950`. Something else almost certainly writes it
+between steps 2 and 4, or `fighter+0x30` moves.
+
+**Next step:** write-breakpoint `model0+0x954` and enumerate *every* distinct `ra` over
+several hits, exactly as was done for `fighter+0x14` (where six hits proved a single
+writer). Do not infer a sole writer from one call site again - that is what cost this round.
+
+**Method note that generalises:** an inferred link in a data-flow chain is not evidence.
+Every link in the chain above that was *breakpoint-confirmed* held up; the one link that was
+*inferred from disassembly* is the one that broke the fix.
