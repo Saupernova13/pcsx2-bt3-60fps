@@ -2125,3 +2125,53 @@ The honest summary: this is a powerful instrument and it produced every structur
 this section, but it costs the user an emulator restart when it is wrong, and it was wrong
 three times out of four. Prefer the PCSX2 debugger's write breakpoint when a write
 breakpoint is what you actually need.
+
+### The position round-trip - five breakpoint-confirmed links (2026-09-02)
+
+Traced with PCSX2 write breakpoints (safe, unlike the tracer). Each link below was read off
+a `ra` register at a real hit, not inferred. **Every one of them turned out to be a copy or
+a difference of something further up**, which is why five rounds were needed.
+
+    model+0x9D0  (matrix translation)  <- StoreMatrix, from 0024E370 in FUN_0024E2B0
+    model+0x980                        <- Vec4Copy(model+0x980, model+0x950)  at 0024E314
+    model+0x950                        <- Vec4Add(model+0x950, fighter+0x10, fighter+0x30)
+                                          at 001D71F4, in FUN_001D7198
+    fighter+0x10                       <- Vec4Sub(fighter+0x10, model+0x970, fighter+0x30)
+                                          at 001D7118, in FUN_001D70E8
+    fighter+0x50 (velocity)            <- Vec4Sub(fighter+0x50, fighter+0x10, anchor)
+                                          at 001D8310
+    model+0x970                        <- Vec4Copy from bone[0]+0x40, at 0024E4CC
+
+`FUN_002505A8(model, i)` = `*(u32*)(model + 0xD6C + i*4)` - the bone pointer table.
+
+**The per-frame cycle, and why grounded motion is already correct:**
+
+| step | call in `FUN_001C1EA0` | what happens |
+|---|---|---|
+| 1 | *before* | something advances `fighter+0x10`  <- STILL UNKNOWN |
+| 2 | `[10] FUN_001D7198` | `model+0x950 = fighter+0x10 + fighter+0x30` |
+| 3 | matrix -> bones | skeleton evaluated, animation root motion applied |
+| 4 | `[16] FUN_001D70E8` | `fighter+0x10 = model+0x970 - fighter+0x30` |
+
+Position round-trips through the skeleton every frame, so ground movement rides the
+animation clock and the existing `+0xC80` fix already covers it.
+
+**Evidence that step 1 exists:** `fighter+0x30` is a pure vertical offset `(0, y, 0)`
+(verified over 300 frames), so X and Z of `model+0x950` and `model+0x970` would be
+*identical* if the round-trip were the only mover. Measured, they differ by **~4.1 units
+per frame in XZ alone**, against a total motion of 6.75/frame. Something injects horizontal
+movement into `fighter+0x10` between steps 4 and 2. **Finding that writer is the next step**
+- breakpoint `fighter0+0x14` and enumerate every distinct `ra`, not just the first: the
+known one is `001D7120` (the step-4 Vec4Sub), and the injector is whatever else appears.
+
+Other useful facts from this round:
+
+- `model+0x9A0` is the model's **world matrix** - rows 0/2 a unit Y-rotation, row 3 the
+  translation with `w=1`. `model+0x990` is its rotation vector, and **`model+0x994` (yaw) is
+  advanced by a per-tick rate from `$gp-0x5C18` and wrapped by `$gp-0x5C14`** at `0024E334`,
+  inside `FUN_0024E2B0`. That is an uncompensated per-tick accumulator in its own right and
+  has not been evaluated yet.
+- Vector library additions: `00121FA8` `Vec4Copy` (`lq`/`sq`), `00121FB8` `Vec4MulAcc`,
+  `00120B98` `StoreMatrix(dst)` writing `vf16..vf19` to `dst+0x00/10/20/30`.
+- Do NOT print a full binary-wide xref dump into the transcript; cap it. One such scan in
+  this session produced several hundred lines for no benefit.
