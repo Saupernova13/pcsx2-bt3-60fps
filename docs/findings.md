@@ -30,17 +30,31 @@ eleven per-tick constants in that function. See "The ki aura at 2x" at the botto
 game has no delta anywhere; it is a fixed 30Hz tick loop now ticking at 60Hz, so
 *everything* is 2x until it is individually halved. Nothing self-corrects.
 
-**Remaining defects: all procedural motion runs at 2x.** Air idle, knockback, falling
-after a stun, ki blast and beam travel. Everything grounded is correct. See "Airborne
-motion - the full investigation" near the bottom of this file: the object chain is
-mapped, eight approaches are ruled out, and the next concrete step is a write breakpoint
-on `model+0x974` with its call stack.
+**Remaining defect: airborne motion runs at 2x.** Air idle, flight, knockback, falling
+after a stun, ki blast and beam travel. Everything grounded is correct. Three things are
+now settled and should not be re-litigated:
+
+- **It is step SIZE, not step COUNT.** Call counters on the gameplay path read *identically*
+  on the ground and in the air. Any hypothesis that needs an extra update pass while
+  airborne is dead on arrival; the measurement is cheap, rerun it before inventing one.
+- **The ki aura is not a second bug.** It still advances at its gated 30Hz in the air. It
+  looks 2x because it faithfully tracks a character whose motion is 2x. Fix the motion and
+  the aura follows.
+- **The render chain is followers all the way down.** `fighter+0x15A0` <- `model+0x970`
+  <- `bone[0]+0x40`, every level a copy or a difference of the one above. Do not walk it
+  again; it is mapped in full below.
+
+Six links of the position chain are confirmed by write breakpoint. The **one link that was
+inferred from disassembly rather than confirmed** - what writes `model+0x950` - is exactly
+where the first fix attempt broke. **The next concrete step is a write breakpoint on
+`model0+0x954`, enumerating every distinct `ra` over several hits**, the way six hits on
+`fighter+0x14` proved a single writer. See the four sections dated 2026-09-02 at the bottom.
 
 **FIXED 2026-08-24: the ki aura.** See the milestone at the bottom. The lever was a
 pass that runs too often, not a constant - `vtable[0]` in this engine is update AND draw,
 so the hook skips the update half on odd frames and falls through to the draw.
 
-**Superseded:** - the user's oldest open report, and the one
+**Superseded - the ki aura, now fixed.** It was the user's oldest open report, and the one
 previous sessions kept mis-answering with `60FPS - effect rotation`. Proven to be an
 uncompensated per-tick quantity by the 30fps oracle; five candidate systems have now been
 eliminated by direct visual test. Read "The ki aura at 2x" at the bottom before touching
@@ -966,6 +980,10 @@ the higher priority of the two.
 
 ## The remaining 2x is AIRBORNE PHYSICS, not effects (2026-08-22)
 
+> **PARTLY SUPERSEDED (2026-09-02).** "Position integrated per loop iteration" was a
+> guess and no such integrator exists. The correct/wrong table at the top is still right.
+
+
 The user's observation that reframed it: **everything wrong is in the air.**
 
 | correct | wrong |
@@ -1031,6 +1049,12 @@ writing instruction directly, which is the one thing static analysis cannot
 supply here. Everything else is guesswork.
 
 ## Airborne motion - the full investigation, and where it stopped (2026-08-22)
+
+> **PARTLY SUPERSEDED (2026-09-02).** Its framing - "airborne movement is a separate
+> integrator" - is not supported. Movement is root motion through the skeleton, and the
+> position chain is now mapped by write breakpoint. Its *ruled-out* table below is still
+> valid and still worth reading. Ignore its "next step"; see the 2026-09-02 sections.
+
 
 The last unsolved symptom. **Everything airborne runs at 2x; everything grounded is
 correct.** Air idle, knockback flight after a heavy smash, falling after a stun, ki blast
@@ -2215,3 +2239,24 @@ writer). Do not infer a sole writer from one call site again - that is what cost
 **Method note that generalises:** an inferred link in a data-flow chain is not evidence.
 Every link in the chain above that was *breakpoint-confirmed* held up; the one link that was
 *inferred from disassembly* is the one that broke the fix.
+
+### Instruments built 2026-09-02, and how far to trust them
+
+All live in `work/`, which is **gitignored** - a fresh clone will not have them. Rebuild
+from the descriptions here if they are missing.
+
+| tool | what it does | risk |
+|---|---|---|
+| `work/aircap.py` | frame-precise capture of both fighter structs and 4KB of each model, to `work/captures/*.npz`; plus a velocity-match analyser | **none** - read-only |
+| `work/callcount.py` | counts entries to chosen functions, per frame | low - pure counters, but it is still code instrumentation |
+| `work/aurabypass.py` | neutralises a shipped `patch=1` group live, for A/B | low - single-word hook at a known site |
+| `work/trace.py` | logs `(id, watched value)` at function entries to a ring buffer | **HIGH - crashed the emulator four times.** Read its section above before reuse |
+
+The capture in `work/captures/air.npz` (300 frames of flight, both fighters, no dropped
+frames, objects verified not reallocated) answered several questions offline at zero risk
+and is worth keeping. Prefer asking it a question over instrumenting the game again.
+
+**The single most valuable habit from this session:** every link in the position chain that
+was confirmed with a PCSX2 write breakpoint held up under test; the one link inferred from
+reading disassembly is the one that broke the fix. Breakpoint the address, enumerate
+*several* hits, and only then believe you know who writes it.
