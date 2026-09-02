@@ -2000,3 +2000,128 @@ The trampoline bumps a counter so the state is a measurement, not an opinion:
 advancing every frame, which is exactly the original bug. With the patch in force it is 60.
 A reading of 0 means the aura is not on screen and the test is telling you nothing - worth
 checking before asking the user to judge anything.
+
+## Airborne 2x - it is the STEP SIZE, and the velocity is fighter+0x50 (2026-09-02)
+
+The user's framing that started this round: *"everything we fixed - fighting, the ki aura -
+is only correct ON THE GROUND. It all goes back to double speed in the air. Gravity
+especially, knocking an opponent flying is air dependent and they move at 2x."*
+
+### The aura is NOT a second bug - one bug, not two
+
+Worth settling first, because it looked like the aura fix had regressed. It has not.
+
+A pure call-counter on the gameplay path (`work/callcount.py`, no behaviour change) gave
+**identical counts on the ground and in the air**, sampled twice:
+
+| counter | ground | air |
+|---|---|---|
+| `FUN_0012B6E0` gameplay update | 1.00/frame | 1.00/frame |
+| `FUN_001C2C80` fighter update | 1.00/frame | 1.00/frame |
+| `FUN_001D64A0` position follower | 2.00/frame | 2.00/frame |
+| `FUN_00164860` aura vtable[0] | 2.00/frame | 2.00/frame |
+
+So nothing is called more often in the air. The aura still advances at its gated 30Hz; it
+only *looks* 2x because it is faithfully tracking a character whose **motion** is 2x.
+**The air defect is step SIZE, not step COUNT.** Any future hypothesis that needs an extra
+update pass in the air is dead on arrival - this measurement is cheap, rerun it.
+
+### fighter+0x50 is the per-tick airborne velocity
+
+Found by capturing the whole fighter struct and 4KB of each model every frame for 300
+frames of flight (`work/aircap.py`, `work/captures/air.npz`) and correlating every moving
+word against the position delta.
+
+| model axis | correlate | scale |
+|---|---|---|
+| `model+0x970` X | `fighter+0x50` | 1.0004 |
+| `model+0x974` Y | `fighter+0x54` | 0.9099 |
+| `model+0x978` Z | `fighter+0x58` | 0.9897 |
+
+Sampled during flight, `fighter+0x54` tracks `d(model Y)` frame for frame:
+
+    frame 30   v = -0.107   d(pos) = -0.265
+    frame 40   v = -1.667   d(pos) = -1.400
+    frame 45   v = -1.917   d(pos) = -1.766
+    frame 50   v = -1.199   d(pos) = -1.202
+
+Mean magnitude **6.7 units per FRAME**. That is the whole bug stated numerically: a per-tick
+velocity with no delta-time term, so at 60Hz it covers exactly twice the ground per second
+that it did at 30Hz.
+
+It is not an *exact* match (max ~18% error) because the model position also carries
+animation root motion on top of the physics translation. Do not expect
+`pos[t+1]-pos[t] == v[t]` to hold to the bit here.
+
+`fighter+0x40` is a sibling vector: X and Z are identical to `+0x50`, only Y differs, and
+its Y sits pinned at ~0.463 whenever vertical motion is passive. Likely pre-gravity or
+desired velocity. The 0.463 varies in its low bits, so it is **computed, not a stored
+constant** - searching the binary for it is a dead end.
+
+### The render chain is all followers - stop walking it
+
+Three levels, each one a follower of the next. Prior sessions burned time on the first two;
+this session proved the third. **Nobody should walk this chain again.**
+
+    fighter+0x15A0  <- exponential smoothing (pos += (target-pos)*k)  FUN_001D64A0
+    model+0x970     <- 128-bit COPY                                   FUN_0024E3F8
+    bone[0]+0x40    <- ???
+
+`FUN_0024E3F8` computes `$a0 = model+0x950+0x20` = `model+0x970` at `0024E4C8` and passes it
+to `FUN_00121FA8`, which is exactly `lq $t0,0($a1)` / `sq $t0,0($a0)` - **a copy, not an
+integrator**. Hand-decoded; capstone shows these as garbage (no R5900 COP2 support).
+
+Useful vector-library additions to the table in the earlier section:
+
+| address | signature |
+|---|---|
+| `00121FA8` | `Vec4Copy(dst, src)` - `lq`/`sq` |
+| `00121FB8` | `Vec4MulAcc(dst, src)` - `lqc2`/`lqc2`/`vmula.xyz`/`sqc2` |
+| `00120B98` | `StoreMatrix(dst)` - `sqc2 vf16..vf19` |
+
+### Static search for the velocity writer is closed
+
+Scanning `0x00100000-0x00300000` for stores to offsets `0x40/0x44/0x50/0x54/0x58` with a
+non-stack base returns hundreds of integer `sw` hits and **not one `sq`**. The velocity is a
+128-bit vector written through the vector library by pointer - the same reason offset
+scanning failed for `fighter+0x15A0`. Static analysis cannot answer this.
+
+**The next step is a PCSX2 debugger write breakpoint on `fighter0+0x54`** (Memory, Write,
+size 4), and reading the Stack tab. `python tools/fighter.py --info` gives the base.
+
+### `work/trace.py` - an in-game tracer, and the three ways it crashed PCSX2
+
+The technique works and answered in four rounds what static analysis could not: it narrowed
+the writer of `model+0x974` from the whole battle loop to one call, by appending
+`(id, watched value)` to a ring buffer at chosen function entries. Unlike gating or nopping
+it changes no behaviour. Results: battle loop -> `FUN_001C2C80` -> first call of
+`FUN_001C1EA0` -> `FUN_0024E3F8`.
+
+**But it crashed the emulator four times.** Each cause is real and each is a trap for any
+future code instrumentation in this project:
+
+1. **Two-word displacement has a restore window.** Restoring `I1` before `I2` leaves the
+   site as `I1 ; nop` for a moment, so a prologue store that saves a callee-saved register
+   is skipped and the epilogue restores garbage. Displace **one** word instead: hook a store
+   whose successor is also a store to a different slot. Stores write no registers, so the
+   reordering is harmless and install/restore are each a single atomic write.
+2. **`$t0-$t3` are only dead at a function ENTRY.** A site-picker that scans forward for a
+   store pair will happily land in the function body, where they are live. The correct
+   condition is not distance but **no branch between the entry and the site** - that keeps
+   you in the entry basic block.
+3. **An uninitialised cursor is a wild store.** The trampoline read its buffer cursor from a
+   scratch word that was only initialised *after* all hooks were installed. On a fresh boot
+   that word is zero, and a `cursor < END` bounds check passes zero happily - so every
+   tracepoint wrote to **address 0x00000000** during installation. Check both ends with one
+   unsigned compare: `(cursor - BUF) unsigned < SIZE`. Disable tracing before the first hook
+   goes in.
+4. **Unexplained, and the reason to stop.** After all three fixes the tracer installed and
+   captured cleanly - then the game died minutes later while sitting idle with the
+   tracepoints still resident and the buffer frozen. The hooks are provably inert in that
+   state, so something about leaving them installed is still wrong. **Do not leave
+   tracepoints resident.** Capture, then remove them immediately.
+
+The honest summary: this is a powerful instrument and it produced every structural result in
+this section, but it costs the user an emulator restart when it is wrong, and it was wrong
+three times out of four. Prefer the PCSX2 debugger's write breakpoint when a write
+breakpoint is what you actually need.
