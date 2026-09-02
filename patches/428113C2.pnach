@@ -131,3 +131,36 @@ patch=1,EE,000F0760,word,00000000 // nop
 patch=1,EE,000F0764,word,080592A7 // j     0x00164A9C         odd frame: draw only
 patch=1,EE,000F0768,word,00000000 // nop
 patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
+
+// --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
+// Movement in BT3 is 100% root motion through the skeleton. With exactly one
+// writer each way (both confirmed by write breakpoint), the per-frame cycle is
+//   model+0x950  = fighter+0x10 + fighter+0x30     FUN_001D7198, 001D71F4
+//   fighter+0x10 = model+0x970 - fighter+0x30      FUN_001D70E8, 001D7118
+// which reduces to  fighter+0x10 += (model+0x970 - model+0x950).  So the whole
+// per-frame displacement is that difference, produced by the skeleton pass.
+// Replacing model+0x970 with the midpoint of the two halves it exactly.
+// EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
+// That asymmetry is the point of the test - it proves both that this is the one
+// movement channel and that ground is already compensated while air is not.
+[60FPS - EXPERIMENT halve root motion]
+description=Test only. Halves all root motion; ground should go slow, air should become correct.
+patch=1,EE,000F0800,word,3C04000F // lui   $a0, hi(scratch)
+patch=1,EE,000F0804,word,348408F0 // ori   $a0, $a0, lo(scratch)
+patch=1,EE,000F0808,word,26050950 // addiu $a1, $s0, 0x950     pre-skeleton position
+patch=1,EE,000F080C,word,0C0487AA // jal   Vec4Add             scratch = 0x950 + 0x970
+patch=1,EE,000F0810,word,26060970 // addiu $a2, $s0, 0x970     delay slot
+patch=1,EE,000F0814,word,3C04000F // lui   $a0, hi(scratch)
+patch=1,EE,000F0818,word,348408F0 // ori   $a0, $a0, lo(scratch)
+patch=1,EE,000F081C,word,3C083F00 // lui   $t0, 0x3f00         0.5f
+patch=1,EE,000F0820,word,44886000 // mtc1  $t0, $f12
+patch=1,EE,000F0824,word,0C0487CE // jal   Vec4Scale           scratch *= 0.5 -> midpoint
+patch=1,EE,000F0828,word,0080282D // move  $a1, $a0            delay slot
+patch=1,EE,000F082C,word,0220202D // move  $a0, $s1            fighter+0x10
+patch=1,EE,000F0830,word,3C05000F // lui   $a1, hi(scratch)
+patch=1,EE,000F0834,word,34A508F0 // ori   $a1, $a1, lo(scratch)
+patch=1,EE,000F0838,word,0C0487B6 // jal   Vec4Sub             fighter+0x10 = midpoint - fighter+0x30
+patch=1,EE,000F083C,word,26260020 // addiu $a2, $s1, 0x20      delay slot
+patch=1,EE,000F0840,word,08075C48 // j     001D7120            back
+patch=1,EE,000F0844,word,00000000 // nop
+patch=1,EE,001D7118,word,0803C200 // jal Vec4Sub -> j 000F0800 (FUN_001D70E8 read-back)
