@@ -151,3 +151,35 @@ def latest_state(slot: int | None = None) -> Path:
     if not hits:
         raise FileNotFoundError(f"No save state matching {pattern}")
     return max(hits, key=lambda p: p.stat().st_mtime)
+
+
+# --- PCSXROO ---------------------------------------------------------------
+# The fork that exposes the debugger over a socket. It runs in portable mode,
+# so its cheats/, sstates/ and snaps/ live next to the executable and are
+# entirely separate from the PCSX2 install above.
+
+_CANDIDATE_PCSXROO_DIRS = [
+    REPO.parent / "pcsxroo" / "bin",
+    REPO.parent / "PCSXROO" / "bin",
+]
+
+
+def pcsxroo_dir() -> Path:
+    explicit = _setting("PCSXROO_DIR")
+    if explicit:
+        return Path(explicit)
+    for candidate in _CANDIDATE_PCSXROO_DIRS:
+        if (candidate / "pcsxroo.exe").exists():
+            return candidate
+    raise FileNotFoundError(
+        "Could not locate PCSXROO. Set PCSXROO_DIR in the environment or in "
+        "local.json."
+    )
+
+
+def roo_cheat_file() -> Path:
+    return pcsxroo_dir() / "cheats" / f"{CRC}.pnach"
+
+
+def roo_snaps_dir() -> Path:
+    return pcsxroo_dir() / "snaps"
