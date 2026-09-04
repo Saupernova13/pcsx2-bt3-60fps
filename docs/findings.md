@@ -2499,12 +2499,31 @@ time, 2.7 units/s squared against 6.4.
 
 In that phase the speed is *clamped to its target* every tick rather than stepping toward
 it, so the observed change is the target's own movement and the approach step is
-irrelevant. The target is therefore evolving more slowly under the patch. The likeliest
-reason is that the target is computed from something the patch halves: `fighter+0x50` is
-the previous tick's displacement and is now half its old value, and any target derived
-from observed velocity inherits that. **Next step if this is worth chasing: a read
-watchpoint on `fighter+0x50` during a sustained sideways hold, and a breakpoint on
-`FUN_001DE000` reading `f12` and `f13` - target and step - to find which of the 17 callers
-drives it.**
+irrelevant.
+
+A breakpoint on `FUN_001DE000` during a sustained sideways hold, at matched real times,
+narrows it to one value. Two calls land per tick, one per fighter:
+
+```
+30fps    ra=001EF314  a0=fighter0  target 0.911642  step 0.925926   speed 0.906403
+         ra=001EEA88  a0=fighter1  target 0.000000  step 0.925926
+patched  ra=001EF314  a0=fighter0  target 0.721057  step 0.925926   speed 0.719722
+         ra=001EEA88  a0=fighter1  target 0.000000  step 0.925926
+```
+
+**The step is a constant `0.925926` and identical at both rates**, so it is uncompensated
+and halving it is right. The *target* is the whole difference: 0.9116 against 0.7211 at the
+same moment, and it climbs at half the real rate under the patch.
+
+The target is computed by `FUN_001DE080`, which **tail-jumps into `FUN_001DE000`** rather
+than calling it - which is why `ra` points at `FUN_001DE080`'s caller and why a static scan
+for `jal 001DE000` does not list this site. `FUN_001DE080` takes a vector in `a3`, measures
+it with `FUN_001221B8` (length), and compares against `$gp-0x6E8C`. So the target is
+derived from the length of a vector, and the obvious candidate is a velocity the patch has
+halved - `fighter+0x50` is the previous tick's displacement and is now half its old value.
+
+**Next step if this is worth chasing:** read `a3` at `FUN_001DE080`'s entry and identify
+the vector, then decide whether the target should be computed from a doubled copy or
+whether the halving belongs one level up.
 
 It is a mild slowness against a former 91% overspeed, so it is a refinement, not a defect.
