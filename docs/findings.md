@@ -19,11 +19,16 @@ and confirmed by the user:**
 | `60FPS - airborne motion` | halves the displacement and the ramp of `pos += dir * speed`, at `FUN_001DE000` |
 | `60FPS - airborne vertical` | the same for `pos.y += vy`, at `FUN_001DED78` |
 | `60FPS - airborne residual` | halves the post-hit slide and its decay epsilon, at `FUN_001DFD88` |
+| `60FPS - gravity` | halves the gravity acceleration and the vertical step it drives, at `FUN_001DED28` |
+| `60FPS - effect rotation` | halves the three per-tick effect phase rates in `FUN_00251A48` |
 
 Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
 
-**A fifth group, `60FPS - effect rotation`, is also shipped and enabled - and it is
-wrong. Revert it.** It was deployed 2026-08-22 without ever being confirmed by the user.
+**A fifth group, `60FPS - effect rotation`, was written off here as wrong. That verdict
+was withdrawn on 2026-09-05 - it is correct and is shipped.** The paragraph below is kept
+for the reasoning it records, not for its conclusion.
+
+> ~~It is wrong. Revert it.~~ It was deployed 2026-08-22 without ever being confirmed by the user.
 On 2026-08-24 its target was frozen outright (all ten phase stores nopped, phases verified
 motionless for 150 frames) and the user reported **no visible change at all**, so it
 compensates something invisible. It is also incomplete on its own terms - four of the
@@ -65,13 +70,23 @@ double rate, so a knockback ends in half the real time.
 - **Root motion is the ground channel only.** The 2026-09-02 halve-root-motion experiment
   failed because it halved a channel that reads zero in the air.
 
-**Still open, reported by the user 2026-09-04 after playing the fix:**
+**FIXED 2026-09-05: falling.** `60FPS - gravity` is shipped. Free fall never went through
+`FUN_001DED78`, the vertical channel the first airborne fix patched - it has its own
+routine, `FUN_001DED28`, with the acceleration and the terminal velocity as plain data
+words. Per-tick acceleration is now 0.2315 against 0.4630, and the applied height change
+is exactly half the stored speed on every tick.
+
+**`60FPS - effect rotation` is reinstated, and this log's earlier verdict on it is
+withdrawn.** It was written off after a 2026-08-24 freeze test showed no visible change,
+but that test was run on the ground. In an airborne hover its three phase rates are the
+only cleanly uncompensated per-tick quantities left in the fighter's model.
+
+**Still open:**
 
 | defect | status |
 |---|---|
-| **Falling is still 2x.** Rising, flight, dashes and knockback are correct; a character coming *down* is not. | under investigation, see the section at the bottom |
-| **Airborne idle animation is still 2x.** The ki aura is correct in the air and so is everything else animated; a character hovering with no input is not. | under investigation, see the section at the bottom |
-| Circling an opponent cruises at 0.80 of its 30fps speed, where before the fix it was 1.91. | measured, root cause narrowed, refinement not defect |
+| **Airborne idle animation reported as 2x.** | The body animation clock, the pose, the fighter struct and the model all measure correct in the air. Effect rotation was the one real 2x left and is now shipped; it may be the fix. See "airborne idle animation: what was ruled out". |
+| Circling an opponent cruises at 0.80 of its 30fps speed, where before the fix it was 1.91. | measured, root cause narrowed to a target value rather than the step; refinement, not defect |
 
 Everything else measures between 0.95 and 1.05 against the 30fps oracle.
 
@@ -2534,3 +2549,113 @@ per-fighter parameter getter, and that is the value evolving at half rate. The n
 0xE)` reads, to find the field behind parameter `0xE` and what advances it per tick.
 
 It is a mild slowness against a former 91% overspeed, so it is a refinement, not a defect.
+
+---
+
+## 2026-09-05 - gravity, the fourth airborne channel
+
+The user played the airborne fix and reported that **falling was still 2x** while rising,
+flight, dashes and knockback were correct. They were right, and the reason is that free
+fall does not go through `FUN_001DED78` at all.
+
+Controlled vertical movement was already correct - measured, holding ascend against the
+30fps oracle gives 0.995 and holding descend gives 1.004. What was still wrong was the
+uncontrolled drop after a knockdown, which needs a six-hit combo to produce: three hits
+leave the victim floating at the top of the arena indefinitely, and only a longer combo
+puts them into the falling state.
+
+A breakpoint on `FUN_001DED78` never fires during that fall. A **write watchpoint on the
+victim's `fighter+0xAC`** named the routine instead:
+
+```
+FUN_001DED28
+    v0 = FUN_001DC298(a0)               = fighter+0x10
+    vy(+0xAC) += g                      g   = 0.462963 per tick, at $gp-0x6E4C
+    if (vy > terminal) vy = terminal    terminal = 27.777775, at $gp-0x6E48
+    pos.y += vy
+```
+
+Both constants are plain data words, and a scan of `.text` for `lwc1 fX, imm(gp)` finds
+**exactly one reader of each**, so the acceleration can be halved in data. Only the
+application needs a trampoline. The terminal velocity is deliberately left alone: `vy`
+stays in its authored 30Hz units, so the value it clamps to is still correct.
+
+Measured, in a real fall:
+
+```
+                per-tick acceleration      applied height change
+30fps                     0.4630           dy = vy
+60fps before the fix      0.4630           dy = vy          <- 2x in real time
+60fps after               0.2315           dy = vy * 0.500
+```
+
+`dy/vy` reads exactly 0.500 on every tick of the descent, and vy reaches the same value at
+the same wall-clock moment, so twice as many ticks cover the same ground.
+
+**Do not try to A/B a fall by forcing it.** Writing `pos.y` verifies, and the game then
+overwrites it from its own round trip on the very next tick; writing the height and vy
+together produced a 20-second "fall" in one configuration and a 1.8-second one in the
+other, purely because the two runs had diverged into different states. The per-tick
+numbers above are the honest measurement.
+
+## 2026-09-05 - ratescan, and effect rotation was not wrong after all
+
+`tools/ratescan.py` makes the audit mechanical. It records the same memory tick by tick
+under both configurations and reports the ratio of per-tick motion: **0.50 compensated,
+1.00 still at double speed**. Per tick rather than per vsync, because at 30fps the game
+ticks every second vsync. The metric is total absolute variation, which reads the same way
+for a ramp and for an oscillator.
+
+It needs one filter to be usable. Most of a fighter struct is counters, bitmasks and
+pointers, and reading those as floats produces per-tick "changes" of 1e20 that bury
+everything real; requiring every sample of a word to be finite and inside a million cut
+one scan from 78 false positives to 2.
+
+Pointed at a hovering fighter, it found the effect-phase table at **`model+0x1038`** and
+upward - nine slots of stride 0x40, three angles each, stepping **0.10, 0.23 and 0.27 per
+tick at both frame rates**. A write watchpoint puts the stores at `00251E80`, `00251E9C`
+and `00251EE0`, inside `FUN_00251A48`, writing `0x28`, `0x2C` and `0x30` of the slot.
+
+That is exactly what `[60FPS - effect rotation]` halves - the group this log had written
+off with *"and it is wrong. Revert it."* **That verdict is withdrawn.** It rested on a
+2026-08-24 test that froze the phases outright and produced no visible change, but that
+test was run **on the ground**. In an airborne hover these are the only cleanly
+uncompensated per-tick quantities left in the fighter's model. Enabling the group takes
+the rates to 0.05, 0.115 and 0.135 and drops the model's uncompensated word count from 30
+to 3, which is what the ground reads too.
+
+The other claim about that group - that it is incomplete, "four of the eleven per-tick
+constants in that function" - is also wrong. `FUN_00251A48` reads 19 gp-relative float
+constants; the rest are `3.141593`, `1.570796` and thresholds, not rates. For the phase
+table the group is complete, and the measurement confirms it.
+
+No regression from enabling it: flight 1.000, dash 0.988, rush 1.031, launched opponent
+0.962.
+
+## 2026-09-05 - airborne idle animation: what was ruled out
+
+The user's second report was that **idle animation in the air is still 2x**, with the ki
+aura and everything else correct. This is not yet explained. What is now ruled out, all by
+measurement:
+
+- **The body animation clock is correct in the air.** `model+0xB40+0x138` advances 2.0 per
+  tick at 30fps and 1.0 per tick at 60fps, in the air exactly as on the ground, and the
+  idle loop is 108 units long in both - 1.8 seconds either way.
+- **The pose matches.** Screenshots taken at the same animation-clock phase while hovering
+  are the same pose under both configurations.
+- **Nothing else in the fighter struct is running fast.** During an air hover only five
+  words move at all; the two with a ratio above 0.8 are `fighter+0x15A0` and `+0x15A8`,
+  the known smoothed render follower, whose exponential filter does not produce a clean
+  0.5 ratio in any case.
+- **Nothing else in the model is running fast** once effect rotation is enabled: 3
+  uncompensated words out of 123 moving, the same count the ground shows.
+- **A 2 MB sweep either side of the model pool** finds 163 uncompensated words out of 3785
+  moving, all of them stepping between 0.001 and 0.006 per tick - too small to be an
+  animation and with ratios around 1.05 rather than a clean 1.0.
+
+So either the effect-rotation group now fixes it - it is the only real 2x that was left in
+an airborne fighter, and it is now shipped - or the thing the user is seeing lives outside
+the fighter and its model. **Next step: ask which element looks fast** (hair, clothing, the
+hovering sway, the whole body) and, if it is the character itself, sweep the model table at
+`0x0031C640` for other entities attached to the fighter rather than only the two fighter
+models.
