@@ -252,3 +252,28 @@ patch=1,EE,000F09C8,word,00000000 // nop
 patch=1,EE,001DFDBC,word,0803C260 // jal Vec4Add -> j trampoline
 patch=1,EE,001DFDD8,word,0803C26D // dmove -> j epsilon trampoline
 
+
+// Gravity proper. FUN_001DED28 is a separate routine from the vertical channel
+// in FUN_001DED78, which is why a breakpoint on the latter never fires during a
+// free fall and why the first airborne fix left falling at 2x:
+//     vy(+0xAC) += g            g = 0.462963 per tick, at $gp-0x6E4C
+//     if (vy > 27.777775) vy = 27.777775                at $gp-0x6E48
+//     pos.y += vy
+// Each constant has exactly one reader in the binary, so the acceleration is
+// halved in data and only the application needs a trampoline. The terminal
+// velocity is deliberately left alone: vy stays in its authored 30Hz units, so
+// the value it clamps to is still correct.
+[60FPS - gravity]
+description=Halve the gravity acceleration and the vertical step it drives, so a knocked-down fighter falls at its real-time speed (FUN_001DED28).
+patch=1,EE,000F0A00,word,C4400004 // replay 001DED58
+patch=1,EE,000F0A04,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0A08,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F0A0C,word,46020842 // mul.s $f1, $f1, $f2
+patch=1,EE,000F0A10,word,DFBF0000 // replay 001DED60
+patch=1,EE,000F0A14,word,46010000 // replay 001DED64
+patch=1,EE,000F0A18,word,E4400004 // replay 001DED68
+patch=1,EE,000F0A1C,word,08077B5B // j 0x001DED6C
+patch=1,EE,000F0A20,word,00000000 // nop
+patch=1,EE,001DED58,word,0803C280 // lwc1 -> j trampoline
+patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
+
