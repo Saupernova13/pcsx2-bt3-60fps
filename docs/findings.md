@@ -65,10 +65,15 @@ double rate, so a knockback ends in half the real time.
 - **Root motion is the ground channel only.** The 2026-09-02 halve-root-motion experiment
   failed because it halved a channel that reads zero in the air.
 
-**Still imperfect:** circling an opponent (holding the stick sideways) now cruises at about
-0.80 of its 30fps speed, where before the fix it was 1.91. Its speed ramps toward a target
-that is itself evolving, and the target evolves more slowly under the patch. Everything
-else measures between 0.95 and 1.05. See the open question at the end of that section.
+**Still open, reported by the user 2026-09-04 after playing the fix:**
+
+| defect | status |
+|---|---|
+| **Falling is still 2x.** Rising, flight, dashes and knockback are correct; a character coming *down* is not. | under investigation, see the section at the bottom |
+| **Airborne idle animation is still 2x.** The ki aura is correct in the air and so is everything else animated; a character hovering with no input is not. | under investigation, see the section at the bottom |
+| Circling an opponent cruises at 0.80 of its 30fps speed, where before the fix it was 1.91. | measured, root cause narrowed, refinement not defect |
+
+Everything else measures between 0.95 and 1.05 against the 30fps oracle.
 
 **FIXED 2026-08-24: the ki aura.** See the milestone at the bottom. The lever was a
 pass that runs too often, not a constant - `vtable[0]` in this engine is update AND draw,
