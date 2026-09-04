@@ -187,6 +187,7 @@ patch=1,EE,001D7118,word,0803C200 // jal Vec4Sub -> j 000F0800 (FUN_001D70E8 rea
 // fighter moving at 2x. The stored speed itself is left in its authored
 // 30Hz units, because other code reads it.
 [60FPS - airborne motion]
+description=Halve both the displacement and the ramp of the airborne directed-travel channel (FUN_001DE000): flight, dashes and knockback.
 patch=1,EE,000F0900,word,3C013F00 // lui $at, 0x3F00
 patch=1,EE,000F0904,word,44811000 // mtc1 $at, $f2
 patch=1,EE,000F0908,word,46027382 // mul.s $f14, $f14, $f2
@@ -204,6 +205,7 @@ patch=1,EE,000F0934,word,00000000 // nop
 patch=1,EE,001DE02C,word,0803C240 // jal 001DBFF8 -> j trampoline
 
 [60FPS - airborne vertical]
+description=The same for the vertical channel (FUN_001DED78): rising, falling and gravity.
 patch=1,EE,000F0940,word,3C013F00 // lui $at, 0x3F00
 patch=1,EE,000F0944,word,44811000 // mtc1 $at, $f2
 patch=1,EE,000F0948,word,46027382 // mul.s $f14, $f14, $f2
@@ -227,6 +229,7 @@ patch=1,EE,001DEDA4,word,0803C250 // jal 001DBFF8 -> j trampoline
 // at 30fps and at 60fps, so the same push is delivered in half the real time.
 // Halving both the applied displacement and the epsilon restores it.
 [60FPS - airborne residual]
+description=Halve the short slide a fighter takes after a hit, and its decay (FUN_001DFD88).
 patch=1,EE,000F0980,word,3C013F00 // lui $at, 0x3F00
 patch=1,EE,000F0984,word,44816000 // mtc1 $at, $f12
 patch=1,EE,000F0988,word,3C04000F // lui $a0, 0x000F
