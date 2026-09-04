@@ -44,12 +44,18 @@ AIRBORNE = [
     "60FPS - airborne motion",
     "60FPS - airborne vertical",
     "60FPS - airborne residual",
+    "60FPS - gravity",
 ]
+
+# Names for groups that do not exist yet. The ini's enabled list is only read at
+# boot, so a name that is not in it cannot be tested without restarting the
+# emulator; carrying spares means the next experiment does not cost a restart.
+SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
-ENABLED_IN_INI = SHIPPED + AIRBORNE
+ENABLED_IN_INI = SHIPPED + AIRBORNE + SPARES
 
 PRESETS = {
     "off": [],

@@ -21,6 +21,7 @@ import argparse
 
 import _bootstrap  # noqa: F401
 
+from ps2ee import config
 from ps2ee.roo import Roo
 
 SCRATCH = 0x000F7000        # far end of the safe zone, nothing else uses it
@@ -146,11 +147,45 @@ def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
     return "60FPS - airborne residual", base, items, (words, hooks)
 
 
+def gravity(roo: Roo) -> tuple[str, int, list, tuple]:
+    """FUN_001DED28: vy(+0xAC) += g, clamped, then pos.y += vy.
+
+    The real gravity, and a separate routine from the vertical channel in
+    FUN_001DED78 - which is why a breakpoint there never fires during a free
+    fall. Both constants are plain gp-relative data words with exactly one
+    reader each, so the acceleration is halved in data; only the application
+    needs code.
+
+    The terminal-velocity clamp is deliberately left alone: vy stays in its
+    authored 30Hz units, so the value it is clamped to is still correct.
+    """
+    base = 0x000F0A00
+    items = [
+        ("copy", 0x001DED58),                    # lwc1 f00, 0x4(v0)   pos.y
+        *[("asm", t) for t in HALF],
+        ("asm", "mul.s $f1, $f1, $f2"),          # vy, halved at the point of use
+        ("copy", 0x001DED60),                    # ld ra, (sp)
+        ("copy", 0x001DED64),                    # add.s f00, f00, f01
+        ("copy", 0x001DED68),                    # swc1 f00, 0x4(v0)
+        ("asm", "j 0x001DED6C"),
+        ("asm", "nop"),
+    ]
+    words = build(roo, base, items)
+    gp = config.GP_BASE
+    hooks = [
+        (0x001DED58, jump(base), "lwc1 -> j trampoline"),
+        (gp - 0x6E4C, roo.read(gp - 0x6E4C) - 0x00800000,
+         "gravity 0.462963 -> 0.231481 per tick"),
+    ]
+    return "60FPS - gravity", base, items, (words, hooks)
+
+
 def jump(target: int) -> int:
     return 0x08000000 | (target >> 2)
 
 
-PARTS = {"air": air_speed, "vert": air_vertical, "residual": air_residual}
+PARTS = {"air": air_speed, "vert": air_vertical, "residual": air_residual,
+         "gravity": gravity}
 
 
 def main() -> int:
