@@ -16,6 +16,9 @@ and confirmed by the user:**
 | `60FPS - input repeat timing` | doubles the menu auto-repeat delay/rate via `FUN_002577F8` |
 | `60FPS - input timing` | halves the 128 per-button frame counters in `FUN_001D3C10` |
 | `60FPS - aura update rate` | runs the ki aura's update on even frames only while still drawing it every frame, at `FUN_00164860` |
+| `60FPS - airborne motion` | halves the displacement and the ramp of `pos += dir * speed`, at `FUN_001DE000` |
+| `60FPS - airborne vertical` | the same for `pos.y += vy`, at `FUN_001DED78` |
+| `60FPS - airborne residual` | halves the post-hit slide and its decay epsilon, at `FUN_001DFD88` |
 
 Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
 
@@ -30,25 +33,42 @@ eleven per-tick constants in that function. See "The ki aura at 2x" at the botto
 game has no delta anywhere; it is a fixed 30Hz tick loop now ticking at 60Hz, so
 *everything* is 2x until it is individually halved. Nothing self-corrects.
 
-**Remaining defect: airborne motion runs at 2x.** Air idle, flight, knockback, falling
-after a stun, ki blast and beam travel. Everything grounded is correct. Three things are
-now settled and should not be re-litigated:
+**FIXED 2026-09-04: airborne motion.** Three more groups are shipped -
+`60FPS - airborne motion`, `60FPS - airborne vertical`, `60FPS - airborne residual`.
+Airborne movement never went through the skeleton at all, which is why every attempt
+aimed at root motion failed. See "Airborne motion, solved" at the bottom for the full
+derivation and the numbers.
+
+The short version: the position round-trip through the root bone is real, and it is how
+*ground* movement works, but during a launched flight the root delta is exactly `0.0000`
+every tick while the fighter still moves. The airborne displacement comes from three
+separate per-tick channels on the fighter itself, all of them uncompensated:
+
+| routine | what it adds per tick |
+|---|---|
+| `FUN_001DE000` | `pos += dir(+0x90) * speed(+0xA8)` |
+| `FUN_001DED78` | `pos.y += vy(+0xAC)` |
+| `FUN_001DFD88` | `pos += residual(+0x80)`, then shrinks it by a fixed epsilon |
+
+Each has a *rate* as well as a *value*, and both halves need halving. The first two get
+their value from `FUN_001DBFF8(current, target, step)`, a move-toward-by-at-most-step
+helper; halving only the applied displacement leaves the ramp and the decay running at
+double rate, so a knockback ends in half the real time.
+
+**Do not re-open these, they are settled by measurement, not by argument:**
 
 - **It is step SIZE, not step COUNT.** Call counters on the gameplay path read *identically*
-  on the ground and in the air. Any hypothesis that needs an extra update pass while
-  airborne is dead on arrival; the measurement is cheap, rerun it before inventing one.
-- **The ki aura is not a second bug.** It still advances at its gated 30Hz in the air. It
-  looks 2x because it faithfully tracks a character whose motion is 2x. Fix the motion and
-  the aura follows.
+  on the ground and in the air.
+- **The ki aura is not a second bug.** It tracks a character whose motion was 2x.
 - **The render chain is followers all the way down.** `fighter+0x15A0` <- `model+0x970`
-  <- `bone[0]+0x40`, every level a copy or a difference of the one above. Do not walk it
-  again; it is mapped in full below.
+  <- `bone[0]+0x40`. Do not walk it again; it is mapped in full below.
+- **Root motion is the ground channel only.** The 2026-09-02 halve-root-motion experiment
+  failed because it halved a channel that reads zero in the air.
 
-Six links of the position chain are confirmed by write breakpoint. The **one link that was
-inferred from disassembly rather than confirmed** - what writes `model+0x950` - is exactly
-where the first fix attempt broke. **The next concrete step is a write breakpoint on
-`model0+0x954`, enumerating every distinct `ra` over several hits**, the way six hits on
-`fighter+0x14` proved a single writer. See the four sections dated 2026-09-02 at the bottom.
+**Still imperfect:** circling an opponent (holding the stick sideways) now cruises at about
+0.80 of its 30fps speed, where before the fix it was 1.91. Its speed ramps toward a target
+that is itself evolving, and the target evolves more slowly under the patch. Everything
+else measures between 0.95 and 1.05. See the open question at the end of that section.
 
 **FIXED 2026-08-24: the ki aura.** See the milestone at the bottom. The lever was a
 pass that runs too often, not a constant - `vtable[0]` in this engine is update AND draw,
@@ -2260,3 +2280,231 @@ and is worth keeping. Prefer asking it a question over instrumenting the game ag
 was confirmed with a PCSX2 write breakpoint held up under test; the one link inferred from
 reading disassembly is the one that broke the fix. Breakpoint the address, enumerate
 *several* hits, and only then believe you know who writes it.
+
+---
+
+## 2026-09-04 - PCSXROO: the emulator became scriptable
+
+Every earlier session drove PCSX2 through PINE, which can read and write memory and
+nothing else. Breakpoints meant asking the user to set them in the GUI and read the
+registers back by screenshot; getting into a fight meant asking the user to play; testing
+a patch meant a full quit and relaunch, because PCSX2 reads its cheat file only at boot.
+
+`Documents/GitHub/pcsxroo` is a PCSX2 fork that exposes the whole debugger over a loopback
+JSON socket. Read `docs/pcsxroo/agent-guide.md` there first. What it changes for this
+project:
+
+- **Breakpoints and watchpoints without a human.** `mc add --on write` plus the stop's
+  `pc` and `ra` is the technique that solved this, and `tools/writers.py` wraps it.
+- **Frame-precise capture.** `frame-advance 1` steps exactly one vsync, so a per-frame
+  delta is a real per-frame delta. Every earlier capture polled a frame counter over PINE
+  and lost frames on any host hiccup, which silently halves the quantity being measured.
+- **`patch.reload` re-reads the pnach files**, so a patch experiment costs seconds instead
+  of a reboot.
+- **Input injection**, so the harness can create the situation it wants to measure - a
+  launched opponent, a sustained flight - reproducibly.
+- **Screenshots**, which are the only way to be sure the numbers describe the situation
+  you think they do.
+
+`ps2ee/roo.py` is the client. Three of its wrappers exist because the raw behaviour
+silently corrupts experiments, and each cost a wrong conclusion before being found:
+
+1. **`loadstate` pauses first.** A load into a running VM leaves the game executing while
+   the reply comes back, and the number of frames lost that way varies per call. Two runs
+   of one experiment then start from different states. Loading into a paused VM restores
+   bit-identically - verified by loading three times and comparing positions.
+2. **`input.release` only queues.** The hook that writes the pad runs on frames the VM
+   executes, so a release issued while paused never lands. The *next* state load then
+   starts with the previous test's button held for one frame, which is enough to throw a
+   punch. `flush_input()` releases and advances, and it has to be called **before** the
+   load, not after - the contaminated frame is the first frame after the restore. This
+   produced a reference measurement 65% too large, once, silently.
+3. **`screenshot` needs a backslash path.** A forward-slash path is accepted, reports
+   `queued`, and no file ever appears.
+
+**A bug in PCSXROO itself, found and fixed here** (branch `fix/frame-advance-input` in that
+repo): `VSyncStart` calls `VSyncOnCPUThread` before `PollInputOnCPUThread`, and
+`VSyncOnCPUThread` is where frame advance pauses the VM. The input hook returned early
+unless the VM was Running, so injected input was dropped on the final frame of every
+advance - and an advance of one frame is nothing but a final frame. `input set` followed by
+repeated `frame-advance 1` therefore held the button for exactly zero frames, while the
+same input over one bulk `frame-advance 120` worked. A stepped capture recorded the game
+ignoring the pad and looked entirely plausible. Allowing `Paused` is safe: the hook's only
+caller runs while the VM is executing, so it is never reached during an idle pause.
+
+## 2026-09-04 - the 30fps oracle, mechanised
+
+The game at 30fps is correct by definition, so the measurement is: the same save state,
+the same scripted input, the same number of vsyncs, once with every compensation removed
+and once patched. Equal vsync counts mean equal real time, which is what "twice as fast"
+is a claim about.
+
+`tools/patchctl.py` makes the "compensation removed" half possible without a reboot. Two
+things had to be worked out:
+
+- **`patch.reload` re-reads the pnach files but not the enabled list.** That list comes
+  from the settings loaded at boot, so editing the game ini mid-session achieves nothing.
+  Renaming a group in the pnach does: a group whose header no longer matches an enabled
+  name is simply not applied. `patchctl` appends ` [off]` to disable.
+- **Removing a patch does not undo it.** `patch=1` lines are rewritten every frame while
+  active, and when the group goes away PCSX2 just stops writing - the last value it wrote
+  stays in RAM. So disabling also has to put the original words back, taken from the boot
+  ELF; addresses outside any ELF segment are the trampoline scratch zone, whose original
+  content is zero. All 109 words verified by readback.
+
+Because the ini's enabled list is frozen until a restart, it now carries the names of
+groups that do not exist yet, so a new experiment does not cost a reboot.
+
+The measurement tools:
+
+| tool | question it answers |
+|---|---|
+| `tools/traj.py compare` | how far did it travel in the same real time? |
+| `tools/traj.py ticks` | is this channel's *per-tick* step the same at both rates (uncompensated) or halved (already fixed)? |
+| `tools/traj.py speed` | what is the speed, in units per second, at the same wall-clock offset? |
+| `tools/speedtest.py` | the acceptance test: one ratio per situation, 1.00 correct, 2.00 the bug |
+
+The `speed` verb earns its place. Everything else compares distances, and a distance is
+the integral of the thing under test: two runs whose speeds match exactly still show
+different distances if one entered a ramp a fraction of a second earlier, and a run that
+is genuinely 20% slow looks fine over a window that starts later in the same ramp.
+
+`tools/mkstate.py` builds the save states an A/B starts from. The launch itself runs at
+whatever rate is under test, so it cannot be inside the measured window - the state has to
+be cut afterwards, with the victim already in the air and its momentum baked in.
+
+## 2026-09-04 - airborne motion, solved
+
+### The measurement that reframed it
+
+From a save state of a launched opponent, with no input at all, per game tick:
+
+```
+=== 30fps reference ===            === 60fps, shipped patches ===
+tick   |dpos|  |root delta|        tick   |dpos|  |root delta|
+4300   6.4815       0.0000         4302   6.4815       0.0000
+4301   6.4815       0.0000         4303   6.4815       0.0000
+4302   6.4815       0.0000         4304   6.4815       0.0000
+...    6.4815       0.0000         ...    6.4815       0.0000
+```
+
+Two things at once. **The root bone delta is exactly zero** for the whole flight, so the
+position round-trip through the skeleton - the thing four sessions had been mapping -
+carries none of this. And **the per-tick step is identical at both rates**, so the channel
+is completely uncompensated: twice the ticks, twice the distance, exactly 2x.
+
+That also settles why the 2026-09-02 halve-root-motion experiment failed. It halved a
+channel that reads zero in the air, which is why the air was untouched, and it was the
+*ground* channel, which is why the ground broke.
+
+### Finding the writers
+
+A write watchpoint on the victim's `fighter+0x10`, over 25 hits, from the airborne state -
+not from the ground, which is what the earlier session had done when it concluded there
+was a single writer:
+
+```
+        pc         ra   hits  instruction
+  00121EE4   001D7120     11  jr ra          Vec4Sub from FUN_001D70E8 - root motion
+  00121EB4   001DE058      3  jr ra          Vec4Add from FUN_001DE000
+  001DE064   001EAC4C      3  swc1 f00, 0xC(s0)
+  001DEDC4   001EAC54      3  swc1 f01, 0x4(s0)
+  00121EB4   001DFDC4      3  jr ra          Vec4Add from FUN_001DFD88
+  001DFDD0   001DFDC4      2  jal 0x001221B8
+```
+
+Six sites, not one. Three separate airborne channels alongside the known root-motion one.
+
+### What each channel does
+
+```
+FUN_001DE000                            directed travel: flight, dash, knockback
+    s0     = FUN_001DC298(fighter)      = fighter+0x10, the position vector
+    speed  = FUN_001DBFF8(*(+0xA8), target, step)   ; approach by at most step
+    *(+0xA8) = speed
+    pos   += *(+0x90) * speed           ; +0x90 is a unit direction vector
+
+FUN_001DED78                            vertical: gravity, rising, falling
+    vy     = FUN_001DBFF8(*(+0xAC), target, step)
+    *(+0xAC) = vy
+    pos.y += vy
+
+FUN_001DFD88                            the short slide after taking a hit
+    if (FUN_001D63A8(...)) return
+    pos   += *(+0x80)                   ; the whole residual, every tick
+    len    = Length(*(+0x80))
+    if (len < eps) *(+0x80) = 0
+    else           *(+0x80) *= (len - eps) / len
+```
+
+`FUN_001DBFF8(current, target, step)` is a move-toward-by-at-most-step helper, decoded
+from its two `bc1fl` branches: return `current + |step|` while that stays below `target`,
+else `current - |step|` while that stays above it, else `target`. It has 9 call sites;
+`FUN_001DE000` has 17 callers and `FUN_001DED78` has 29, so these are the engine's general
+motion primitives and patching them covers every move rather than one move type.
+
+Confirmed by reading the fields during a launch: `+0x90` has length exactly `1.0000` and
+`+0xA8` reads `6.48148`, which is the per-tick step to four decimal places.
+
+### The fix, and why it is two halvings and not one
+
+Each channel has a **value** and a **rate**, and both are per tick:
+
+- Halve only the applied displacement and the fighter moves at the right speed, but the
+  ramp and the decay still run at double rate - a knockback reaches its end in half the
+  real time. Measured as 1.43x total distance with a correct instantaneous speed.
+- Halve only the approach step and the fighter still moves at 2x.
+
+So the trampolines halve `f14` (the approach step) before the call and halve the applied
+displacement after it. **The stored speed is left in its authored 30Hz units**, because
+other code reads it; only its use is halved.
+
+The arithmetic, with `s` the stored speed in units per tick: applying `s/2` at 60Hz gives a
+real speed of `30s`, matching `s` applied at 30Hz. Ramping by `step/2` per tick at 60Hz
+gives `ds/dt = 30*step`, matching `step` per tick at 30Hz. Two halvings, no quarterings.
+
+The decay confirms it directly - knockback speed, tick by tick:
+
+```
+30fps           6.4815  6.3272  6.1728  5.7099             (-0.1543, -0.1543, -0.4629)
+60fps shipped   6.4815  6.3272  6.1728  5.7099  5.2469 ... (identical per tick: 2x in time)
+60fps patched   6.4815  6.4043  6.3272  6.0957  5.8642 ... (exactly half per tick)
+```
+
+### Results
+
+Against the unpatched 30fps game, same state, same input, same vsyncs
+(`tools/speedtest.py`, cruise column - speed once both runs are already moving):
+
+| situation | before | after |
+|---|---|---|
+| sustained flight | 2.056 | **1.000** |
+| boosted dash | 1.507 | 0.988 |
+| melee rush | 0.465 | 1.031 |
+| backward flight, terminal speed | - | 125.000 vs 125.000 units/s |
+| launched opponent, per tick | 6.4815, same as 30fps | 3.2407, exactly half |
+| circling sideways | 1.911 | 0.803 |
+
+Soak test: 63 seconds of live play with randomised input, 3757 ticks at a measured 59.6
+ticks per second, no crash, rendering correct by screenshot.
+
+### Open question: circling is now 20% slow
+
+Holding the stick sideways circles the opponent, and that motion goes through
+`FUN_001DE000` like everything else - the first ticks of the hold show its speed stepping
+by exactly half, `-0.46296` against the reference's `-0.92593`, so the patch is doing what
+it intends. What differs is later: all three configurations climb the same ramp toward a
+terminal speed of about 88 units/second, and the patched run climbs it more slowly in real
+time, 2.7 units/s squared against 6.4.
+
+In that phase the speed is *clamped to its target* every tick rather than stepping toward
+it, so the observed change is the target's own movement and the approach step is
+irrelevant. The target is therefore evolving more slowly under the patch. The likeliest
+reason is that the target is computed from something the patch halves: `fighter+0x50` is
+the previous tick's displacement and is now half its old value, and any target derived
+from observed velocity inherits that. **Next step if this is worth chasing: a read
+watchpoint on `fighter+0x50` during a sustained sideways hold, and a breakpoint on
+`FUN_001DE000` reading `f12` and `f13` - target and step - to find which of the 17 callers
+drives it.**
+
+It is a mild slowness against a former 91% overspeed, so it is a refinement, not a defect.
