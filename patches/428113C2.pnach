@@ -164,3 +164,58 @@ patch=1,EE,000F083C,word,26260020 // addiu $a2, $s1, 0x20      delay slot
 patch=1,EE,000F0840,word,08075C48 // j     001D7120            back
 patch=1,EE,000F0844,word,00000000 // nop
 patch=1,EE,001D7118,word,0803C200 // jal Vec4Sub -> j 000F0800 (FUN_001D70E8 read-back)
+
+// --- airborne motion ------------------------------------------------------
+// Ground movement is root motion through the skeleton, and the animation
+// clock patch already halves it. Airborne movement does not go through the
+// skeleton at all: measured over a launched opponent, the root bone delta is
+// exactly 0.0000 for every tick of the flight while the fighter still moves
+// 6.4815 units per tick, identically at 30fps and at 60fps. That is why the
+// earlier halve-root-motion experiment changed ground speed and left the air
+// untouched.
+//
+// Two engine routines carry it, both the same shape:
+//   FUN_001DE000   speed(+0xA8) = approach(speed, target, step)
+//                  pos += dir(+0x90) * speed
+//   FUN_001DED78   vy(+0xAC)    = approach(vy, target, step)
+//                  pos.y += vy
+// where approach() is FUN_001DBFF8, a move-toward-by-at-most-step helper.
+//
+// Both halves have to be halved. Halving only the applied displacement gives
+// the right speed but lets the ramp and the decay run at double rate, so the
+// knockback ends in half the time; halving only the approach step leaves the
+// fighter moving at 2x. The stored speed itself is left in its authored
+// 30Hz units, because other code reads it.
+[60FPS - airborne motion]
+patch=1,EE,000F0900,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0904,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F0908,word,46027382 // mul.s $f14, $f14, $f2
+patch=1,EE,000F090C,word,0C076FFE // jal 0x001DBFF8
+patch=1,EE,000F0910,word,00000000 // nop
+patch=1,EE,000F0914,word,26050080 // replay 001DE034
+patch=1,EE,000F0918,word,E6000098 // replay 001DE038
+patch=1,EE,000F091C,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0920,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F0924,word,46020302 // mul.s $f12, $f00, $f2
+patch=1,EE,000F0928,word,0C0487CE // jal 0x00121F38
+patch=1,EE,000F092C,word,03A0202D // replay 001DE044
+patch=1,EE,000F0930,word,08077812 // j 0x001DE048
+patch=1,EE,000F0934,word,00000000 // nop
+patch=1,EE,001DE02C,word,0803C240 // jal 001DBFF8 -> j trampoline
+
+[60FPS - airborne vertical]
+patch=1,EE,000F0940,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0944,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F0948,word,46027382 // mul.s $f14, $f14, $f2
+patch=1,EE,000F094C,word,0C076FFE // jal 0x001DBFF8
+patch=1,EE,000F0950,word,00000000 // nop
+patch=1,EE,000F0954,word,C6010004 // replay 001DEDAC
+patch=1,EE,000F0958,word,E600009C // replay 001DEDB0
+patch=1,EE,000F095C,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0960,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F0964,word,46020002 // mul.s $f00, $f00, $f2
+patch=1,EE,000F0968,word,46000840 // add.s $f1, $f1, $f0
+patch=1,EE,000F096C,word,08077B6E // j 0x001DEDB8
+patch=1,EE,000F0970,word,00000000 // nop
+patch=1,EE,001DEDA4,word,0803C250 // jal 001DBFF8 -> j trampoline
+
