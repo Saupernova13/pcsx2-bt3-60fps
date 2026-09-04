@@ -2515,15 +2515,17 @@ patched  ra=001EF314  a0=fighter0  target 0.721057  step 0.925926   speed 0.7197
 and halving it is right. The *target* is the whole difference: 0.9116 against 0.7211 at the
 same moment, and it climbs at half the real rate under the patch.
 
-The target is computed by `FUN_001DE080`, which **tail-jumps into `FUN_001DE000`** rather
-than calling it - which is why `ra` points at `FUN_001DE080`'s caller and why a static scan
-for `jal 001DE000` does not list this site. `FUN_001DE080` takes a vector in `a3`, measures
-it with `FUN_001221B8` (length), and compares against `$gp-0x6E8C`. So the target is
-derived from the length of a vector, and the obvious candidate is a velocity the patch has
-halved - `fighter+0x50` is the previous tick's displacement and is now half its old value.
+`FUN_001DE080` **tail-jumps into `FUN_001DE000`** rather than calling it, which is why `ra`
+points at `FUN_001DE080`'s own caller and why a static scan for `jal 001DE000` does not
+list this site. Its `a3` is a flag, not a vector - read live, it is `0` and `7`.
 
-**Next step if this is worth chasing:** read `a3` at `FUN_001DE080`'s entry and identify
-the vector, then decide whether the target should be computed from a doubled copy or
-whether the halving belongs one level up.
+The target arrives already computed: at `FUN_001DE080`'s entry `f12` is the same 0.911642
+that reaches `FUN_001DE000`. It is set at `001EF2F0` by **`FUN_001DAC78(fighter, 0xE)`**, a
+per-fighter parameter getter, and that is the value evolving at half rate. The nearby
+`0x41F00000` constant at `001EF2D8` is **not** a frame rate despite reading as `30.0f`:
+`FUN_001E0708` compares it against a vector length, so it is a distance threshold.
+
+**Next step if this is worth chasing:** a watchpoint on whatever `FUN_001DAC78(fighter,
+0xE)` reads, to find the field behind parameter `0xE` and what advances it per tick.
 
 It is a mild slowness against a former 91% overspeed, so it is a refinement, not a defect.
