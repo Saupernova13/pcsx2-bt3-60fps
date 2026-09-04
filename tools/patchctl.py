@@ -47,6 +47,14 @@ AIRBORNE = [
     "60FPS - gravity",
 ]
 
+# Reinstated 2026-09-05. A 2026-08-24 test froze these phases and reported no
+# visible change, so the group was written off as compensating something
+# invisible - but that test was run on the ground. In an airborne hover these
+# are the only cleanly uncompensated per-tick quantities left in the fighter's
+# model, stepping 0.10/0.23/0.27 per tick at both rates, and the group halves
+# exactly those.
+EFFECTS = ["60FPS - effect rotation"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -55,12 +63,12 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
-ENABLED_IN_INI = SHIPPED + AIRBORNE + SPARES
+ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + SPARES
 
 PRESETS = {
     "off": [],
     "shipped": SHIPPED,
-    "air": SHIPPED + AIRBORNE,
+    "air": SHIPPED + AIRBORNE + EFFECTS,
 }
 
 DISABLED_SUFFIX = " [off]"
