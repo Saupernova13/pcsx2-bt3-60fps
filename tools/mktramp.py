@@ -101,11 +101,56 @@ def air_vertical(roo: Roo) -> tuple[str, int, list, list]:
     return "60FPS - airborne vertical", base, items, (words, hook)
 
 
+def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
+    """FUN_001DFD88: pos += residual(+0x80), then shrink it by a fixed eps.
+
+    A hit leaves a decaying slide behind. The whole vector is added every tick
+    and then shortened by an absolute epsilon, so at 60fps it is delivered in
+    half the real time and decays in half the real time - same total distance,
+    twice the speed. Halving both the application and the epsilon puts it back.
+
+    The scaled copy goes to a fixed scratch vector rather than the stack:
+    nothing runs between the scale and the add, so there is nothing to be
+    re-entrant against, and leaving sp alone keeps the trampoline harmless.
+    """
+    base, temp = 0x000F0980, 0x000F09E0
+    items = [
+        *[("asm", t) for t in ["lui $at, 0x3F00", "mtc1 $at, $f12"]],
+        ("asm", f"lui $a0, 0x{temp >> 16:04X}"),
+        ("asm", f"ori $a0, $a0, 0x{temp & 0xFFFF:04X}"),
+        ("asm", "jal 0x00121F38"),               # Vec4Scale(temp, residual, 0.5)
+        # The word at 001DFDB8 is "dmove a2, s1", not a1 - it is the delay slot
+        # of the guard branch, feeding the add that this replaces. The scale
+        # wants the residual as its source, so this one is assembled.
+        ("asm", "daddu $a1, $s1, $zero"),        # src = residual
+        ("copy", 0x001DFDB0),                    # dmove a0, s0   pos
+        ("copy", 0x001DFDAC),                    # dmove a1, s0   pos
+        ("asm", f"lui $a2, 0x{temp >> 16:04X}"),
+        ("asm", "jal 0x00121EA8"),               # Vec4Add(pos, pos, temp)
+        ("asm", f"ori $a2, $a2, 0x{temp & 0xFFFF:04X}"),
+        ("asm", "j 0x001DFDC4"),
+        ("asm", "nop"),
+        # The decay epsilon, halved. Hooked one instruction early so the load
+        # of the epsilon rides in the delay slot and is already done here.
+        *[("asm", t) for t in HALF],
+        ("asm", "mul.s $f1, $f1, $f2"),
+        ("copy", 0x001DFDD8),                    # dmove a0, s1
+        ("asm", "j 0x001DFDE0"),
+        ("asm", "nop"),
+    ]
+    words = build(roo, base, items)
+    hooks = [
+        (0x001DFDBC, jump(base), "jal Vec4Add -> j trampoline"),
+        (0x001DFDD8, jump(base + 13 * 4), "dmove -> j epsilon trampoline"),
+    ]
+    return "60FPS - airborne residual", base, items, (words, hooks)
+
+
 def jump(target: int) -> int:
     return 0x08000000 | (target >> 2)
 
 
-PARTS = {"air": air_speed, "vert": air_vertical}
+PARTS = {"air": air_speed, "vert": air_vertical, "residual": air_residual}
 
 
 def main() -> int:

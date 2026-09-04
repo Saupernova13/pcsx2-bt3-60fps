@@ -16,14 +16,12 @@ one whose step halves is already fixed.
 A script is a list of segments, and a segment is either:
 
     ("hold", frames, buttons, stick)   advance in one call, no sampling
-    ("record", frames)                 advance a frame at a time, sample each
+    ("record", frames, buttons, stick) advance a frame at a time, sample each
 
-They are separate because PCSXROO drops injected input on the final frame of
-any frame-advance - the vsync handler pauses the VM before the input hook runs,
-and that hook returns early unless the VM is running. Advancing one frame at a
-time therefore applies no input at all, so a held button has to happen in one
-bulk call. Sampled segments run with the pad released, which is what a physics
-measurement wants anyway.
+Recording with a button held needs a PCSXROO built after the frame-advance
+input fix. Before it, the vsync handler paused the VM ahead of the input hook,
+which then returned early - so an advance of a single frame applied no input at
+all and a stepped capture recorded the game ignoring the pad.
 
     python tools/traj.py capture ref --script coast --config off  --slot 2
     python tools/traj.py capture new --script coast --config air  --slot 2
@@ -53,13 +51,20 @@ OUT = config.WORK / "captures"
 SCRIPTS: dict[str, list[tuple]] = {
     # Nothing but physics: start from an already-launched state and watch.
     # No input at all, so nothing here depends on the input path.
-    "coast": [("record", 300)],
+    "coast": [("record", 300, [], None)],
     # Climb, then let go.
-    "fall": [("hold", 90, [], (0.0, 1.0)), ("record", 240)],
+    "fall": [("hold", 90, [], (0.0, 1.0)), ("record", 240, [], None)],
     # Stand still. Any divergence here is noise, not physics.
-    "idle": [("record", 180)],
-    # Ground control: walk, then record the stop.
-    "walk": [("hold", 90, [], (0.0, -1.0)), ("record", 120)],
+    "idle": [("record", 180, [], None)],
+    # Held movement, recorded throughout. The hold before it exists so both
+    # rates are already cruising when the recording starts - a 60fps run gets
+    # further through a wind-up in the same real time, and that is not a rate
+    # bug but it swamps one.
+    "back": [("hold", 90, [], (0.0, 1.0)), ("record", 180, [], (0.0, 1.0))],
+    "forward": [("hold", 90, [], (0.0, -1.0)), ("record", 180, [], (0.0, -1.0))],
+    "strafe": [("hold", 90, [], (1.0, 0.0)), ("record", 180, [], (1.0, 0.0))],
+    "dash": [("hold", 60, ["Cross"], (0.0, 1.0)),
+             ("record", 180, ["Cross"], (0.0, 1.0))],
 }
 
 
@@ -74,18 +79,16 @@ def capture(roo: Roo, tag: str, script: str, cfg: str, slot: int) -> None:
 
     pairs = resolve(roo)
     rows, ticks = [], []
-    for segment in SCRIPTS[script]:
-        if segment[0] == "hold":
-            _, frames, buttons, stick = segment
-            roo.input_set(*buttons, left=stick)
+    for kind, frames, buttons, stick in SCRIPTS[script]:
+        roo.input_set(*buttons, left=stick)
+        if kind == "hold":
             roo.frame_advance(frames)
-            roo.input_release()
-            roo.frame_advance(2)
         else:
-            for _ in range(segment[1]):
+            for _ in range(frames):
                 roo.frame_advance(1)
                 rows.append([_row(roo, pair) for pair in pairs])
                 ticks.append(roo.read(FRAME_COUNTER))
+    roo.input_release()
 
     if [str(p) for p in resolve(roo)] != [str(p) for p in pairs]:
         raise RuntimeError("the fighters were reallocated mid-capture")
@@ -159,6 +162,36 @@ def show_ticks(tag: str, who: int, limit: int) -> None:
               f"{norm(delta(step, root)):14.4f}")
 
 
+def speeds(tags: list[str], who: int, window: int) -> None:
+    """Instantaneous speed in units per second, against real time.
+
+    Everything else in this file compares distances, and a distance is the
+    integral of the thing actually under test. Two runs whose speeds match
+    perfectly still show different distances if one entered a ramp a fraction
+    of a second earlier, and a run that is genuinely 20% slow looks fine over a
+    window that happens to start later in the same ramp. So: sample the speed
+    itself, at the same wall-clock offsets, in units both rates can be read in.
+
+    A vsync is 1/60s whatever the game does with it, so the divisor is the same
+    for both - which is the whole point of measuring per vsync.
+    """
+    caps = [(tag, load(tag)) for tag in tags]
+    n = min(len(c["rows"]) for _, c in caps)
+    print(f"speed in units/second, sampled over {window} vsyncs "
+          f"({window / 60:.2f}s), {n} vsyncs recorded")
+    print(f"{'at':>7} " + " ".join(f"{tag:>13}" for tag, _ in caps)
+          + f" {'ratio':>7}")
+    for i in range(window, n, max(window, (n - window) // 12)):
+        values = []
+        for _, cap in caps:
+            here = cap["rows"][i][who]["pos"]
+            back = cap["rows"][i - window][who]["pos"]
+            values.append(norm(delta(here, back)) / (window / 60.0))
+        ratio = values[-1] / values[0] if values[0] > 1e-6 else float("nan")
+        print(f"{i / 60:6.2f}s " + " ".join(f"{v:13.3f}" for v in values)
+              + f" {ratio:7.3f}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -182,11 +215,18 @@ def main() -> int:
     tick.add_argument("--who", type=int, default=0)
     tick.add_argument("--limit", type=int, default=14)
 
+    spd = sub.add_parser("speed")
+    spd.add_argument("tags", nargs="+")
+    spd.add_argument("--who", type=int, default=0)
+    spd.add_argument("--window", type=int, default=12)
+
     args = parser.parse_args()
     if args.verb == "capture":
         capture(Roo().connect(), args.tag, args.script, args.config, args.slot)
     elif args.verb == "compare":
         compare(args.left, args.right, args.who)
+    elif args.verb == "speed":
+        speeds(args.tags, args.who, args.window)
     else:
         for tag in args.tags:
             show_ticks(tag, args.who, args.limit)

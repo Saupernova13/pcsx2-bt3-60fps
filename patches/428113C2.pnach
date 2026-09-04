@@ -219,3 +219,33 @@ patch=1,EE,000F096C,word,08077B6E // j 0x001DEDB8
 patch=1,EE,000F0970,word,00000000 // nop
 patch=1,EE,001DEDA4,word,0803C250 // jal 001DBFF8 -> j trampoline
 
+
+// A hit also leaves a decaying slide on the victim: FUN_001DFD88 adds the
+// whole of fighter+0x80 to the position every tick and then shortens that
+// vector by a fixed epsilon until it reaches zero. Measured across a rush,
+// the vector goes 0.9259 -> 0.3086 -> 0 in exactly the same number of ticks
+// at 30fps and at 60fps, so the same push is delivered in half the real time.
+// Halving both the applied displacement and the epsilon restores it.
+[60FPS - airborne residual]
+patch=1,EE,000F0980,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F0984,word,44816000 // mtc1 $at, $f12
+patch=1,EE,000F0988,word,3C04000F // lui $a0, 0x000F
+patch=1,EE,000F098C,word,348409E0 // ori $a0, $a0, 0x09E0
+patch=1,EE,000F0990,word,0C0487CE // jal 0x00121F38
+patch=1,EE,000F0994,word,0220282D // daddu $a1, $s1, $zero
+patch=1,EE,000F0998,word,0200202D // replay 001DFDB0
+patch=1,EE,000F099C,word,0200282D // replay 001DFDAC
+patch=1,EE,000F09A0,word,3C06000F // lui $a2, 0x000F
+patch=1,EE,000F09A4,word,0C0487AA // jal 0x00121EA8
+patch=1,EE,000F09A8,word,34C609E0 // ori $a2, $a2, 0x09E0
+patch=1,EE,000F09AC,word,08077F71 // j 0x001DFDC4
+patch=1,EE,000F09B0,word,00000000 // nop
+patch=1,EE,000F09B4,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F09B8,word,44811000 // mtc1 $at, $f2
+patch=1,EE,000F09BC,word,46020842 // mul.s $f1, $f1, $f2
+patch=1,EE,000F09C0,word,0220202D // replay 001DFDD8
+patch=1,EE,000F09C4,word,08077F78 // j 0x001DFDE0
+patch=1,EE,000F09C8,word,00000000 // nop
+patch=1,EE,001DFDBC,word,0803C260 // jal Vec4Add -> j trampoline
+patch=1,EE,001DFDD8,word,0803C26D // dmove -> j epsilon trampoline
+
