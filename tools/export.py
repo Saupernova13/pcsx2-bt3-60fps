@@ -10,8 +10,13 @@ comment with it, and puts the list of what to enable at the top.
 The name matters: PCSX2 finds a pnach by the game's CRC, so the file has to be
 called 428113C2.pnach wherever it ends up.
 
-    python tools/export.py                      # to the desktop
+    python tools/export.py --release v2-airborne-and-hover
     python tools/export.py --to build/
+
+With --release it writes two copies: releases/<name>/ for the record, and
+releases/latest/ which is always the newest stable patch. Both are named
+428113C2.pnach, because PCSX2 finds a pnach by CRC and will ignore any other
+name. Tag the commit to match, so a release directory and a tag always agree.
 """
 
 from __future__ import annotations
@@ -86,6 +91,8 @@ def main() -> int:
     parser.add_argument("--source", default="patches/428113C2.pnach")
     parser.add_argument("--to", default=None,
                         help="directory to write into (default: the desktop)")
+    parser.add_argument("--release", default=None, metavar="NAME",
+                        help="write releases/NAME/ and refresh releases/latest/")
     args = parser.parse_args()
 
     source = Path(args.source)
@@ -103,19 +110,26 @@ def main() -> int:
         lines += body
     text = "\n".join(lines).rstrip() + "\n"
 
-    out_dir = Path(args.to) if args.to else Path(os.path.expanduser("~")) / "Desktop"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / f"{config.CRC}.pnach"
-    dest.write_text(text, encoding="utf-8", newline="\r\n")
+    if args.release:
+        root = Path(__file__).resolve().parent.parent / "releases"
+        targets = [root / args.release, root / "latest"]
+    elif args.to:
+        targets = [Path(args.to)]
+    else:
+        targets = [Path(os.path.expanduser("~")) / "Desktop"]
 
-    problems = Pnach.load(dest).validate()
-    if problems:
-        raise SystemExit("the exported pnach did not validate:\n  "
-                         + "\n  ".join(problems))
-    written = Pnach.load(dest)
-    print(f"{dest}")
-    print(f"  {len(written.groups)} groups, "
-          f"{sum(len(g.lines) for g in written.groups)} patch lines, validated")
+    for out_dir in targets:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest = out_dir / f"{config.CRC}.pnach"
+        dest.write_text(text, encoding="utf-8", newline="\r\n")
+        problems = Pnach.load(dest).validate()
+        if problems:
+            raise SystemExit("the exported pnach did not validate:\n  "
+                             + "\n  ".join(problems))
+        written = Pnach.load(dest)
+        print(f"{dest}")
+        print(f"  {len(written.groups)} groups, "
+              f"{sum(len(g.lines) for g in written.groups)} patch lines, validated")
     for name in dropped:
         print(f"  dropped (development only)  {name}")
     return 0
