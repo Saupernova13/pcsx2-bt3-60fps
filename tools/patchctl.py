@@ -62,6 +62,12 @@ EFFECTS = ["60FPS - effect rotation"]
 # halves the step together.
 TWEENS = ["60FPS - tween duration"]
 
+# The particle system, found 2026-09-05. FUN_00167258 ages aura and trail
+# particles with half a dozen per-tick channels and no timestep; gating its
+# caller's update on frame parity - reusing the skip the game already has for
+# its own hidden flag - fixes all of them at once and still draws every frame.
+PARTICLES = ["60FPS - particle update rate"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -70,13 +76,14 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
-ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + TWEENS + SPARES
+ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + SPARES
 
 PRESETS = {
     "off": [],
     "shipped": SHIPPED,
     "air": SHIPPED + AIRBORNE + EFFECTS,
     "tween": SHIPPED + AIRBORNE + EFFECTS + TWEENS,
+    "full": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES,
 }
 
 DISABLED_SUFFIX = " [off]"
