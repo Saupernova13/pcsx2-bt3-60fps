@@ -132,6 +132,23 @@ patch=1,EE,000F0764,word,080592A7 // j     0x00164A9C         odd frame: draw on
 patch=1,EE,000F0768,word,00000000 // nop
 patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
 
+// The tween system - every ease, pulse, fade and blend in the game.
+// FUN_00267AC8(obj, seconds, from, to) builds a linear tween by converting a
+// duration in SECONDS into a count of frames:
+//     obj+0x08 = seconds * 30.0        frames remaining
+//     obj+0x0C = (to - from) / frames  step applied per call
+// and FUN_00267B00 advances it exactly one step per tick. The 30.0 is the
+// game's frame rate written into the arithmetic, so at 60fps the stepper is
+// called twice as often against a duration still counted in 30Hz frames and
+// every tween finishes in half its intended real time. One word fixes both
+// halves at once: 60.0 doubles the frame count and halves the step.
+// Found by sweeping RAM for words that REVERSE DIRECTION twice as often rather
+// than words that step twice as far - the airborne idle's tell was a triangle
+// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings.md.
+[60FPS - tween duration]
+description=Count tween durations in 60Hz frames so eases, pulses, fades and blends take their intended real time.
+patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is
