@@ -2659,3 +2659,115 @@ the fighter and its model. **Next step: ask which element looks fast** (hair, cl
 hovering sway, the whole body) and, if it is the character itself, sweep the model table at
 `0x0031C640` for other entities attached to the fighter rather than only the two fighter
 models.
+
+## 2026-09-05 - the airborne idle: a clean oracle, and every clock in RAM
+
+The previous section ended by asking for a sweep of the model table, on the theory that
+some second entity attached to the fighter was the thing running fast. That is answered,
+and so is a bigger question - but the defect is still not found, so what follows is mostly
+elimination, recorded so it is not repeated.
+
+### The measurement was wrong before it was inconclusive
+
+Every airborne A/B up to here flew to the hover inside the measured window: hold `Cross`
+with the stick forward for N vsyncs, release, sample. That is not an oracle. At 30fps those
+N vsyncs are N/2 ticks of ascent and at 60fps they are N, so the two runs arrive at
+different heights carrying different momentum, and every positional word in the fighter
+then differs for reasons that have nothing to do with the patch. Read that way the fighter
+struct reported 51 of 70 moving words "at double speed", including six at 44x - all of it
+an artifact of comparing a run that had stopped drifting against one that had not.
+
+The fix is to take the flight out of the measured window entirely. `scratchpad/mkair.py`
+flies once, waits for the hover to settle - drift falls to exactly 0.00000 per vsync,
+y frozen at -151.227 - and cuts a save state there. Both configurations then load
+identical RAM and take **no input at all**, so any difference between them is the patch
+and nothing else. A screenshot confirms the state is the real thing: the fighter hovering
+high above the arena in the flight idle, aura lit, opponent a speck on the ground below.
+
+Two facts about flight that are worth writing down, since neither is guessable:
+
+- `Cross` plus left stick `(0.0, 1.0)` is the only input that gets airborne. `R1` alone
+  does nothing at all, and `R1` with the stick forward barely leaves the ground.
+- **World Y is inverted.** Altitude is negative - the ground is about -0.05 and a good
+  hover is -150. A "height" check written the intuitive way passes on the ground and
+  fails in the air.
+
+### Every animation clock in RAM, found by shape
+
+The model table at `0x0031C640` holds 128 pointers of which exactly **2 are live** -
+`008C02F0` and `008C1970`, the two fighter models. There is no hair, cape, aura or
+afterimage entity hiding behind it, so a search that follows pointers from the fighter can
+only ever find what has already been searched.
+
+Searching by shape instead has no such limit. An animation controller is recognisable
+without knowing who owns it: the clock sits at `+0x138`, its per-tick rate at `+0x140`, and
+the rate reads a stock `2.0`. So a moving float whose neighbour eight bytes along is
+exactly `2.0` is a running animation clock, wherever it lives. Across all 32 MB there are
+exactly **three**:
+
+| clock | controller | 30fps | 60fps | ratio |
+|---|---|---|---|---|
+| `008C0F68` | `008C0E30` | 1.00000 | 1.00000 | 1.000 |
+| `008C25E8` | `008C24B0` | 1.00000 | 1.00000 | 1.000 |
+| `01995B84` | `01995A4C` | 0.03593 | 0.03593 | 1.000 |
+
+The first two are the fighters' body controllers at `model+0xC78`. All three advance the
+same amount per vsync at both rates, which is to say **at the correct speed in real time**.
+Measured per tick the same numbers read 2.0 against 1.0, the halving the patch installs;
+per vsync - per unit of real time, which is what the user sees - they read 1.00 against
+1.00. There is no fourth clock and none of the three is fast.
+
+That is as close to proof as this project gets that **the body animation is not what is
+running at double speed in the air.**
+
+### A per-vsync sweep of all 32 MB, and why the first one lied
+
+With both runs starting from identical RAM, a full sweep becomes meaningful. Storing 20
+snapshots of 32 MB is not possible, so `scratchpad/ramsweep.py` keeps running accumulators
+instead - per word the sum of the non-zero absolute deltas, how many there were, and the
+largest.
+
+The first version dropped that largest delta before averaging, to stop a looping clock's
+wrap from swamping its step. That quietly biased the whole comparison. At 30fps the game
+ticks on every second vsync, so a 20-vsync window gives ten non-zero deltas against the
+60fps run's twenty, and removing the maximum costs a ten-sample mean far more than a
+twenty-sample one. Every merely noisy word came out looking 1.1-1.7x faster at 60fps: 8199
+words in that band, more than sat around 1.0. Keeping every delta and letting a wrap
+inflate one word rather than a whole class moved 9063 words onto 1.0 and shrank the
+suspicious band by a third. **A robustness trick that is not symmetric between the two arms
+of an A/B is a bug in the oracle, not a refinement of it.**
+
+### What the sweep found, and why it is not the answer
+
+One region stands out with ratios that are not noise at all - dead-clean `2.000` on values
+like `0.50000 -> 1.00000`, `2.30000 -> 4.60000` and `25.60027 -> 51.20022`. It sits at
+`0x018768A8`-`0x0187C6F8`, immediately past the two fighter structs, and it is a pool of
+per-tick timers: a write watchpoint names `00267AE4 swc1 f12, 0x8(a0)` as the writer and
+`FUN_00267B00` as the stepper, which does
+
+```
+lwc1  f00, 0x8(a1)     # the timer
+sub.s f00, f00, 1.0    # exactly one per call
+```
+
+A countdown decremented by exactly 1.0 per call, uncompensated, which is exactly the shape
+of the bug being hunted.
+
+It is still not the defect. Running the same A/B from the **ground** state finds the pool
+just as busy there - 341 moving words and 65 at 2x, against 334 and 51 in the air. The user
+reports the ground as correct. Whatever these timers drive is either invisible or already
+compensated somewhere downstream, and a patch aimed at them would be a change made for the
+sake of a number rather than for anything on screen.
+
+### Where this leaves it
+
+Ruled out for the airborne idle, all by measurement from the identical-state oracle: the
+body animation clock, every other animation clock in RAM, the whole model block
+`0x0000`-`0x1600`, the model table, the fighter struct, and the per-tick timer pool behind
+the fighters.
+
+The next measurement drops step size altogether. Comparing how far a word moves is
+confounded by state divergence; an animation that plays at double speed reverses direction
+twice as often in the same number of vsyncs, and a count of sign changes needs no
+magnitude, no alignment, and one word of state per address - so it can sweep all of RAM.
+That is `scratchpad/oscscan.py`.
