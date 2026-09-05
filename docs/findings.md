@@ -3105,3 +3105,77 @@ situation only rules out what that situation actually exercises**, and the cost 
 finding out was two fixes that were real defects but were not the reported one.
 When the user can put the game in the situation, take the save state from them
 rather than building an approximation of it.
+
+## 2026-09-05 - MILESTONE: the hovering idle is fixed, confirmed in play
+
+> that worked, this is a milestone
+
+The hover bob group is confirmed by the user in normal play, not only by
+measurement. That matters because two fixes before it measured correct and were
+real defects, and neither was the thing being reported - **a patch is not
+confirmed until the person who reported the symptom says the symptom is gone.**
+
+### Where the patch stands
+
+Thirteen groups ship. Every one is verified against the unpatched 30fps game as
+its own oracle - same save state, same input, same number of vsyncs.
+
+| group | what it fixes | confirmed |
+|---|---|---|
+| battle | the battle loop stride, 30 -> 60 | in play |
+| animation clock | animation time itself, seven hook sites | in play |
+| input repeat timing | menu auto-repeat delay and rate | in play |
+| input timing | the 128 per-button frame counters | in play |
+| aura update rate | the ki aura, advanced every other frame | in play |
+| effect rotation | the four per-tick phase rates behind swirls | measured |
+| airborne motion | directed travel: flight, dashes, knockback | in play |
+| airborne vertical | rising and falling | in play |
+| airborne residual | the post-hit slide and its decay | in play |
+| gravity | the fall acceleration and the step it drives | in play |
+| tween duration | every ease, pulse, fade and blend in the game | measured |
+| particle update rate | aura and trail particle lifetimes | measured |
+| **hover bob** | **the airborne idle's rise and fall** | **in play** |
+
+Two groups stay in the repo pnach and never ship: `animation rate`, superseded by
+`animation clock`, and `EXPERIMENT halve root motion`, which deliberately breaks
+ground movement. `tools/export.py` strips both.
+
+### The save states, and which one is worth keeping
+
+| slot | what it holds |
+|---|---|
+| 1 | the hand-made ground state, never overwritten |
+| 2 | the opponent launched and flying |
+| 3, 4 | synthesized airborne hovers - **the crouched flight pose, not the hover idle** |
+| **5** | **the user's own session, captured live while hovering** |
+
+Slot 5 is the only state that contains the real hovering idle, and it is the one
+that made the bob findable. `roo.savestate` works on a running VM, so capturing
+the user's situation costs nothing and beats approximating it. Slots 3 and 4 are
+kept only as a reminder of what a synthesized situation does and does not
+exercise.
+
+### What is still open
+
+- **About 70 float words in the effect region** still reverse roughly twice as
+  often, spread across `0198F000`-`01995000` with no dominant cluster. Several
+  step *less* at 60fps than at 30, so that count is an upper bound and part of it
+  is noise. There is no second obvious particle pool.
+- **Circling sideways at 0.803 cruise**, from an earlier session. The next step
+  written down there still stands: watchpoint whatever `FUN_001DAC78(fighter,
+  0xE)` reads.
+- Nothing else is reported broken in play.
+
+### Working notes for whoever picks this up
+
+- **Commit after each verified step.** Two power cuts during this session each
+  destroyed a running emulator instance. Save states and the repo survive; a
+  four-minute RAM sweep in progress does not.
+- **One driver at a time.** The emulator serves a single client; a background
+  sweep and a foreground experiment will fight over it and both will be wrong.
+- **A `patch=1` line is re-applied every frame.** Poking the stock value back
+  into a patched address does not disable the group - it is overwritten on the
+  next frame. Use `patchctl` with an explicit group list instead.
+- **`$gp` reads zero wherever the VM pauses**, so gp-relative constants cannot be
+  resolved from the register. Measure the value and scan for it, then confirm
+  which copy by halving each in turn.
