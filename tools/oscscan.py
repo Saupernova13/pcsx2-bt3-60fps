@@ -74,14 +74,17 @@ def plausible(a: np.ndarray) -> np.ndarray:
 
 
 def measure(roo: Roo, cfg: str, base: int, size: int, samples: int,
-            stride: int, slot: int, poke=()) -> dict:
+            stride: int, slot: int, poke=(), settle: int = 0) -> dict:
     roo.flush_input()
     roo.loadstate(slot)
     patchctl.apply(roo, patchctl.PRESETS.get(cfg) or cfg.split(","), quiet=True)
     for addr, value in poke:
         if not roo.write(addr, value):
             raise SystemExit(f"poke {addr:08X}={value:08X} did not take")
-    roo.frame_advance(2)
+    # Let the configuration take hold before the first sample. Anything the
+    # state froze mid-flight - a tween carries the step it was built with -
+    # is still running on the old numbers until something rebuilds it.
+    roo.frame_advance(2 + settle)
 
     raw = snap(roo, base, size)
     ok = plausible(raw)
@@ -131,15 +134,18 @@ def main() -> int:
     parser.add_argument("--max-flips", type=int, default=20,
                         help="ignore words that reverse on nearly every sample - "
                              "those are toggles, not animations")
+    parser.add_argument("--settle", type=int, default=0,
+                        help="vsyncs to run under the configuration before the "
+                             "first sample, so state frozen mid-flight rebuilds")
     parser.add_argument("--limit", type=int, default=40)
     args = parser.parse_args()
 
     poke = [tuple(int(y, 0) for y in x.split("=")) for x in args.poke.split(",") if x]
     roo = Roo().connect()
     a = measure(roo, args.ref, args.base, args.size, args.samples,
-                args.stride, args.slot)
+                args.stride, args.slot, settle=args.settle)
     b = measure(roo, args.cfg, args.base, args.size, args.samples,
-                args.stride, args.slot, poke)
+                args.stride, args.slot, poke, settle=args.settle)
 
     fa, fb = a["flips"], b["flips"]
     real = a["ok"] & b["ok"]
