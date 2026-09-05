@@ -2990,3 +2990,118 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-09-05 - the hovering idle bob, and the state every scan had been missing
+
+The user, after two fixes that were real but were not the one they were seeing:
+
+> whenever you load state or I see you "playing the game" you're mostly on the
+> ground. im in the air now.
+
+They were right, and it was the whole problem.
+
+### The synthesized hover was the wrong animation
+
+Every airborne state built here was made the same way: hold `Cross` with the
+stick forward, release, wait for the drift to reach zero. That does put the
+fighter in the air, and it is settled, and it is reproducible - and it leaves
+them in the **crouched flight pose**, leaning forward. The hovering idle is a
+different clip entirely: upright, arms down, holding station. Screenshots of the
+two side by side are not subtle.
+
+**A character in the flight pose does not bob.** So every scan of the model came
+back clean - "0 double-speed words in 0x0000-0x1600" - because the thing that
+runs fast was not running at all in the state being measured. The measurement was
+sound; it was pointed at the wrong animation for two sessions.
+
+The fix for the method is to stop synthesizing the situation. `roo.savestate`
+works on a running VM, so the user's own session became slot 5 while they were
+sitting in the air. Every measurement below starts there.
+
+### The bob is not the animation
+
+In the real hovering idle the body animation clock is still correct - it steps
+1.0 per vsync at both rates, exactly as it did everywhere else. But the fighter's
+**world position never moves at all**, while the skeleton root Y swings through
+about 4 units, and swings through it about twice as often at 60fps. That is why
+a position trace of a hover looks perfectly still: the bob is absorbed by the
+anchor, not expressed in world space.
+
+Re-running the model scan from slot 5 - the same scan that had reported nothing -
+lit up 19 words with clean 2.00 ratios, all in the hovering fighter's model:
+`+0x954` and `+0x974` (root Y before and after the skeleton pass), `+0x9D4` (the
+matrix translation Y), `+0xAF8`-`+0xB04`, `+0xF64`-`+0xFE8`, `+0x1120`-`+0x11A8`.
+Their waveform is a clean sine that completes its arc in half the real time.
+
+The fighter struct, scanned from the same state, gave the input: `+0x34` (the
+anchor Y) and `+0xB8`, both at exactly 2.00.
+
+### The generator
+
+A write watchpoint on the anchor Y lands in the tail of `FUN_001DFD88`:
+
+```
+001DFF44  lwc1  $f0, -0x6DF0($gp)   phase increment
+001DFF48  add.s $f0, $f12, $f0      phase += increment, once per tick
+001DFF4C  c.lt.s $f1, $f0           wrap at a limit
+001DFF54  swc1  $f0, 0xA8($s0)      the phase          -> fighter+0xB8
+001DFF6C  jal   0x0011F588          sine of the phase
+001DFF74  add.s $f0, $f0, $f0       doubled for amplitude
+001DFF78  swc1  $f0, 0x24($s0)      the anchor Y       -> fighter+0x34
+```
+
+The increment measures **0.10472 per tick, which is pi/30** - one full revolution
+per 60 ticks. That is two seconds at 30Hz and one second at 60. The game's frame
+rate is written into the arithmetic exactly as it was in the tween constructor,
+just spelled as a fraction of pi instead of as `30.0`.
+
+### Resolving the constant without $gp
+
+`$gp` reads zero wherever the VM pauses - the pause lands in the kernel idle loop
+where r28 is not live - and a breakpoint on the instruction did not stop in time.
+So the constant was found by value instead: measure the increment exactly, then
+scan for it. Four identical copies of pi/30 sit in the small-data pool at
+`002FD088`, `002FD468`, `002FD47C` and `002FD480` - the same pool as the gravity
+constant at `002FD424`.
+
+Halving each in turn says which is which, with no inference at all:
+
+| halved | phase per vsync at 60fps |
+|---|---|
+| `002FD088` | 0.10036 |
+| **`002FD468`** | **0.05018** |
+| `002FD47C` | 0.10036 |
+| `002FD480` | 0.10036 |
+
+And scanning the whole code segment for `lwc1 f?, -0x6DF0($gp)` finds **exactly
+one instruction** - `001DFF44` itself - with no `lw`, `sw` or `swc1` at that
+offset either. The constant is private to the bob, so a one-word data patch is
+completely surgical.
+
+    patch=1,EE,002FD468,word,3D56774E // pi/30 -> pi/60
+
+Halving a float is subtracting `0x00800000` from it, so `3DD6774E` becomes
+`3D56774E`. Frequency halves; amplitude is untouched.
+
+### Verification
+
+From the user's own captured hover, through the shipped group, 150 vsyncs:
+
+| configuration | `002FD468` | phase per tick | bob reversals |
+|---|---|---|---|
+| `off` - the 30fps oracle | `3DD6774E` = pi/30 | 0.10472 | **2** |
+| `full` without this group | `3DD6774E` = pi/30 | 0.10472 | **5** |
+| `full` - shipping | `3D56774E` = pi/60 | 0.05236 | **2** |
+
+Same turns in the same real time, and the bob's span is 4.0000 in both - the
+amplitude never changed. No regression: dash 0.988, launched-opponent coast
+0.985, unchanged.
+
+### The lesson worth keeping
+
+Three separate sweeps of the model reported it clean, and all three were correct
+about the state they were run in. **A negative result from a synthesized
+situation only rules out what that situation actually exercises**, and the cost of
+finding out was two fixes that were real defects but were not the reported one.
+When the user can put the game in the situation, take the save state from them
+rather than building an approximation of it.
