@@ -68,6 +68,12 @@ TWEENS = ["60FPS - tween duration"]
 # its own hidden flag - fixes all of them at once and still draws every frame.
 PARTICLES = ["60FPS - particle update rate"]
 
+# The hovering idle bob, found 2026-09-05. A sine whose phase advances pi/30 a
+# tick - one cycle per 60 ticks - added to the fighter's anchor, entirely
+# separate from the animation clock. Only one instruction in the game reads the
+# constant, so halving it touches nothing else.
+HOVER = ["60FPS - hover bob"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -76,14 +82,15 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
-ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + SPARES
+ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
+                  + HOVER + SPARES)
 
 PRESETS = {
     "off": [],
     "shipped": SHIPPED,
     "air": SHIPPED + AIRBORNE + EFFECTS,
     "tween": SHIPPED + AIRBORNE + EFFECTS + TWEENS,
-    "full": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES,
+    "full": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER,
 }
 
 DISABLED_SUFFIX = " [off]"

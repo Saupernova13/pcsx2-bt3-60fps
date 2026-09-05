@@ -179,6 +179,29 @@ patch=1,EE,000F0798,word,0805A041 // j    0x00168104
 patch=1,EE,000F079C,word,00000000 // nop
 patch=1,EE,001680FC,word,0803C1E0 // ld -> j 000F0780 (FUN_00168084 update gate)
 
+// The hovering idle bob - the up and down float of a fighter holding station in
+// the air. It is not the body animation: the animation clock is already correct
+// in the air, which is why every measurement aimed at it kept reading 1.000
+// while the hover still looked fast. The bob is generated separately, in
+// FUN_001DFD88's tail:
+//     001DFF44  lwc1  $f0, -0x6DF0($gp)   phase increment
+//     001DFF48  add.s $f0, $f12, $f0      phase += increment, once per tick
+//     001DFF54  swc1  $f0, 0xA8($s0)      the phase, at fighter+0xB8
+//     001DFF6C  jal   0x0011F588          sine of the phase
+//     001DFF74  add.s $f0, $f0, $f0       doubled for amplitude
+//     001DFF78  swc1  $f0, 0x24($s0)      the anchor Y, at fighter+0x34
+// The increment is pi/30 - one full cycle per 60 ticks, which is two seconds at
+// 30Hz and one second at 60. Halving it to pi/60 restores the period and leaves
+// the amplitude alone. World position never moves during the bob; the anchor
+// absorbs it, which is why a position trace looks perfectly still.
+// The constant has four identical copies in the small-data pool and exactly one
+// instruction in the whole code segment reads this one, so the patch is private
+// to the bob. Found by scanning the model in the REAL hover idle - earlier scans
+// sat in the crouched flight pose, where the character does not bob at all.
+[60FPS - hover bob]
+description=Halve the hovering idle's bob phase so a fighter holding station in the air rises and falls at its real-time speed.
+patch=1,EE,002FD468,word,3D56774E // pi/30 -> pi/60   hover bob phase increment
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is
