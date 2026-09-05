@@ -74,6 +74,13 @@ PARTICLES = ["60FPS - particle update rate"]
 # constant, so halving it touches nothing else.
 HOVER = ["60FPS - hover bob"]
 
+# The blast hit cadence, found 2026-09-06. A hitbox's tick counter H[0x0A] is
+# advanced once a tick and a hit lands when it reaches an interval authored in
+# ticks, so multi-hit attacks land twice as fast at 60fps and burn through their
+# hit budget - and so their duration - in half the real time. Gating the single
+# call that advances it on frame parity fixes cadence and duration together.
+BLAST = ["60FPS - blast hit cadence"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -83,14 +90,16 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
-                  + HOVER + SPARES)
+                  + HOVER + BLAST + SPARES)
 
 PRESETS = {
     "off": [],
     "shipped": SHIPPED,
     "air": SHIPPED + AIRBORNE + EFFECTS,
     "tween": SHIPPED + AIRBORNE + EFFECTS + TWEENS,
-    "full": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER,
+    "noblast": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER,
+    "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+             + BLAST),
 }
 
 DISABLED_SUFFIX = " [off]"

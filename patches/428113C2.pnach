@@ -202,6 +202,33 @@ patch=1,EE,001680FC,word,0803C1E0 // ld -> j 000F0780 (FUN_00168084 update gate)
 description=Halve the hovering idle's bob phase so a fighter holding station in the air rises and falls at its real-time speed.
 patch=1,EE,002FD468,word,3D56774E // pi/30 -> pi/60   hover bob phase increment
 
+// The blast hit cadence, found 2026-09-06. Every attack's hitbox carries a tick
+// counter at H[0x0A] (H = [obj+0x60]) that FUN_001AFE70 advances once a tick,
+// and a hit lands when it reaches the interval D[0x0B], authored IN TICKS in the
+// move's data record (D = [[obj+0x64]+0x24]). The same counter paces the whole
+// attack: it ends once the hits landed, H[0x0B], exceed the maximum D[0x0A].
+// Nothing compensates it, so at 60fps a Kamehameha lands its hits twice as fast
+// and spends its hit budget in half the real time - the reported "cut short,
+// fewer hits". FUN_0012E7C8 is the only thing that increments the counter and
+// 001AFE98 is its only caller, so gating that one call on frame parity fixes the
+// cadence and the duration together. The first hit of an attack is never delayed
+// - the blez at 001AFF08 short-circuits while no hits have landed - so single
+// hit melee is untouched. Verified against the 30fps oracle: same save state,
+// same scripted input, hits every 8 vsyncs and the damage spanning 32, against
+// 4 and 16 unpatched, with damage and hit count identical either way.
+[60FPS - blast hit cadence]
+description=Pace multi-hit attacks by real time, so Kamehameha-style blasts land their hits at the right rate and last as long as they should.
+patch=1,EE,000F0200,word,3C080033 // lui  $t0, 0x33
+patch=1,EE,000F0204,word,8D081D64 // lw   $t0, 0x1d64($t0)   frame counter
+patch=1,EE,000F0208,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F020C,word,15000003 // bnez $t0, 000F021C      odd frame: do not count
+patch=1,EE,000F0210,word,00000000 // nop
+patch=1,EE,000F0214,word,0C04B9F2 // jal  0x0012E7C8         even frame: count as normal
+patch=1,EE,000F0218,word,00000000 // nop
+patch=1,EE,000F021C,word,0806BFA8 // j    0x001AFEA0         rejoin past the delay slot
+patch=1,EE,000F0220,word,00000000 // nop
+patch=1,EE,001AFE98,word,0803C080 // jal 0012E7C8 -> j 000F0200 (hitbox counter tick)
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is
