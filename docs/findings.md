@@ -3179,3 +3179,91 @@ exercise.
 - **`$gp` reads zero wherever the VM pauses**, so gp-relative constants cannot be
   resolved from the register. Measure the value and scan for it, then confirm
   which copy by halving each in turn.
+
+## 2026-09-05 - ki blasts are cut short: four hypotheses, all wrong
+
+Reported by the user: ki blasts (Kamehameha and friends) last a shorter time and
+land fewer hits at 60fps, and in ultimate-attack cutscenes the *blast* runs at
+double speed while the bone and mesh animation plays correctly - so the energy
+ball forms too fast and the sequence "ends early".
+
+**Not solved.** What follows is what was measured and ruled out, so the next
+attempt does not repeat it.
+
+### The instruments
+
+Two globals hold the combo readout, found by intersecting two moments whose
+on-screen values were known (1760 at one frame, 2310 eight frames later):
+
+    0033371C   combo damage
+    00333724   hit count
+
+`00331D64` is the frame counter, which rose by exactly 8 over those 8 vsyncs and
+so confirms 60fps ticks once per vsync.
+
+Save states, all captured live from the user's own session:
+
+    slot 6   mid-Kamehameha, beam on screen, captured patched
+    slot 7   the ultimate just started, camera on Goku, ball not yet formed, patched
+    slot 8   the same moment of the same ultimate, captured UNPATCHED at 30fps
+
+### A contaminated measurement, and the state that fixed it
+
+From slot 7, running the two arms against each other, the ultimate's damage
+landed at vsync 128 patched and vsync 200 unpatched - apparently a large real
+difference. **It was an artifact.** Slot 7 was captured with the patch running,
+so every tween already in flight carried a step computed from the fixed 60.0
+constant; replayed unpatched those tweens run at *half* speed and stretch the
+sequence. A state captured under one configuration cannot serve as the reference
+for the other whenever the patch changes stored data rather than only code.
+
+Asking the user to capture the same moment with the patch off gave slot 8, and
+measuring each state in the configuration it was captured in:
+
+| state | configuration | beam bright until |
+|---|---|---|
+| slot 8 | unpatched 30fps | vsync 152 |
+| slot 7 | patched 60fps | vsync 160 |
+
+**The ultimate's overall duration is not halved.** Frames captured at matched
+vsyncs in the two arms show the same body pose, the same camera and the same QTE
+prompt at vsync 60.
+
+### Ruled out
+
+- **The sequence length.** 152 vs 160 vsyncs, above.
+- **The beam's remaining life.** From slot 6, frame-exact brightness gives 64
+  vsyncs unpatched against 62 patched.
+- **The blast node's own lifetime.** `FUN_0017C8F4` runs a duration down at
+  `0017C99C` by exactly 1.0 a tick, from the `1.0` at `0017C990` - a genuinely
+  uncompensated per-tick timer of precisely the shape being hunted, in a node
+  type neither the aura nor the particle gate covers. Halving it changed nothing
+  the user could see. Worth knowing it exists; it is not this bug.
+- **Ki drain.** No word behaves like a gauge emptying during a beam. The
+  candidates near `0031C118`-`0031C158` read ratio 0.96 - correct - and the one
+  that moves (`0031C128`) wobbles rather than draining, at ratio 1.39.
+- **An earlier claim, withdrawn.** A ki barrage was reported here as delivering
+  its hits "in half the real time". That came from sampling on a 10-vsync grid;
+  at 2-vsync resolution the last hit lands at vsync 12 unpatched against 10
+  patched, a factor of 1.25, and the move is front-loaded enough that most of its
+  hits land before sampling begins. It is not evidence of anything.
+
+### What the next attempt should do differently
+
+Every measurement above looks at *duration*. The user's description is about a
+blast that stops early, which duration should capture - and does not. Two
+readings survive:
+
+1. The affected quantity is not on any clock that was watched. A beam in this
+   game may persist while a resource lasts rather than while a timer runs, and no
+   such resource has been located yet.
+2. The situations are not the same situation. Slots 7 and 8 are different
+   battles - different health, different blast stock, different positions - and
+   only the *phase* of the move is comparable between them, not the outcome.
+
+The cleanest experiment not yet run: have the user fire **the same beam twice
+from one save state**, once with the patch and once without, capturing a state
+immediately before the input in each case, and compare the hit count. Hit count
+is the thing the user actually reports losing, and it is a single integer that
+needs no alignment between runs. Everything measured so far has been a proxy for
+it.
