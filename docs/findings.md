@@ -2771,3 +2771,114 @@ confounded by state divergence; an animation that plays at double speed reverses
 twice as often in the same number of vsyncs, and a count of sign changes needs no
 magnitude, no alignment, and one word of state per address - so it can sweep all of RAM.
 That is `scratchpad/oscscan.py`.
+
+## 2026-09-05 - the tween system: every ease in the game ran at double speed
+
+Sweeping for words that **step twice as far** had run out of road. The metric that
+found this asks a different question - which words **reverse direction twice as
+often** in the same amount of real time. An animation at double speed has to, and
+unlike a step size a reversal count needs no magnitude and no alignment between
+the two runs, so it survives the state divergence that had been drowning every
+positional field in noise.
+
+### Three ways to get the reversal count wrong
+
+Each of these was found by getting it wrong first, and each one alone is enough to
+make the scan useless.
+
+1. **Sample both rates on the same real-time grid, with the same number of
+   samples.** Reading every vsync gives the 60fps run twice as many looks at the
+   same two seconds, and twice as many looks at a noisy word find twice as many
+   reversals whatever its speed. Sampling every second vsync in both fixes it, and
+   is also exactly one sample per tick at 30fps so nothing is read twice there.
+2. **Check the words are actually floats.** The two ~24 KB regions at `0x006E9000`
+   and `0x007E9000` are DMA and GIF packet data. Read as floats they are denormal
+   zeros punctuated by values like `2.5e30`, and their sign flips mean nothing.
+   They accounted for almost the entire first result.
+3. **Start from a state that needs no input** - `tools/mkstate.py airidle`.
+
+Unfiltered the scan reported 6792 words at 2x. With the grid fixed and
+non-floats excluded: 657, and the top six were unmistakable.
+
+### The tell
+
+Two copies of one small structure, at `0x01879368` and `0x018795F4`, sampled every
+second vsync during an airborne idle:
+
+```
+01879370   30fps   0.000  0.333  0.667  1.000  0.667  0.333   period 12 vsyncs
+           60fps   0.667  0.667  0.000  0.667  0.667  0.000   period  6 vsyncs
+```
+
+A triangle wave, ping-ponging 0 to 1 and back in steps of one third, at exactly
+double the frequency. `+0x00` is a 1,2,3 phase index, `+0x04` the direction,
+`+0x0C` the endpoint. A write watchpoint named `FUN_00267B00`, and its
+constructor sits just above it.
+
+### The bug
+
+`FUN_00267AC8(obj, seconds, from, to)` builds a linear tween:
+
+```
+00267AC8  lui   at, 0x41F0        ; 30.0
+00267AD4  mul.s f12, f12, f00     ; obj+0x08 = seconds * 30    frames remaining
+00267AD8  swc1  f13, 0x10(a0)     ; obj+0x10 = from            current value
+00267AE0  swc1  f14, 0x14(a0)     ; obj+0x14 = to              target
+00267AF0  div.s f00, f00, f12     ; obj+0x0C = span / frames   step per call
+```
+
+and `FUN_00267B00` advances it exactly one step per tick, decrementing the frame
+count by 1.0 and clamping at the target.
+
+**The 30.0 is the game's frame rate written into the arithmetic.** A caller asks
+for a duration in seconds; the constructor converts it to ticks assuming 30 ticks
+per second. At 60fps the stepper is called twice as often against a duration still
+counted in 30Hz frames, so every tween finishes in half the time it was authored
+for. This is the same class of defect as everything else here - a per-tick
+quantity with no timestep - but it is the first one found in a *general-purpose
+service* rather than in a particular behaviour, which is why it survived so long:
+it is not the aura's bug or the animation system's bug, it is every ease, pulse,
+fade and blend in the game at once.
+
+One word repairs both halves, because both derive from the same constant:
+
+    patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0
+
+60.0 doubles the frame count and halves the step together.
+
+### Verification
+
+Through the shipped pnach group, not a memory poke, from the identical
+airborne-idle state:
+
+| preset | word at `00267AC8` | tween period |
+|---|---|---|
+| `off` (the 30fps oracle) | `3C0141F0` = 30.0 | 12 vsyncs |
+| `air` | `3C0141F0` = 30.0 | **6 vsyncs** |
+| `tween` | `3C014270` = 60.0 | 12 vsyncs |
+
+No regression: dash 0.988 and launched-opponent coast 0.985, both unchanged from
+before the group existed.
+
+### What this does not yet explain
+
+The reversal scan still finds 191 real-float oscillators at 2x outside the display
+packets, about a hundred of them in the effect pool at `0x0198F000`-`0x0199A000`.
+Some of that is an artifact of the method rather than a defect: **a save state cut
+before the fix contains tween objects whose `step` was already computed from the
+30Hz constant**, and those keep running fast until something rebuilds them, which
+in a two-second window most long tweens never do. The ping-pong pair rebuilds
+every six ticks, which is exactly why it was the clearest signal in the sweep.
+
+Two dead ends worth not repeating, both ruled out by measurement from the
+identical-state oracle:
+
+- **The per-tick timer pool** at `0x018768A8`-`0x0187C6F8` is dead-clean 2.000 on
+  values like `0.5 -> 1.0` and `25.60027 -> 51.20022`, and it is the countdown
+  field of these same tween objects. It stays at 2.000 *after* the fix and that is
+  correct - the duration is now legitimately twice as many frames. Counting
+  "words at 2x" is the wrong success measure for this bug; the value field is what
+  has to come back to 1.0, and it does.
+- **The same pool is just as busy on the ground** - 341 moving words and 65 at 2x,
+  against 334 and 51 in the air - so it was never going to be an air-specific
+  defect on its own.
