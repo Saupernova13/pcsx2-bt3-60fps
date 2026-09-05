@@ -55,6 +55,13 @@ AIRBORNE = [
 # exactly those.
 EFFECTS = ["60FPS - effect rotation"]
 
+# The tween system, found 2026-09-05. FUN_00267AC8 converts a duration in
+# seconds into frames at a hard-coded 30.0, and FUN_00267B00 steps it once per
+# tick, so at 60fps every ease, pulse and blend in the game finishes in half its
+# intended real time. One word - 30.0 becomes 60.0 - doubles the frame count and
+# halves the step together.
+TWEENS = ["60FPS - tween duration"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -63,12 +70,13 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
-ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + SPARES
+ENABLED_IN_INI = SHIPPED + AIRBORNE + EFFECTS + TWEENS + SPARES
 
 PRESETS = {
     "off": [],
     "shipped": SHIPPED,
     "air": SHIPPED + AIRBORNE + EFFECTS,
+    "tween": SHIPPED + AIRBORNE + EFFECTS + TWEENS,
 }
 
 DISABLED_SUFFIX = " [off]"
