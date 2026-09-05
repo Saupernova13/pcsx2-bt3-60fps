@@ -48,10 +48,10 @@ RECIPES = {
 }
 
 
-def build(roo: Roo, recipe: str, slot: int) -> None:
+def build(roo: Roo, recipe: str, slot: int, config: str = "shipped") -> None:
     roo.flush_input()
     roo.loadstate(GROUND_SLOT)
-    patchctl.apply(roo, patchctl.SHIPPED)
+    patchctl.apply(roo, patchctl.PRESETS.get(config) or config.split(","))
     roo.frame_advance(4)
 
     who, steps = RECIPES[recipe]
@@ -83,6 +83,11 @@ def main() -> int:
     parser.add_argument("recipe", nargs="?", choices=sorted(RECIPES))
     parser.add_argument("--slot", type=int, default=2)
     parser.add_argument("--list", action="store_true")
+    # Which patches are live while the state is cut. It matters more than it
+    # looks: a tween object carries the step it was built with, so a state cut
+    # under the wrong configuration hands both arms of a later A/B a set of
+    # objects that were already wrong when they were frozen.
+    parser.add_argument("--config", default="shipped")
     args = parser.parse_args()
 
     if args.list or not args.recipe:
@@ -91,7 +96,7 @@ def main() -> int:
         return 0
     if args.slot == GROUND_SLOT:
         raise SystemExit("slot 1 is the hand-made ground state; pick another")
-    build(Roo().connect(), args.recipe, args.slot)
+    build(Roo().connect(), args.recipe, args.slot, args.config)
     return 0
 
 
