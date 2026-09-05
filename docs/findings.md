@@ -2882,3 +2882,111 @@ identical-state oracle:
 - **The same pool is just as busy on the ground** - 341 moving words and 65 at 2x,
   against 334 and 51 in the air - so it was never going to be an air-specific
   defect on its own.
+
+## 2026-09-05 - the particle system, and the freeze that finally located it
+
+The tween fix was real but it was not the airborne idle - the user tested it and
+reported no change. What follows is what found the actual one.
+
+### Freeze the clock and see what is left moving
+
+`[60FPS - animation clock]` hooks **seven** sites, not the five an earlier
+diagnostic froze, so no previous run of this test meant anything. Zeroing the
+rate multiplier at all seven - `000F0104, 000F0124, 000F0144, 000F0164,
+000F0184, 000F01A4, 000F01C4` - pins the fighter's clock solid at 62.0 while the
+game keeps running. Anything still moving is then, by construction, not driven
+by animation time.
+
+Counting plausible-float words that move at all, in a settled airborne hover:
+
+| region | normal | animation clock frozen |
+|---|---|---|
+| display packets `006E`/`007E` | 4982 / 4951 | 1139 / 1127 |
+| `00900000` | 5495 | 526 |
+| **effects `01900000`** | **3913** | **3494** |
+| fighter 0 model | 128 | 106 |
+
+The rendering collapses, as it should. The effect pool barely notices. **The
+effect system runs almost entirely independently of the animation clock**, which
+is why every measurement aimed at the clock kept coming back correct while the
+user kept seeing something at double speed.
+
+### What the effects were doing
+
+An oscillation scan of `0x01870000`-`0x019A0000` from the identical-state oracle
+put 41 of its 107 candidates on a single page. Their raw series, sampled once per
+tick:
+
+```
+0199AD64   30fps   5  4  3  2  1  0 -1 -1        lifetime, -1.0 per tick
+           60fps   5  3  1 -1 -1                 same per tick, half the real time
+0199ADAC   30fps   0.504 0.420 0.336 0.252 ...   alpha ramp, -0.084 per tick
+0199A7CC   30fps   29 28 27 26 25 24 23 23       a phase counter, -1 per tick
+```
+
+A particle system. Particles are born, age one unit per tick and die, so at 60fps
+every particle lives half as long and the whole effect cycles at double speed. In
+an airborne hover the body is almost still and the aura and its ki wisps are
+nearly all the motion there is - which is exactly why this reads as "the air idle
+is 2x" while the ground looks fine.
+
+`FUN_00167258` is the updater: 20 entries of stride `0x70`, with
+
+```
+00167318  lui at, 0x3F80     ; f05 = 1.0
+001673B0  sub.s f00,f00,f05  ; lifetime -= 1.0
+001672DC  mul.s f00,f00,f03  ; position += direction * rate(+0x5D4)
+0016732C  add.s f02,f02,f00  ; +0x60C += +0x5D0
+00167368  sw a1, 0x5BC(s1)   ; four-phase counter, +1
+```
+
+Halving the `1.0` at `00167318` does fix the lifetime - it steps `5.5 4.5 3.5` and
+lands back on the 30fps period - but the alpha ramp is untouched, because it is a
+different channel. **Chasing per-tick constants one at a time reaches only the
+ones that happen to be constants**; the position rate and the ramp are
+per-instance data fields, and the phase counter is an integer.
+
+### The fix, and why it is a gate rather than a constant
+
+The only caller of `FUN_00167258` is `FUN_00168084`, an effect node's vtable[0] -
+reached indirectly, no direct callers. It has the same shape as the ki aura's
+`FUN_00164860`: **that one call updates and then tail-calls the draw**, ending in
+`j FUN_001ADA58` or `j FUN_00167E68`. Gating the whole call would delete a frame
+of the effect rather than slow it, which is the trap the aura work already fell
+into once.
+
+But the game has the branch already. At `00168104` a global flag sends execution
+straight to `001681D4`, which sits **after all the update work and before the draw
+tail call**. ORing frame parity into that flag test makes the particles advance at
+their authored 30Hz while still being drawn every frame - and it fixes every
+channel at once instead of one constant at a time.
+
+One detail: the hook goes on the `ld` at `001680FC`, not the `andi` at `00168100`.
+The andi's delay slot is the branch itself, and a branch cannot sit in a delay
+slot. Hooking one instruction earlier means replaying both the load and the andi
+in the trampoline.
+
+### Verification
+
+From the settled airborne-idle state, against the 30fps oracle, through the
+shipped group:
+
+```
+0199AD64   off  5 4 3 2 1 0 -1 -1   |  gated  5 4 3 2 1 0 -1 -1   (was 5 3 1 -1 -1)
+0199ADAC   off  .50 .42 .34 .25 ... |  gated  .50 .42 .34 .25 ... (was .50 .34 .17)
+0199A7CC   off  29 28 27 26 25 ...  |  gated  29 28 27 26 25 ...  (was 29 27 25 23)
+```
+
+Every channel back on the 30fps period. Across `0x01870000`-`0x019A0000` the
+plausible-float words oscillating at 2x fall from 107 to 70, and the whole
+`0199A000` cluster disappears. No regression: dash 0.988 and launched-opponent
+coast 0.985, unchanged.
+
+### What is left
+
+70 float words in the effect region still reverse about twice as often, spread
+over `0198F000`-`01995000` with no single dominant cluster. Several of them step
+*less* at 60fps than at 30 (`0.0106 -> 0.0059`, `0.1407 -> 0.0734`), so that
+count is an upper bound and part of it is noise rather than defect. There is no
+second obvious particle pool; the next one will have to be picked out
+individually.
