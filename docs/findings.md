@@ -3363,3 +3363,98 @@ The next thing to try is a write watchpoint on the beam object's own fields
 during the beam - `+0x1F8`, `+0x20C`, `+0x210`, `+0x1F4` - rather than a search
 for constants, and to find where the beam decides to end rather than assuming it
 counts down.
+
+## 2026-09-06 - ki blasts solved: a hitbox counter authored in ticks
+
+Two sessions had hunted this as "which constant makes the beam short". It was
+never a constant. It is a counter, and finding it took abandoning three separate
+lines of attack that all looked promising.
+
+### The oracle that made it tractable
+
+Screen brightness had been the measure of a beam all along, and it is a bad one:
+a fixed luma threshold catches the launch flash, misses the beam, and resolves to
++/- the sampling step. The damage counter is far better - `0033371C` moves in
+exact integers, needs no screenshots, and can be read every single vsync:
+
+| configuration | damage steps | cadence | span |
+|---|---|---|---|
+| unpatched 30fps | 2840 4260 5680 7100 8520 | every **8 vsyncs** | 32 |
+| patched 60fps | the same five values | every **4 vsyncs** | 16 |
+
+Identical damage, identical hit count, exactly half the real time. Uniform 1420
+steps. That is the whole bug in one table, and it took two minutes to produce
+once the instrument was right. **Reach for the exact integer the game already
+maintains before reaching for a picture of the screen.**
+
+### Three wrong turns, and what each one cost
+
+**`FUN_00186250` is a constructor, not an update.** The previous session had it
+as "the beam update, confirmed". Breaking on it shows 18 calls clustered in four
+frames, each building a 0x40-byte node - and its first act is copying 0x40 bytes
+from a template. The real update is `FUN_001866C0`, slot [0] of the same
+six-word class descriptor at `002C3EF0`; `00186250` is slot [1]. The descriptor
+table at `002C3E00` holds eighteen of these records, and slot [0] is always the
+update-and-draw.
+
+**The `seconds * 30.0` family is real, and is not this bug.** The shipped tween
+fix was exactly that shape, so enumerating every `lui $at, 0x41F0` in the code
+segment seemed certain to find it: 145 sites. Breaking on all of them narrows to
+the 33 that execute during a blast, and **none of the 33 changes the cadence** -
+tested in two batches and individually. A complete, mechanical elimination of a
+whole hypothesis class is worth the twenty minutes it costs.
+
+**A dead field that looked alive.** `+0x1F4` of a beam node visibly counts down
+and freezes the instant the beam ends. It is neither: a write watchpoint on it
+catches nothing at all, because the pool at `01A2Exxx` is being recycled and the
+"countdown" was successive nodes landing on the same address. A value that
+changes with no writer is not a clock, it is different memory.
+
+### The actual mechanism
+
+Trace backwards from the symptom instead. The opponent's HP is `018726A4` -
+found by scanning all of RAM for words whose change pattern matches the damage
+schedule *exactly*, which returns six addresses out of eight million. A write
+watchpoint on it names `FUN_001CE630`, whose live call site is `001CBEF4`, and
+walking up gives the chain
+
+    FUN_001AFE70  -> 001CD320 -> 001CC588 -> 001CBD70 -> 001CE630 (apply damage)
+
+with `FUN_001AFE70` called **every frame** and everything below it only every
+fourth. The gate is inside it, and it is not a float anywhere:
+
+    H = [obj+0x60]                    the live hitbox
+    D = [[obj+0x64]+0x24]             the move's data record
+    H[0x0A]   tick counter, ++ once per frame by FUN_0012E7C8 at 001AFE98
+    D[0x0B]   the hit interval, AUTHORED IN TICKS
+    H[0x0B]   hits landed so far
+    D[0x0A]   the maximum number of hits
+
+A hit lands when `H[0x0A] >= D[0x0B]`, which resets `H[0x0A]` to zero; the attack
+ends when `H[0x0B] > D[0x0A]`. **One counter paces both the cadence and the
+duration** - hits arriving twice as fast spend the hit budget in half the time -
+which is why the beam was short *and* felt like fewer hits. The designers wrote
+these intervals as tick counts, so there is no constant to scale.
+
+### The fix
+
+`FUN_0012E7C8` has exactly one caller and `H[0x0A]` is read and reset only inside
+`FUN_001AFE70`, so gating that single call on frame parity is as narrow as a fix
+in this project gets. Single-hit attacks cannot regress: the `blez` at `001AFF08`
+short-circuits while no hits have landed, so the first hit of any attack is never
+delayed.
+
+### Still open: the launch flash
+
+The visual white-out is a separate channel and is **not fixed**. It lasts 8
+samples at 30fps and 4 at 60 on a 3-vsync grid - **12 ticks either way** - so it
+is a per-tick effect-node lifetime of the `seconds * 30.0` family after all, just
+not one that touches damage. Doubling the 22 such sites that fire during a blast
+restores most of it (21 vsyncs against the oracle's 24); doubling all 31 sites
+that structurally convert seconds to a stored frame count makes it *worse*, so
+they interfere and the set is not simply additive.
+
+That is where it stands, and it deliberately was not shipped: tuning twenty-two
+simultaneous constants against mean screen luma is how you get a change that
+measures well and looks wrong. The next attempt should bisect the 22 against the
+brightness curve, one class at a time, and confirm each in play.
