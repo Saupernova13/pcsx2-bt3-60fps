@@ -3267,3 +3267,99 @@ immediately before the input in each case, and compare the hit count. Hit count
 is the thing the user actually reports losing, and it is a single integer that
 needs no alignment between runs. Everything measured so far has been a proxy for
 it.
+
+## 2026-09-05 - ki blasts, reproduced at last: 28 vsyncs against 16
+
+The previous section recorded four wrong hypotheses about this bug and, worse, a
+measurement that had to be withdrawn. The thing that broke the deadlock was not
+a better hypothesis - it was being able to fire the move on demand.
+
+### Ask the game for the controls
+
+Guessing the control scheme cost most of a session. Every "modifier + button"
+probe returned the same result for `L1`, `L2` and `R2`, which looked like proof
+the shoulder buttons were not reaching the game - but `tools/padcheck.py` shows
+all four reaching it perfectly. The probes were identical because the *move* was
+identical: the modifier was right and the assumption about which button ran the
+Kamehameha was wrong.
+
+**The game documents itself.** Pause, choose *View Skill List*, and the panel
+lists the character's Special Attacks with the stock each costs, drawing the
+input for the highlighted one at the bottom:
+
+| move | input | stock |
+|---|---|---|
+| Wild Sense | L2 + Circle | 2 |
+| Now I'm Mad! | - | 3 |
+| **Super Kamehameha** | **L2 + Triangle** | **3** |
+| Meteor Smash | - | 3 |
+| **Angry Kamehameha** (ultimate) | - | 4 |
+
+One screenshot answered what a dozen input probes could not.
+
+### Script input in ticks, not vsyncs
+
+The first A/B with the correct input still failed, and failed silently: at 30fps
+the move never came out at all, so the reference run measured an empty screen.
+The input script was written in vsyncs - 20 held, 6 pressed - which is 20 and 6
+ticks at 60fps but only 10 and 3 at 30fps, too short to register. Lengthening it
+to 48 and 16 vsyncs makes the move fire at both rates. **A scripted input has to
+be long enough in TICKS at the slower rate**, and a run has to check the move
+actually happened rather than assume it.
+
+### The measurement
+
+`tools/blasttest.py`. Same save state, same scripted input, same vsyncs:
+
+| configuration | damage | hits | beam on screen |
+|---|---|---|---|
+| unpatched 30fps | 8520 | 6 | **28 vsyncs** (8..32) |
+| patched 60fps | 8520 | 6 | **16 vsyncs** (8..20) |
+| battle group only | 8520 | 6 | 16 vsyncs |
+
+The beam is on screen for roughly half as long, and the way the damage arrives
+is the tell: unpatched it *ticks out* - 1520, 4260, 7100, 8520 over about twelve
+vsyncs - while patched the whole 8520 lands at once. That is the reported "cut
+short, fewer hits", measured.
+
+**Battle-group-only reproduces it exactly**, so no group in the patch causes
+this and none compensates it. It is a missing compensation, not a regression.
+
+### The beam is FUN_00186250
+
+A sweep during the beam for words moving the same amount per tick at both rates
+- excluding the tween pool, whose countdowns legitimately read 2x - pointed at
+`01A0D4D0`, `01A0D764` and `01A36xxx`. Write watchpoints on those land in the
+`00183xxx`/`00184xxx` module, whose caller is **`FUN_00186250`: a vtable entry
+at `002C3EF4`, no direct callers**, the same shape as the ki aura's
+`FUN_00164860` and the particle node's `FUN_00168084`.
+
+Gating that function wholesale on frame parity stretches the beam from 16 vsyncs
+to 56 and drops the damage to zero, so it is unquestionably the beam - but a
+blanket gate is not the fix, because the same call does the hit detection.
+
+### Eliminated
+
+Every `lui $at, 1.0` in `FUN_00186250`, tested one at a time against the harness,
+all leaving the beam at 16 vsyncs:
+
+    001863BC   0018672C   001867C8   00186810   00186850   00186890   001868CC
+
+`001867C8` feeds a countdown at `+0x1F8`; `00186810` feeds a counter at `+0x20C`
+compared against a limit at `+0x210` that calls `FUN_00182DE0` - which looks
+exactly like a hit-cadence timer and still is not it. Also eliminated earlier:
+`FUN_0017C8F4`'s per-tick lifetime at `0017C990`.
+
+### Where to pick this up
+
+The harness is the asset: `tools/blasttest.py` turns any candidate into a
+two-minute yes/no, with `--pokes label=ADDR:WORD`. The target is confirmed. What
+is not yet known is which channel inside `FUN_00186250` sets how long the beam
+lives - it is not any of its seven `1.0` constants, so it is likely a duration
+read from the move's data table and stepped somewhere else, or a stage counter
+whose threshold rather than whose step is the per-tick quantity.
+
+The next thing to try is a write watchpoint on the beam object's own fields
+during the beam - `+0x1F8`, `+0x20C`, `+0x210`, `+0x1F4` - rather than a search
+for constants, and to find where the beam decides to end rather than assuming it
+counts down.
