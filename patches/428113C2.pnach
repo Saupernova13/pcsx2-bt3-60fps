@@ -229,6 +229,48 @@ patch=1,EE,000F021C,word,0806BFA8 // j    0x001AFEA0         rejoin past the del
 patch=1,EE,000F0220,word,00000000 // nop
 patch=1,EE,001AFE98,word,0803C080 // jal 0012E7C8 -> j 000F0200 (hitbox counter tick)
 
+// The blast's visible effects, found 2026-09-06. A ki blast is drawn by effect
+// nodes of two classes - the beam core, class descriptor 002C3EF0, and the
+// flare that follows it, 002C40F0 - and each one's update carries half a dozen
+// coupled per-tick channels: a start delay, an emit countdown, a geometry
+// cadence that calls the segment builders FUN_00182DE0 and FUN_0018322C, a
+// lifetime, a stagger and a fade. Scaling any one of them in isolation does
+// nothing, because they are compared against each other; the whole update has
+// to run at 30Hz, which is the same fix the ki aura and the particle system
+// already use. Both classes open with a call to FUN_0012D1D0 and a branch that
+// skips the entire update while still reaching the draw tail call, so ORing
+// frame parity into that branch reuses a skip the game already has.
+// Measured on screen brightness, the flash goes from 9 vsyncs to 18 against the
+// unpatched game's 21, and recovers its two-humped shape - the charge and the
+// fire - which at 60fps had merged into one. Damage, hit count and hit cadence
+// are untouched, so this composes with the blast hit cadence group.
+[60FPS - blast effect rate]
+description=Run a ki blast's beam and flare effects at their real-time speed, so the blast forms and fires over the time it should.
+patch=1,EE,000F0240,word,3C080033 // lui  $t0, 0x33
+patch=1,EE,000F0244,word,8D081D64 // lw   $t0, 0x1d64($t0)   frame counter
+patch=1,EE,000F0248,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F024C,word,00481025 // or   $v0, $v0, $t0      odd frame: take the skip
+patch=1,EE,000F0250,word,10400003 // beqz $v0, 000F0260
+patch=1,EE,000F0254,word,00000000 // nop
+patch=1,EE,000F0258,word,08061A38 // j    0x001868E0         skip the update, still draw
+patch=1,EE,000F025C,word,00000000 // nop
+patch=1,EE,000F0260,word,080619BF // j    0x001866FC         run the update as normal
+patch=1,EE,000F0264,word,00000000 // nop
+patch=1,EE,001866F4,word,0803C090 // bnez -> j 000F0240      beam core update gate
+patch=1,EE,000F0280,word,3C080033 // lui  $t0, 0x33
+patch=1,EE,000F0284,word,8D081D64 // lw   $t0, 0x1d64($t0)
+patch=1,EE,000F0288,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F028C,word,00481025 // or   $v0, $v0, $t0
+patch=1,EE,000F0290,word,10400004 // beqz $v0, 000F02A4
+patch=1,EE,000F0294,word,00000000 // nop
+patch=1,EE,000F0298,word,8E0300B0 // lw   $v1, 0xb0($s0)     the likely branch's slot,
+patch=1,EE,000F029C,word,080659DA // j    0x00196768         replayed only when taken
+patch=1,EE,000F02A0,word,00000000 // nop
+patch=1,EE,000F02A4,word,08065877 // j    0x001961DC         run it
+patch=1,EE,000F02A8,word,00000000 // nop
+patch=1,EE,001961D4,word,0803C0A0 // bnel -> j 000F0280      flare update gate
+patch=1,EE,001961D8,word,00000000 // nop out the nullified delay slot
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is

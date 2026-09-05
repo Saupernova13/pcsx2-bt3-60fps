@@ -81,6 +81,13 @@ HOVER = ["60FPS - hover bob"]
 # call that advances it on frame parity fixes cadence and duration together.
 BLAST = ["60FPS - blast hit cadence"]
 
+# The blast's visible effects, found 2026-09-06. A ki blast is drawn by two
+# effect-node classes whose updates each carry half a dozen coupled per-tick
+# channels, so no single constant fixes them; gating both updates on frame
+# parity - reusing the skip each one already has, so the draw still runs - is
+# the same fix the ki aura and the particle system use.
+BLASTFX = ["60FPS - blast effect rate"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -90,7 +97,7 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
-                  + HOVER + BLAST + SPARES)
+                  + HOVER + BLAST + BLASTFX + SPARES)
 
 PRESETS = {
     "off": [],
@@ -98,8 +105,10 @@ PRESETS = {
     "air": SHIPPED + AIRBORNE + EFFECTS,
     "tween": SHIPPED + AIRBORNE + EFFECTS + TWEENS,
     "noblast": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER,
-    "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+    "nofx": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST),
+    "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+             + BLAST + BLASTFX),
 }
 
 DISABLED_SUFFIX = " [off]"

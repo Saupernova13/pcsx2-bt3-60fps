@@ -3458,3 +3458,42 @@ That is where it stands, and it deliberately was not shipped: tuning twenty-two
 simultaneous constants against mean screen luma is how you get a change that
 measures well and looks wrong. The next attempt should bisect the 22 against the
 brightness curve, one class at a time, and confirm each in play.
+
+## 2026-09-06 - the fix that measured right and looked like nothing
+
+The hit-cadence fix above is real and the user saw no change at all from it, and
+that is worth recording as plainly as the fix itself. It moves *when* damage is
+applied - 8 vsyncs apart instead of 4 - while leaving the hit count, the total
+damage and every drawn frame identical. Nothing about it is visible unless you
+are reading the combo counter. **A quantity being provably wrong does not make it
+the quantity the player is complaining about.**
+
+What the player sees is the effect, and the effect is drawn by two node classes:
+the beam core at descriptor `002C3EF0` and the flare that follows it at
+`002C40F0`. Each update carries half a dozen coupled per-tick channels - start
+delay, emit countdown, a geometry cadence driving the segment builders
+`FUN_00182DE0` and `FUN_0018322C`, lifetime, stagger, fade - all compared against
+each other, which is why every single-constant test came back clean. Both open
+with a call to `FUN_0012D1D0` and a branch that skips the whole update while
+still reaching the draw, so parity into that branch is the same fix the aura and
+the particles already use. The flare's skip is a *likely* branch, so its delay
+slot has to be nopped and replayed only on the taken path.
+
+    flash on screen        off 30fps   gates off   gates on
+                            30 vsyncs   12 vsyncs   24 vsyncs
+
+Twelve to twenty-four is exactly the doubling a parity gate should produce, and
+the two-humped curve - the charge, then the fire - comes back; at 60fps the two
+humps had merged into one.
+
+### Two instrument failures worth remembering
+
+**Poking a stock value back does not disable a group.** The three-way comparison
+first came back with the gated and un-gated arms byte-for-byte identical, because
+PCSX2 rewrites every `patch=1` line each frame and had simply put the hooks back.
+This is already written down in this document and it still cost a run. Toggle by
+group through `patchctl`, never by poke.
+
+**The 30fps arm drifts between boots.** The same `off` measurement gives 21, 27
+and 30 vsyncs on different launches while being bit-identical when repeated
+inside one session. Only ever compare arms measured in the same session.
