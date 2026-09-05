@@ -149,6 +149,36 @@ patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
 description=Count tween durations in 60Hz frames so eases, pulses, fades and blends take their intended real time.
 patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0
 
+// The particle system behind auras, ki wisps and trails. FUN_00168084 is an
+// effect node's vtable[0], and as with the ki aura that one call both updates
+// and draws - it ends in a tail call to the draw (FUN_001ADA58, or FUN_00167E68
+// when flags&4). Its update is FUN_00167258, a loop over 20 entries of stride
+// 0x70 with several per-tick channels and no timestep between them:
+//     lifetime -= 1.0            00167318 supplies the 1.0
+//     alpha ramp -= 0.084
+//     position += direction * rate(+0x5D4)
+//     +0x60C += +0x5D0,  +0x5C8 += +0x5CC
+//     a four-phase counter at +0x5BC, +1 per tick
+// Halving them one constant at a time reaches only the ones that are constants.
+// Gating the update instead fixes every channel together, and the game already
+// has the exact branch for it: at 00168104 a global flag sends it straight to
+// 001681D4, which is past all the update work and before the draw tail call.
+// The hook simply ORs frame parity into that flag test, so the particles
+// advance at their authored 30Hz while still being drawn at 60fps.
+// The hook sits on the ld at 001680FC rather than the andi at 00168100, because
+// the andi's delay slot is the branch itself and a branch cannot sit in one.
+[60FPS - particle update rate]
+description=Advance aura and trail particles every other frame so they live and fade at their real-time speed, while still drawing them at 60fps.
+patch=1,EE,000F0780,word,DC4319F0 // ld   $v1, 0x19F0($v0)   replay displaced
+patch=1,EE,000F0784,word,30630100 // andi $v1, $v1, 0x100    replay the delay slot
+patch=1,EE,000F0788,word,3C080033 // lui  $t0, 0x33
+patch=1,EE,000F078C,word,8D081D64 // lw   $t0, 0x1d64($t0)   frame counter
+patch=1,EE,000F0790,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F0794,word,00681825 // or   $v1, $v1, $t0      odd frame: take the skip
+patch=1,EE,000F0798,word,0805A041 // j    0x00168104
+patch=1,EE,000F079C,word,00000000 // nop
+patch=1,EE,001680FC,word,0803C1E0 // ld -> j 000F0780 (FUN_00168084 update gate)
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is
