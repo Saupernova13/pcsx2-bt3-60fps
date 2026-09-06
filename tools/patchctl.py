@@ -123,12 +123,15 @@ PRESETS = {
              + BLAST),
     "noseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
               + BLAST + BLASTFX),
-    # BLASTFX and SEQ are WITHDRAWN - both break blast rendering. Gating an
-    # effect update skips the geometry rebuild it does every frame, so the beam
-    # has nothing to draw; gating the sequence controller makes it miss the edge
-    # that spawns the beam. Kept in the pnach as a record, never enabled.
+    # BLASTFX is WITHDRAWN: gating an effect update skips the geometry rebuild
+    # it does every frame, so the beam has nothing to draw. It stays in the
+    # pnach as a record and is never enabled. SEQ was blamed for that damage and
+    # is innocent - it draws nothing, and with BLASTFX gone it costs the beam
+    # nothing while fixing the ultimate's pacing.
+    "noseq2": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR),
+             + BLAST + BLASTDUR + SEQ),
 }
 
 DISABLED_SUFFIX = " [off]"
