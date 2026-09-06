@@ -33,7 +33,8 @@ from ps2ee import config
 from ps2ee.pnach import Pnach
 
 # Present in the repo pnach, never in a shared copy.
-DEVELOPMENT_ONLY = ["60FPS - animation rate", "60FPS - EXPERIMENT halve root motion"]
+DEVELOPMENT_ONLY = ["60FPS - animation rate", "60FPS - EXPERIMENT halve root motion",
+                    "60FPS - blast effect rate", "60FPS - blast sequence rate"]
 
 # Stated plainly at the top of the shared file rather than left to be discovered.
 KNOWN_BROKEN: list[str] = []

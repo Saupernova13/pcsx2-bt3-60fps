@@ -18,7 +18,6 @@ gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 //   60FPS - particle update rate
 //   60FPS - hover bob
 //   60FPS - blast hit cadence
-//   60FPS - blast effect duration
 //   60FPS - airborne motion
 //   60FPS - airborne vertical
 //   60FPS - airborne residual
@@ -261,39 +260,6 @@ patch=1,EE,001AFE98,word,0803C080 // jal 0012E7C8 -> j 000F0200 (hitbox counter 
 // unpatched game's 21, and recovers its two-humped shape - the charge and the
 // fire - which at 60fps had merged into one. Damage, hit count and hit cadence
 // are untouched, so this composes with the blast hit cadence group.
-[60FPS - blast effect duration]
-description=Halve every per-tick step in the blast effect nodes, so a ki blast's beam lasts as long as it should without skipping the geometry it rebuilds each frame.
-patch=1,EE,0018672C,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001867C8,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00186810,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00186850,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00186890,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001868CC,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00196278,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001962A8,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,0019631C,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00196348,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001963B4,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00196460,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001964D8,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001965A8,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001965D8,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,00196674,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001966B4,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,001966F0,word,3C013F00 // 1.0 -> 0.5 per tick
-patch=1,EE,0019672C,word,3C013F00 // 1.0 -> 0.5 per tick
-
-// --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
-// Movement in BT3 is 100% root motion through the skeleton. With exactly one
-// writer each way (both confirmed by write breakpoint), the per-frame cycle is
-//   model+0x950  = fighter+0x10 + fighter+0x30     FUN_001D7198, 001D71F4
-//   fighter+0x10 = model+0x970 - fighter+0x30      FUN_001D70E8, 001D7118
-// which reduces to  fighter+0x10 += (model+0x970 - model+0x950).  So the whole
-// per-frame displacement is that difference, produced by the skeleton pass.
-// Replacing model+0x970 with the midpoint of the two halves it exactly.
-// EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
-// That asymmetry is the point of the test - it proves both that this is the one
-// movement channel and that ground is already compensated while air is not.
 [60FPS - airborne motion]
 description=Halve both the displacement and the ramp of the airborne directed-travel channel (FUN_001DE000): flight, dashes and knockback.
 patch=1,EE,000F0900,word,3C013F00 // lui $at, 0x3F00
