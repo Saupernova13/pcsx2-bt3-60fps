@@ -309,6 +309,48 @@ patch=1,EE,000F0644,word,0806B464 // skip: j 0x001AD190
 patch=1,EE,000F0648,word,00000000 // nop
 patch=1,EE,001AD188,word,0803C180 // jalr $v1 -> j 000F0600  scene-graph dispatch
 
+// The blast effect duration, found 2026-09-06 - after a gated version of this
+// broke rendering and had to be withdrawn. A ki blast is drawn by two effect
+// classes, the beam core FUN_001866C0 and the flare FUN_001961A0, and each
+// update steps several coupled per-tick channels by 1.0: a start delay, an emit
+// countdown, a hit-cadence accumulator, a lifetime, a stagger and a fade.
+//
+// These updates also REBUILD THE BEAM'S GEOMETRY every frame, which is why
+// gating them is wrong however tempting it looks: skipping the update does not
+// slow the beam, it leaves nothing to draw. The symptoms were exact - the charge
+// ball never appeared, the output beam never rendered, and a half-built effect
+// stayed stuck to the character's hands because its lifetime never ran out.
+//
+// Halving every step instead keeps the geometry rebuilt on every frame and moves
+// all the channels together, which matters: the channels are compared against
+// each other, so halving any ONE of them does nothing at all - that is why every
+// single-constant test in earlier sessions came back clean.
+//
+// Measured in real time with the game running free: the Super Kamehameha's beam
+// is on screen 0.6s..1.75s unpatched-at-60fps, 0.6s..2.85s with this, against
+// the 30fps game's 0.6s..3.0s. Damage and hit count are byte identical.
+[60FPS - blast effect duration]
+description=Halve every per-tick step in the blast effect nodes, so a ki blast's beam lasts as long as it should without skipping the geometry it rebuilds each frame.
+patch=1,EE,0018672C,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001867C8,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00186810,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00186850,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00186890,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001868CC,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00196278,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001962A8,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,0019631C,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00196348,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001963B4,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00196460,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001964D8,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001965A8,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001965D8,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,00196674,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001966B4,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,001966F0,word,3C013F00 // 1.0 -> 0.5 per tick
+patch=1,EE,0019672C,word,3C013F00 // 1.0 -> 0.5 per tick
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is

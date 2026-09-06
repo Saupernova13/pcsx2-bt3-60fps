@@ -94,6 +94,13 @@ BLASTFX = ["60FPS - blast effect rate"]
 # controller with a per-tick counter) paces ultimate sequences by real time.
 SEQ = ["60FPS - blast sequence rate"]
 
+# The blast effect duration, found 2026-09-06. The two effect classes that draw a
+# ki blast step several coupled per-tick channels by 1.0 AND rebuild the beam
+# geometry every frame - so they cannot be gated, only slowed. Halving all
+# nineteen steps together moves the channels in step; halving any one does
+# nothing, because they are compared against each other.
+BLASTDUR = ["60FPS - blast effect duration"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -103,7 +110,8 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
-                  + HOVER + BLAST + BLASTFX + SEQ + SPARES)
+                  + HOVER + BLAST + BLASTFX + SEQ
+                  + BLASTDUR + SPARES)
 
 PRESETS = {
     "off": [],
@@ -115,8 +123,12 @@ PRESETS = {
              + BLAST),
     "noseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
               + BLAST + BLASTFX),
+    # BLASTFX and SEQ are WITHDRAWN - both break blast rendering. Gating an
+    # effect update skips the geometry rebuild it does every frame, so the beam
+    # has nothing to draw; gating the sequence controller makes it miss the edge
+    # that spawns the beam. Kept in the pnach as a record, never enabled.
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTFX + SEQ),
+             + BLAST + BLASTDUR),
 }
 
 DISABLED_SUFFIX = " [off]"
