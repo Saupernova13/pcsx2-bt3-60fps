@@ -3606,3 +3606,40 @@ it draws nothing, so it has no geometry to skip, and it costs the beam nothing
 from 1.4s to 2.0s against a 2.1s target. **When two changes ship together and
 only the pair is measured, a good change can be discarded on the evidence
 against the bad one.**
+
+## 2026-09-06 - the charged blast is a different code path, and SEQ kills it
+
+The sequence gate was withdrawn, restored as "innocent", and then withdrawn
+again for good. The restore was wrong, and the reason is worth more than the
+fix: **it was cleared using an uncharged tap of the move, which never exercises
+the charge path at all.**
+
+A Super Kamehameha can be tapped or charged - hold Triangle, get a BOOST!
+prompt, release to fire a bigger beam. Every automated test in this project
+tapped it. Charged, with the sequence gate enabled:
+
+| configuration | hits | damage | beam on screen |
+|---|---|---|---|
+| unpatched 30fps | 6 | 12120 | 0.3s .. 2.6s |
+| shipped groups only | 6 | 13680 | 0.3s .. 1.3s |
+| + blast effect duration | 6 | 13680 | **0.3s .. 2.7s** |
+| + blast sequence rate | 5 | **1520** | **nothing renders** |
+
+The move still fires - banner, BOOST! prompt, correct firing pose, correct
+controller rumble, correct duration - and draws nothing and deals nothing. The
+gated controller is what SPAWNS the effects, so gating it at half rate loses the
+spawn entirely on the charge path.
+
+**Both withdrawn groups failed the same way for the same reason: an effect that
+is gated is an effect that does not get built.** One skipped the geometry
+rebuild, the other skipped the spawn. Gating is the right fix for a system that
+only advances state; it is never the right fix for one that constructs
+something every frame.
+
+### What that says about test inputs
+
+A scripted input exercises exactly one path. This one tapped a button that the
+player holds, and three sessions of measurements inherited that blind spot -
+including the measurement that "cleared" a group which breaks the game outright.
+When a move has a charge, a level, or a direction, the script has to cover it,
+and the user's description of how they play it is the specification.
