@@ -3497,3 +3497,66 @@ group through `patchctl`, never by poke.
 **The 30fps arm drifts between boots.** The same `off` measurement gives 21, 27
 and 30 vsyncs on different launches while being bit-identical when repeated
 inside one session. Only ever compare arms measured in the same session.
+
+## 2026-09-06 - the blast sequence, found by bisecting code instead of constants
+
+Two fixes shipped before this one measured correctly and changed nothing the
+player could see. Both were developed against a scripted Super Kamehameha from
+slot 1 - a move that turns out **not to exhibit the bug at all**: 6 hits and 8520
+damage at both rates, with the beam only marginally shorter. Everything tuned
+against it was tuned against a case that was already fine.
+
+**Reproduce the case the user described, not a convenient one.** From the user's
+own capture of the Angry Kamehameha, photographed in real time, the difference is
+obvious: the camera cuts back to the fight at 2.1s unpatched and 1.4s patched.
+
+### Two instruments that were lying
+
+**A screenshot needs a running VM, so frame-advance plus screenshot cannot time
+anything.** Each sample let the game run about five uncontrolled ticks - the
+first one after a load slipped 181. Every "vsync" label on the earlier brightness
+curves was fiction. The fix is to stop stepping: let the emulator run free and
+sample on the wall clock, so each frame is a real instant and two runs at
+different frame rates line up on real time.
+
+**A counter read mid-climb is not a result.** The frames showed 8 hits at 30fps
+against 6 at 60fps, which looked like the reported "does less hits". Both runs
+end at 8 hits and 16640 damage; the combo readout was simply caught part-way up.
+Hit count and damage are identical at both rates, in every case measured.
+
+### The decomposition that pointed the way
+
+The cut happens 79 ticks in at 30fps and 107 at 60fps - neither equal in time nor
+equal in ticks. Solving `T + N/30 = 2.47` and `T + N/60 = 1.66` gives `T = 0.85s`
+correctly compensated and `N = 49` ticks not compensated at all. A mixed
+sequence, which is why every whole-sequence measurement looked ambiguous.
+
+### Bisecting the code
+
+Searching for the constant failed repeatedly - it is not a constant. What worked
+was gating a call on frame parity and asking one question of the picture: *did
+the camera cut move?* One screenshot per candidate, each probe from the same
+state so nothing accumulates.
+
+    0012B700 -> FUN_0012CB60 -> 0012CB84 -> FUN_001AD150
+
+`FUN_001AD150` is the scene-graph walker: for every node it loads the class at
+`[node+0x28]` and calls `vtable[0]` through a single indirect call at `001AD188`.
+Gating that call for a *range of vtable addresses* turns "which class?" into a
+binary search, and the range narrows to one: **vtable `002C3940`, update
+`FUN_001587B8`** - an action/state controller, not a renderer, whose per-tick
+counter at `+0x14` is advanced at `001589D0`. Nothing is drawn from it, so gating
+costs no frame.
+
+    camera cut      unpatched 30fps   patched   with the gate
+                          2.1s          1.4s        2.0s
+
+The normal-battle blast schedule is byte identical with and without it.
+
+### A trampoline bug worth recognising
+
+The first range sweep answered "delayed" for every range including disjoint ones.
+The cause was a branch offset off by two instructions, so classes *below* the
+range fell into the parity check as well and everything was gated. **When a
+bisection reports the same answer for disjoint halves, suspect the instrument
+before the hypothesis.**

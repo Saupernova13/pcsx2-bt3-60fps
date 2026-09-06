@@ -88,6 +88,12 @@ BLAST = ["60FPS - blast hit cadence"]
 # the same fix the ki aura and the particle system use.
 BLASTFX = ["60FPS - blast effect rate"]
 
+# The blast sequence rate, found 2026-09-06 - the one the player actually sees.
+# The scene graph dispatches every node's vtable[0] through one indirect call;
+# gating that call for a single class (vtable 002C3940, FUN_001587B8, an action
+# controller with a per-tick counter) paces ultimate sequences by real time.
+SEQ = ["60FPS - blast sequence rate"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -97,7 +103,7 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
-                  + HOVER + BLAST + BLASTFX + SPARES)
+                  + HOVER + BLAST + BLASTFX + SEQ + SPARES)
 
 PRESETS = {
     "off": [],
@@ -107,8 +113,10 @@ PRESETS = {
     "noblast": SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER,
     "nofx": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST),
+    "noseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTFX),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTFX),
+             + BLAST + BLASTFX + SEQ),
 }
 
 DISABLED_SUFFIX = " [off]"
