@@ -271,6 +271,44 @@ patch=1,EE,000F02A8,word,00000000 // nop
 patch=1,EE,001961D4,word,0803C0A0 // bnel -> j 000F0280      flare update gate
 patch=1,EE,001961D8,word,00000000 // nop out the nullified delay slot
 
+// The blast sequence rate, found 2026-09-06. This is the one the player sees:
+// in an ultimate, the energy ball forms at double speed and the camera cuts back
+// to the fight early. Found by bisecting the CODE rather than searching for
+// constants - gate a call on frame parity, ask whether the camera cut moves, and
+// descend into whichever subtree it was. That path runs
+//   0012B700 -> FUN_0012CB60 -> 0012CB84 -> FUN_001AD150
+// which is the scene-graph walker: for every node it loads the class at
+// [node+0x28] and calls vtable[0] through the single indirect call at 001AD188.
+// Gating that call for one class only - vtable 002C3940, update FUN_001587B8 -
+// is the whole fix. That class is an action/state controller, not a renderer, so
+// nothing is drawn from it and gating loses no frame; its per-tick counter at
+// +0x14 (advanced at 001589D0) is what paces the sequence.
+// Measured in REAL TIME with the game running free, from the user's own capture
+// of the ultimate: the camera cuts at 2.1s unpatched, 1.4s patched, and 2.0s
+// with this gate. The normal-battle blast schedule is byte identical either way.
+[60FPS - blast sequence rate]
+description=Pace ultimate-attack sequences by real time, so a blast charges and fires over the time it should instead of at double speed.
+patch=1,EE,000F0600,word,3C08002C // lui  $t0, 0x2c
+patch=1,EE,000F0604,word,35083940 // ori  $t0, $t0, 0x3940   first class to gate
+patch=1,EE,000F0608,word,0048482B // sltu $t1, $v0, $t0
+patch=1,EE,000F060C,word,1520000B // bnez $t1, call          below the range: run it
+patch=1,EE,000F0610,word,00000000 // nop
+patch=1,EE,000F0614,word,3C08002C // lui  $t0, 0x2c
+patch=1,EE,000F0618,word,35083958 // ori  $t0, $t0, 0x3958   one past the last
+patch=1,EE,000F061C,word,0048482B // sltu $t1, $v0, $t0
+patch=1,EE,000F0620,word,11200006 // beqz $t1, call          above the range: run it
+patch=1,EE,000F0624,word,00000000 // nop
+patch=1,EE,000F0628,word,3C080033 // lui  $t0, 0x33
+patch=1,EE,000F062C,word,8D081D64 // lw   $t0, 0x1d64($t0)   frame counter
+patch=1,EE,000F0630,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F0634,word,15000003 // bnez $t0, skip          odd frame: skip this class
+patch=1,EE,000F0638,word,00000000 // nop
+patch=1,EE,000F063C,word,0060F809 // call: jalr $v1          the node's vtable[0]
+patch=1,EE,000F0640,word,00000000 // nop
+patch=1,EE,000F0644,word,0806B464 // skip: j 0x001AD190
+patch=1,EE,000F0648,word,00000000 // nop
+patch=1,EE,001AD188,word,0803C180 // jalr $v1 -> j 000F0600  scene-graph dispatch
+
 // --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
 // Movement in BT3 is 100% root motion through the skeleton. With exactly one
 // writer each way (both confirmed by write breakpoint), the per-frame cycle is
