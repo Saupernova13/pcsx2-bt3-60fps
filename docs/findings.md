@@ -3643,3 +3643,47 @@ player holds, and three sessions of measurements inherited that blind spot -
 including the measurement that "cleared" a group which breaks the game outright.
 When a move has a charge, a level, or a direction, the script has to cover it,
 and the user's description of how they play it is the specification.
+
+## 2026-09-06 - what is left, and what has been ruled out on it
+
+Shipping state after the charged-blast regression was fixed: rendering is
+correct on both moves, the beam's damage window matches the unpatched game
+exactly, and the beam's visible duration is restored by halving the effect
+nodes' per-tick steps. **The ultimate's cinematic is still paced in ticks and
+cuts back to the fight early**, and that is stated in the released file's header.
+
+### The decomposition, for whoever picks this up
+
+The camera cut lands 79 ticks in at 30fps and 107 at 60fps - neither equal in
+real time nor equal in ticks. Solving the pair gives about **0.85s that is
+correctly compensated and about 49 ticks that are not**. Only that 49-tick piece
+needs fixing.
+
+### Ruled out, with the evidence
+
+- **Gating the controller class** (vtable `002C3940`, `FUN_001587B8`). It does
+  pace the cut correctly - 1.4s becomes 2.0s against a 2.1s target - and it is
+  unshippable: it costs the *spawn*, so a charged blast renders nothing and
+  deals 1520 damage instead of 13680. Worse, the pacing it produces looks like a
+  side effect rather than a mechanism: gating each of its three calls
+  individually (`0012CE88`, `00158F00`, `00158C70`) changes the timing not at
+  all, so what actually moved the cut was leaving the node's "processed this
+  frame" bit `0x10` set at `001587DC`. A fix that works by accident is not a fix.
+- **The sequence counter** at `+0x14`, advanced at `001589D0` - the only per-tick
+  increment in `FUN_00158980`. Halving it changes nothing.
+- **`FUN_00158980`'s call site** at `00158818`, and **`FUN_00158C70`'s** at
+  `00158804`. Neither moves the cut.
+- **Constants.** The whole `00158000..00159400` module contains no `1.0` and no
+  `30.0` float constant at all; it is an integer state machine.
+- **The charge meter.** `0031C4AC` fills at +6.0 a tick at 30fps and +3.0 at
+  60fps - **+180 a second either way**, and it reaches its cap in the same real
+  time. Its timestep `0031C4F0` is tween-driven and equally correct. The charge
+  is not what runs fast.
+
+### The one lead not yet followed
+
+`FUN_00158F00` decides whether the sequence advances by asking whether an
+animation is still playing (`FUN_00206C20`, on `[obj+0x24]` and the bytes at +4
+and +5). If the cinematic waits on an animation whose clock is not the battle
+animation clock this patch already fixes, that wait is the 49 ticks. Finding
+which animation object that is, and how its clock advances, is the next step.
