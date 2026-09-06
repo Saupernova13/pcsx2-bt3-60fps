@@ -3560,3 +3560,49 @@ The cause was a branch offset off by two instructions, so classes *below* the
 range fell into the parity check as well and everything was gated. **When a
 bisection reports the same answer for disjoint halves, suspect the instrument
 before the hypothesis.**
+
+## 2026-09-06 - gating an effect update deletes the beam, and how that was found
+
+v5 shipped two groups together and broke rendering: the ultimate drew no beam at
+all, the Super Kamehameha drew its charge but no output beam, and a half-built
+charge effect stayed **stuck to the character's hands** after the move ended.
+
+### Why gating was wrong here
+
+The ki aura and the particle system are both fixed by gating their update on
+frame parity, so gating the blast's effect classes looked like the same move. It
+is not. **These updates rebuild the beam's geometry every frame.** Skipping one
+does not slow the beam down, it leaves nothing to draw that frame - and because
+the lifetime countdown lives in the same skipped block, a node that should have
+expired never does. That is the stuck effect, exactly.
+
+The correct fix is to halve every per-tick step instead: 1.0 becomes 0.5 at all
+six sites in the beam core `FUN_001866C0` and all thirteen in the flare
+`FUN_001961A0`. The geometry is still rebuilt on every frame, and all the
+channels move together - which is the whole point, because they are compared
+against each other. **Halving any ONE of them does nothing at all**, which is why
+every single-constant test across three sessions came back clean and why the
+pattern was invisible until they were changed as a set.
+
+    Super Kamehameha, beam on screen (real time, game running free)
+      unpatched 30fps   0.6s .. 3.0s
+      60fps, no fix     0.6s .. 1.75s
+      60fps, halved     0.6s .. 2.9s
+
+### The measurement that was lying about the gate
+
+The gated version *measured* as an improvement - mean screen luma stayed high
+for longer. It stayed high because the stuck effect was still on screen. **A
+brightness metric cannot tell a longer beam from a leaked one**; the frames had
+to be looked at. Every brightness result in this project that was not confirmed
+by looking at the picture should be treated as suspect.
+
+### Blaming the wrong half of a pair
+
+Both groups were withdrawn together because both shipped together. Re-measured
+separately on the corrected patch, the sequence gate turned out to be innocent:
+it draws nothing, so it has no geometry to skip, and it costs the beam nothing
+(0.6s..2.9s with it, the same without) while moving the ultimate's camera cut
+from 1.4s to 2.0s against a 2.1s target. **When two changes ship together and
+only the pair is measured, a good change can be discarded on the evidence
+against the bad one.**
