@@ -123,15 +123,16 @@ PRESETS = {
              + BLAST),
     "noseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
               + BLAST + BLASTFX),
-    # BLASTFX is WITHDRAWN: gating an effect update skips the geometry rebuild
-    # it does every frame, so the beam has nothing to draw. It stays in the
-    # pnach as a record and is never enabled. SEQ was blamed for that damage and
-    # is innocent - it draws nothing, and with BLASTFX gone it costs the beam
-    # nothing while fixing the ultimate's pacing.
-    "noseq2": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-               + BLAST + BLASTDUR),
+    # BLASTFX and SEQ are both WITHDRAWN, for the same underlying reason: an
+    # effect that is gated is an effect that does not get built. BLASTFX skips
+    # the geometry rebuild; SEQ skips the controller step that SPAWNS the
+    # effects, so a charged blast renders nothing at all and deals no damage.
+    # SEQ looked innocent only because it was tested with an uncharged tap,
+    # which never exercises the charge path. Both stay in the pnach as a record.
+    "withseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQ),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQ),
+             + BLAST + BLASTDUR),
 }
 
 DISABLED_SUFFIX = " [off]"
