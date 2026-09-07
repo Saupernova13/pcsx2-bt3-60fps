@@ -159,8 +159,14 @@ PRESETS = {
     # whose validation has a hole exactly where the symptom is.
     "withphase": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                   + BLAST + BLASTDUR + SEQWAIT + PHASE),
+    # SEQWAIT is WITHDRAWN 2026-09-07 as well, at the user's call, stepping one
+    # more milestone back to v8 after the trap survived withdrawing PHASE. It is
+    # confirmed-good in play for the ultimate's cinematic, so this is a rollback
+    # to isolate a fault, not a verdict on the group.
+    "withseqwait": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQWAIT),
+             + BLAST + BLASTDUR),
 }
 
 DISABLED_SUFFIX = " [off]"
