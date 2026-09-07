@@ -3818,3 +3818,34 @@ Gating all 28 broke ordinary melee: the fourth hit of a mashed rush lands at
 seconds with all 28 gated. Some of these counters are clocks and some are
 levels - a combo index, an input window - and the ones that are levels must not
 be slowed. They have to be selected by measurement, not by shape.
+
+### Which of the 28 to gate, measured one at a time
+
+Two oracles, both counted in vsyncs so they mean real time at either rate: a
+held Blast 2 to its first hit (unpatched 176, patched-without 115) and the
+fourth hit of a mashed rush (unpatched 122, patched-without 114). Each site was
+gated alone and scored on both.
+
+| Site | charge | melee 4th | verdict |
+|---|---|---|---|
+| `001F7A00` | **175** | 114 | the held charge itself - state 271 |
+| 21 others | 115 | 114 | neutral here; same shape, other states |
+| `001F1C74` | 105 | 114 | cuts the charge short |
+| `001F31C0` | 115 | never | costs the rush its fourth hit outright |
+| `001FBF28` | 115 | 160 | slows the rush |
+| `001FCE34` | 65 | 214 | breaks both |
+| `001FF9A8` | 111 | 138 | slows both |
+| `001FFC10` | 66 | 215 | breaks both |
+
+Those six are excluded. The remaining 22 leave both oracles where the rest of
+the patch leaves them and fix the one they are supposed to fix.
+
+### A trap: shrinking a live group leaves its hooks in RAM
+
+`patchctl` restores the original word for every address it can see in the
+pnach. Rewrite a group with **fewer** addresses than it had a moment ago and
+the addresses that were dropped are no longer in the file, so nothing restores
+them - the game keeps jumping into a trampoline that is no longer being
+maintained. That produced twenty minutes of unreproducible measurements: the
+unpatched arm read 176, then 65, then 112, then no hit at all. Restarting the
+emulator fixed it instantly. **Shrink a group and restart, or measure nothing.**
