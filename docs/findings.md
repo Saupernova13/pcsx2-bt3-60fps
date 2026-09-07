@@ -3687,3 +3687,44 @@ animation is still playing (`FUN_00206C20`, on `[obj+0x24]` and the bytes at +4
 and +5). If the cinematic waits on an animation whose clock is not the battle
 animation clock this patch already fixes, that wait is the 49 ticks. Finding
 which animation object that is, and how its clock advances, is the next step.
+
+## 2026-09-07 - the user's full defect list
+
+Everything below is the user's own observation of the shipped patch in normal
+play, recorded verbatim in substance so no item gets lost between sessions.
+
+### Still wrong, and running fast
+
+| # | What the player sees |
+|---|---|
+| 1 | Blasts end too fast and travel too fast - **including explosive waves** |
+| 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly |
+| 3 | Death of an ordinary character: the camera revolves around the corpse too fast |
+| 4 | Camera is still too fast in some attack animations - Perfect Barrier named |
+| 5 | Character switch: the sky stops rotating about a second in |
+| 6 | Pre-fight intro: mouths do not move at all; some intro animations are too fast or too slow for the camera |
+| 7 | Vegeta's scouter "Final Galick Cannon": the start animation's mouth movement finishes early, and after the rush sequence the fade to white ends too early, revealing the animation still playing behind it |
+
+### Running slow - overcompensated
+
+| # | What the player sees |
+|---|---|
+| 8 | Cell's Perfect -> Super Perfect transformation lasts roughly 0.3s longer than it should. Frieza final -> 100% likewise. Reads as a consistent transformation overshoot of a few hundred milliseconds. |
+
+### What the list has in common
+
+Items 2, 3, 4, 5 and 6 are all **camera or scene motion**, not fighter motion.
+Items 6 and 7 are both **mouth animation** desynchronised from the shot it plays
+over. Item 7 also has a **fade** ending before the animation under it does.
+Blasts (1) are paced by the same scripted-sequence machinery as the ultimate's
+camera cut already documented above.
+
+That points at a single suspect rather than seven: a **scripted-timeline clock**
+- the thing that advances camera keyframes, facial animation and screen fades
+during a scripted shot - separate from the battle animation clock this patch
+already compensates. One uncompensated tick source feeding all of them explains
+why the fighters look right while everything staged around them runs double.
+
+Item 8 is the opposite sign and so is almost certainly a *different* cause: a
+transformation is being held slightly too long, which is what over-halving a
+duration that was already partly compensated looks like.
