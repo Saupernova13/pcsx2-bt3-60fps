@@ -3849,3 +3849,21 @@ them - the game keeps jumping into a trampoline that is no longer being
 maintained. That produced twenty minutes of unreproducible measurements: the
 unpatched arm read 176, then 65, then 112, then no hit at all. Restarting the
 emulator fixed it instantly. **Shrink a group and restart, or measure nothing.**
+
+### A second trap: loading the state *after* disabling the patch
+
+`realclock.py` loads the save state, applies the preset, then loads the state
+again so the patch is live from the first frame. That is right for turning a
+group **on** and silently wrong for turning it **off**: the save states were
+captured while patched, so their RAM image contains the patched words, and the
+second load puts them straight back after `patchctl` has just restored the
+originals. The unpatched arm is then not unpatched.
+
+It reads as a plausible result rather than an error. The "30fps" run measured
+181 ticks in six seconds one way and 362 the other - the give-away is that the
+unpatched game can only ever tick 30 times a second. **Check the tick rate of
+the unpatched arm in any real-time measurement**; 60 ticks a second means the
+patch is still in RAM.
+
+Order that works: load the state, apply the preset, run. Never load again after
+applying.
