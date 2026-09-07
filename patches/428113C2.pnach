@@ -769,3 +769,23 @@ patch=1,EE,000F0A20,word,00000000 // nop
 patch=1,EE,001DED58,word,0803C280 // lwc1 -> j trampoline
 patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 
+[60FPS - blast flash duration]
+description=Halve a blast effect node's duration, which is held in seconds and drained 1/30 per tick, so it lasts its real time instead of expiring twice as fast.
+// FUN_0017D8C0, an effect-node class entry (fn ptr at 002C3E80), runs
+//   [node+0x4E4] -= 1/30   once per tick, and expires the node at zero.
+// The 1/30 is pooled in .lit4 at 002FCC8C, so no scan for `lui` immediates
+// could ever see it. Measured from slot 0 with a breakpoint on the site and
+// the node pointer taken from $s1:
+//
+//     arm              expires at   ticks   per-tick step
+//     off (30fps ref)   vsync 19      9       -0.03333
+//     full (shipped)    vsync 10      9       -0.03333     <- half the real time
+//     full + this       vsync 19     18       -0.01667     <- matches the ref
+//
+// The fix repoints the load at a 1/60 the pool already holds at 002FC474, so
+// it is one word with no trampoline and no scratch RAM.
+//   0017D940  lwc1 $f1, -0x75e4($gp)   ->   lwc1 $f1, -0x7dfc($gp)
+// No regression: blast 8 hits / 15120 damage and a mashed rush 4 hits / 4th at
+// vsync 114, identical with and without.
+patch=1,EE,0017D940,word,C7818204
+
