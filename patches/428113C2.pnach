@@ -769,3 +769,52 @@ patch=1,EE,000F0A20,word,00000000 // nop
 patch=1,EE,001DED58,word,0803C280 // lwc1 -> j trampoline
 patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 
+
+// The knockback flight, found 2026-09-07. A fighter sent flying by a heavy
+// smash enters state 213 (or 214 / 223), and FUN_001E9590 counts a phase timer
+// at fighter+0x3D8 down once a tick from a value chosen per move - 50 for the
+// D5 smash, 15 for D6, 32 for DF. Those are 30Hz frame counts, so at 60fps the
+// victim leaves the constant-speed launch and drops into the gravity tumble in
+// half its real time: measured, state 213 ended at tick 52 in BOTH arms, which
+// is 104 vsyncs at 30fps and 52 at 60. The travel itself is already correct -
+// the victim's position matched the 30fps arm to 0.15 units at the same real
+// time - so only the duration is wrong, and doubling the three authored values
+// restores it. The counter still decrements every tick, so unlike a parity gate
+// this cannot leave a fighter stuck in the state.
+[60FPS - knockback flight]
+description=Double the launch-flight durations behind a heavy smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590).
+patch=1,EE,001E9614,word,2402001E // move D6 launch: 15 -> 30 ticks
+patch=1,EE,001E962C,word,24020064 // move D5 launch: 50 -> 100 ticks
+patch=1,EE,001E963C,word,24020040 // move DF launch: 32 -> 64 ticks
+
+// The Circle pursuit, found 2026-09-07 - the stomp that follows a heavy smash.
+// Four separate 30Hz frame counts and one lead prediction, all in the same
+// chain, and every one of them has to be doubled or the stomp misses:
+//
+//   state 43  FUN_001F30E0  a 6-tick windup before the teleport fires
+//   state 48  FUN_001F3668  the rise: (target - pos) * 0.25, added once a tick,
+//                           exiting after exactly 4 ticks. Halving the step and
+//                           doubling the count keeps the endpoint identical and
+//                           doubles only the duration.
+//   state 155 FUN_001E7408  after 20 ticks of diving, the horizontal speed is
+//                           halved EVERY tick - the dive gives up. At 60fps
+//                           that stall arrived before the dive could close.
+//   FUN_001DE8A8            the intercept: target = foePos + foeVel * param_4,
+//                           where foeVel is PER TICK and param_4 is a lead in
+//                           TICKS. Measured at the call: the raw prediction was
+//                           (87.5, -55.6, 40.0) from the foe at 30fps and
+//                           exactly half that at 60, because the velocity is
+//                           correctly halved while the tick count is not.
+//
+// The lead is doubled inside the solver rather than at the call site, because
+// param_4 is built as fVar7 + 4.0 + fVar5 with a per-move fVar7 - doubling the
+// literal 4.0 only corrects the move whose fVar7 is zero. FUN_001DE8A8 has
+// exactly one caller, so changing the scale it uses touches nothing else.
+[60FPS - pursuit timing]
+description=Double the four frame counts and the intercept lead behind the Circle pursuit stomp, so it connects at 60fps as it does at 30.
+patch=1,EE,001F3194,word,28430008 // windup effect onset: 4 -> 8 ticks
+patch=1,EE,001F31B0,word,2842000C // windup before the teleport: 6 -> 12 ticks
+patch=1,EE,001F3754,word,3C013E00 // rise step 0.25 -> 0.125
+patch=1,EE,001F3798,word,24030008 // rise length 4 -> 8 steps
+patch=1,EE,001E769C,word,28430029 // dive stall after 20 -> 40 ticks
+patch=1,EE,001DE918,word,4614A300 // lead x2: mov.s $f12,$f20 -> add.s $f12,$f20,$f20
