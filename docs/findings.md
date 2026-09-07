@@ -3943,3 +3943,110 @@ Whatever schedules that hit is neither. The next thing to try is the collision
 itself: `001CE8DC` applies the damage, called from `001CE888`; walking up from
 there to whatever decides the hitbox has arrived is the remaining thread.
 
+
+## 2026-09-07 - play-test of v9, and the constant pool nobody had looked at
+
+### What the user confirmed in normal play
+
+The first report against the shipped 17-group patch, and it splits cleanly.
+
+| | |
+|---|---|
+| **Confirmed fixed** | Blasts inside pre-load / cinematic animations. Goku's Angry Kamehameha **does not end early**: the full 3D bone animation plays, and the spawning Kamehameha's charge plays through properly |
+| **Semi-confirmed** | Blasts generally "seem to last longer". Improvement, not a clean pass |
+| **NOT fixed** | The character-switch sky rotation; Vegeta's scouter / Final Galick Cannon; Cell's Perfect -> Super Perfect transformation; mouth movement |
+
+The user's own read, and it matches the grouping in the 2026-09-07 defect list:
+**the sky, the scouter and the transformations all seem to stem from one issue.**
+
+This retires the "predicted, not measured" row for the ultimate's cinematic -
+`sequence wait` really did fix the staged beats, in play, which is what the
+frame-stepped 161-vs-191 measurement claimed. It does **not** retire the row for
+the death cameras or Perfect Barrier, which are still unmeasured.
+
+### The symptom class, stated more precisely than before
+
+Every unfixed item is a thing that **ends** at the wrong time while the animation
+underneath it plays correctly:
+
+- the sky **stops** rotating about a second into a character switch
+- the Galick Cannon's fade to white **ends** before the animation behind it does
+- the scouter line's mouth movement **finishes early**
+- transformations **run long** - the same class, overshooting instead
+
+That is not a rate that is too fast. It is a *duration* expiring at the wrong
+time. Which is fix shape 3 - "a length authored in seconds, converted with a
+hard-coded 30" - and so far exactly one group in the patch is that shape.
+
+### Correction: the data segment DOES contain 1/30 and 1/60
+
+This log has claimed since 2026-08-22, as evidence for "the engine has no
+timestep", that *"the data segment contains no 1/30, 1/60, 30.0 or 60.0 float
+anywhere"*. Half of that is wrong, and the half that is wrong is the important
+half.
+
+The reason nobody found them: **no scan in this project has ever read `.lit4`.**
+The ELF's section table survived stripping, and it has a section layout that was
+never examined:
+
+    .text      00100000  0x1bf6b0     (NOT 0x1c33c0 - that figure swallowed .vutext)
+    .vutext    002bf6b0  0x3cd0       VU microcode
+    .lit4      002fc280  0x25a0       2408 pooled float constants  <- here
+    .sdata     002fe880  0x8ee
+    .DVP.overlay..* x12               VU1 microprogram overlays
+
+ee-gcc materialises a float with `lui` when its low half is zero and pools it in
+`.lit4` otherwise. So:
+
+- `30.0` (0x41F00000) and `60.0` - low half zero - are **always** `lui $at, 0x41F0`.
+  The old claim is correct for these, and the 145-site enumeration of that
+  immediate was complete.
+- `1/30` (0x3D888889), `1/60` and `pi/30` have non-zero low halves, so they are
+  **never** an immediate and **always** a `lwc1` from `.lit4`. Every scan that
+  looked for immediates was structurally blind to them.
+
+This is the same failure as "every scan looked for floats, and the clocks were
+integers", one level down.
+
+### 24 pooled per-tick rates, 24 readers, one reader each
+
+    1/30   x18      1/60   x2      pi/30  x3      pi/60  x2
+
+Each constant has exactly one `lwc1 ...($gp)` reading it - a clean 1:1 map, so
+each site is independent and can be swept alone.
+
+| site | const | shape |
+|---|---|---|
+| `0017D940` | 1/30 | `[s1+0x4E4] -= 1/30`, then `c.olt.s` against 0 - **a countdown in seconds, in the effect-node region** |
+| `0023F438` | 1/30 | `[a0] -= 1/30` - another per-tick countdown |
+| `001DFEA0` | pi/30 | `[s0+0xA8] += pi/30` - a **second** bob channel in `FUN_001DFD88` |
+| `001DFF0C` | pi/30 | `[s0+0xA8] -= pi/30` - the wrap-down path of the same |
+| `001DFF44` | pi/30 | **already patched** - this is `[60FPS - hover bob]` |
+| `001C670C` | pi/60 | `[s1+0x80] -= pi/60` per tick |
+| `001C66D0` | 1/30 | `[s1+0x80] += x * 1/30` |
+| `001C4F38` | pi/30 | phase fed to `FUN_0011F588` (sine) |
+| `00143A9C`, `00144904`, `00145164`, `00210BE8`, `00210C60`, `00210ED8`, `002121D8` | 1/30 | **store 1/30 into an object field** next to a `lui $at, 0x4334` (180.0) and a `div.s` - seeding a per-tick step as instance data |
+| `0020F09C` | 1/30 | a clamp - `if (x < 1/30) x = 1/30` - with `lui $at, 0x41F0` immediately after |
+| `0013D2C0`, `0024C668`, `0024CCE0`, `0024E6D4`, `001C4534`, `001F5B7C` | 1/30, 1/60 | not yet classified; four sit in the clip-player module around `FUN_0024D038` |
+
+**`[60FPS - hover bob]` is one of twenty-four.** It was found by a write
+watchpoint on a symptom, never as a member of a class, and the class was never
+enumerated. Two more pi/30 phase increments sit in the very function that fix
+patched, untouched.
+
+The constructor-seeding group matters most for method: a rate copied out of
+`.lit4` into a struct field at construction is **invisible to any scan of the
+update code**, because at update time it is data. That is the same reason the
+particle system's alpha ramp and position rate resisted every constant hunt.
+
+### Next
+
+1. Census all 23 unfixed sites from an ordinary battle. Sites that do **not**
+   fire there belong to the special situations the user is reporting - character
+   switch, transformation, intro - which is the partition worth having before
+   building any of those save states.
+2. The clip-player cluster (`0024C668`, `0024CCE0`, `0024E6D4`) is the first
+   place to look for mouth animation; facial animation is clip playback and
+   "mouths do not move at all" has never been A/B'd against the unpatched game.
+3. `0017D940` is a per-tick countdown in seconds in the effect-node region and
+   is the strongest single candidate for "blasts end too fast" surviving at all.
