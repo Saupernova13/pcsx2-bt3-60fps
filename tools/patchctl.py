@@ -101,6 +101,13 @@ SEQ = ["60FPS - blast sequence rate"]
 # nothing, because they are compared against each other.
 BLASTDUR = ["60FPS - blast effect duration"]
 
+# The scripted-sequence clock, found 2026-09-07. A sequence step that is waiting
+# counts an integer down once a tick, and those waits are authored in 30Hz
+# frames, so every staged beat - camera cuts, mouth lines, fades, the instant an
+# ultimate releases its beam - lands in half its real time. Counting down on
+# even ticks only fixes the whole class at once without skipping any work.
+SEQWAIT = ["60FPS - sequence wait"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -111,7 +118,7 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
-                  + BLASTDUR + SPARES)
+                  + BLASTDUR + SEQWAIT + SPARES)
 
 PRESETS = {
     "off": [],
@@ -131,8 +138,10 @@ PRESETS = {
     # which never exercises the charge path. Both stay in the pnach as a record.
     "withseq": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQ),
+    "noseqwait": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR),
+             + BLAST + BLASTDUR + SEQWAIT),
 }
 
 DISABLED_SUFFIX = " [off]"

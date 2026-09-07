@@ -362,6 +362,38 @@ patch=1,EE,0019672C,word,3C013F00 // 1.0 -> 0.5 per tick
 // EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
 // That asymmetry is the point of the test - it proves both that this is the one
 // movement channel and that ground is already compensated while air is not.
+// The scripted-sequence clock, found 2026-09-07 - the one behind everything the
+// game stages rather than simulates. FUN_00158850 steps one node of a scripted
+// sequence per tick, and a step that is waiting counts a plain integer down by
+// one at 00158914 ([node+4]) and 0015894C ([node+8]). Both waits are authored in
+// 30Hz frames, so at 60fps every scripted beat - a camera cut, a mouth line, a
+// fade, the moment an ultimate lets go of its beam - arrives in half its real
+// time. Counting down on even ticks only restores all of them at once, and
+// unlike gating the node's update it skips nothing: the step still runs, still
+// spawns, still draws, it just waits the right length of time.
+[60FPS - sequence wait]
+description=Count scripted-sequence waits down at 30Hz, so staged beats keep their real timing.
+patch=1,EE,000F0AC0,word,8E020004 // lw $v0, 4($s0)        the wait counter, reloaded
+patch=1,EE,000F0AC4,word,3C010033 // lui $at, 0x33
+patch=1,EE,000F0AC8,word,8C211D64 // lw $at, 0x1d64($at)   global frame counter
+patch=1,EE,000F0ACC,word,30210001 // andi $at, $at, 1
+patch=1,EE,000F0AD0,word,14200002 // bnez $at, 000F0ADC    odd tick: hold
+patch=1,EE,000F0AD4,word,00000000 // nop
+patch=1,EE,000F0AD8,word,2442FFFF // addiu $v0, $v0, -1    even tick: count down
+patch=1,EE,000F0ADC,word,08056246 // j 0x158918
+patch=1,EE,000F0AE0,word,00000000 // nop
+patch=1,EE,00158910,word,0803C2B0 // lw -> j 000F0AC0
+patch=1,EE,000F0AE4,word,8E020008 // lw $v0, 8($s0)        the second wait, same shape
+patch=1,EE,000F0AE8,word,3C010033 // lui $at, 0x33
+patch=1,EE,000F0AEC,word,8C211D64 // lw $at, 0x1d64($at)
+patch=1,EE,000F0AF0,word,30210001 // andi $at, $at, 1
+patch=1,EE,000F0AF4,word,14200002 // bnez $at, 000F0B00
+patch=1,EE,000F0AF8,word,00000000 // nop
+patch=1,EE,000F0AFC,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F0B00,word,08056254 // j 0x158950
+patch=1,EE,000F0B04,word,00000000 // nop
+patch=1,EE,00158948,word,0803C2B9 // lw -> j 000F0AE4
+
 [60FPS - EXPERIMENT halve root motion]
 description=Test only. Halves all root motion; ground should go slow, air should become correct.
 patch=1,EE,000F0800,word,3C04000F // lui   $a0, hi(scratch)
