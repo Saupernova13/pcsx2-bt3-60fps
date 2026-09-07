@@ -38,8 +38,14 @@ DEVELOPMENT_ONLY = ["60FPS - animation rate", "60FPS - EXPERIMENT halve root mot
 
 # Stated plainly at the top of the shared file rather than left to be discovered.
 KNOWN_BROKEN: list[str] = [
-    "in an ultimate attack the camera cuts back to the fight early - the blast "
-    "itself is correct, the cinematic around it is still paced in ticks",
+    "an ultimate's beam lands its first hit about half a second early. The "
+    "cinematic up to the launch is now correct to within two vsyncs; what is "
+    "left is the flight, and it is neither an integer tick counter nor a "
+    "per-tick float step - every one of those in the game has been gated or "
+    "halved and none of them moves it",
+    "a transformation runs a few hundred milliseconds LONG - the opposite sign, "
+    "so a different cause",
+    "in the pre-fight intro the characters' mouths do not move at all",
 ]
 
 
