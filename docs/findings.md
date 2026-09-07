@@ -3728,3 +3728,93 @@ why the fighters look right while everything staged around them runs double.
 Item 8 is the opposite sign and so is almost certainly a *different* cause: a
 transformation is being held slightly too long, which is what over-halving a
 duration that was already partly compensated looks like.
+
+## 2026-09-07 - the two clocks behind everything the game stages
+
+Three sessions of chasing individual effects ended here: the blasts are not
+paced by the effects at all. They are paced by two integer counters, and both
+were invisible to every scan run before today because every scan looked for
+floats.
+
+### The instrument that found them
+
+`tools/ratediff.py` asks every word in RAM whether it still moves at double
+speed: same save state, same input, the same number of **vsyncs** - the same
+real time - once unpatched and once patched. A quantity the patch compensates
+covers the same distance in both arms; one it misses covers twice as much.
+Three snapshots per arm rather than two, because a word that only moves when
+its pool is freed and refilled jumps once, while a clock advances the same
+amount in each half of the window. That one requirement cut 805 false
+candidates to 28 real ones.
+
+Its companion `eventdiff.py` stops both arms at the same **event** instead of
+the same time. Whatever a script keeps time by has to read the same at that
+instant in both arms, because the event is the same point in the script.
+
+Neither found the answer directly, but between them they said what the answer
+was not: no float in the game moves at double speed during an ultimate except
+some long-dead tweens. The clocks had to be integers.
+
+### The chain, from the symptom down
+
+The ultimate is one fighter **state**. `FUN_001E23D0` is the state machine: the
+current state index lives at `fighter+0x948`, the handler table at `002C4980`,
+and the handler is called once a tick with message 2. Save state 8 sits in
+state 261, which becomes state 264 (`FUN_001F6518`, the Angry Kamehameha) at
+0.42s unpatched and 0.40s patched - the same real time, so the entry is fine.
+
+Inside the state, the animation schedule is fine too. Goku's model at
+`008C0E30` advances `+0x138` by 2.0 a tick unpatched and 1.0 a tick patched:
+**the animation clock patch is doing its job**, and every clip that ends
+naturally ends at the same real time in both arms. What differed was the moment
+an external event *interrupted* a clip - and that traced to the fighter's
+animation attribute bit 0xA7 (`FUN_001DAC78`, bitfields at `fighter+0x1085` and
+`+0x10AD`), set by `FUN_00158980`'s action from a scripted sequence.
+
+### Clock one: the scripted sequence's wait
+
+`FUN_00158850` steps one node of a scripted sequence per tick. A step that is
+waiting counts a plain integer down by one - `[node+4]` at `00158914`,
+`[node+8]` at `0015894C` - and fires its action when it hits zero. Those waits
+are authored in 30Hz frames, so at 60fps every beat the game *stages* rather
+than simulates arrives in half its real time: camera cuts, mouth lines, fades,
+and the instant an ultimate lets go of its beam.
+
+Counting down on even ticks only moved the Angry Kamehameha's first hit from
+124 vsyncs to 161 against an unpatched 191, and every staged beat before the
+beam launch now lands within two vsyncs of the unpatched game.
+
+This is the fix the two withdrawn groups were reaching for and getting wrong.
+Gating a node's *update* skips its spawn and its draw. Gating only the *wait*
+skips nothing.
+
+### Clock two: the fighter state's phase timer
+
+Every state handler keeps a counter in the scratch block the dispatcher zeroes
+on entry (`memset(fighter+0x3D0, 0, 0x50)` at `001E247C`), advances it once a
+tick, and compares it against a count authored in 30Hz frames. In the held
+Super Kamehameha - state 271, `FUN_001F7860` - that is `001F7A00`:
+
+    lw    $v0, ($s0)          # ticks in this phase
+    addiu $v0, $v0, 1
+    slt   $v1, $v0, $s3       # ... against the authored charge length
+    bnez  $v1, skip
+    sw    $v0, ($s0)          # delay slot: stored every tick either way
+
+`tools/phasetimer.py` finds all 28 of them by the shape the compiler gives
+them: `addiu $sN, fighter, 0x3d8` in the prologue, then `[$sN] += 1` with a
+matching load and store. `tools/mkgate.py` writes a trampoline for each that
+adds one on even ticks only - an integer cannot be halved, and freezing one
+hangs the state.
+
+Held Blast 2, button down throughout, to the first hit: **unpatched 176 vsyncs,
+patched-without-this 115, patched-with-this 175.** Same six hits, same 10900
+damage, same eight-vsync spacing.
+
+### Why the blanket gate is wrong, and what it cost
+
+Gating all 28 broke ordinary melee: the fourth hit of a mashed rush lands at
+122 vsyncs unpatched, 114 with the rest of the patch, and never within five
+seconds with all 28 gated. Some of these counters are clocks and some are
+levels - a combo index, an input window - and the ones that are levels must not
+be slowed. They have to be selected by measurement, not by shape.
