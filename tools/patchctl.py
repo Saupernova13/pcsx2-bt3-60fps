@@ -149,8 +149,18 @@ PRESETS = {
                   + BLAST + BLASTDUR + PHASE),
     "nophase": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT),
+    # PHASE is WITHDRAWN 2026-09-07. It gates 22 counters inside the fighter
+    # state machine - the exact mechanism behind a fighter that fails to leave a
+    # state - and every one of them was scored against two GROUNDED oracles, a
+    # held charge and a mashed rush. No airborne state was ever tested. The user
+    # hit a repeatable trap in state 157 (FUN_001E6DC8), an airborne state, with
+    # no pending transition. Not proven to be this group; withdrawn because it
+    # is the only shipped group that touches state transitions and the only one
+    # whose validation has a hole exactly where the symptom is.
+    "withphase": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PHASE),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQWAIT + PHASE),
+             + BLAST + BLASTDUR + SEQWAIT),
 }
 
 DISABLED_SUFFIX = " [off]"
