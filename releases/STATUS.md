@@ -1,10 +1,11 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v12**.
+Newest at the top. `releases/latest/` currently holds **v13**.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v13-pursuit-stomp` | 18 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds the two pursuit groups; inherits v12's flag |
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
 | `v10-withdraw-phase-timers` | 16 | superseded | correct | Identical group list to v12 |
@@ -33,6 +34,28 @@ again. Differs from v11 by exactly one group, `[60FPS - sequence wait]`.
 > problem. Reported by the user, currently unconfirmed and uncharacterised.
 > Every later build inherits this flag until it is explicitly cleared by
 > testing. If input feel is ever in question, compare against v11 first.
+
+## v13 - the pursuit stomp
+
+Adds `[60FPS - knockback flight]` and `[60FPS - pursuit timing]` to the v12 set.
+Fixes the heavy smash into Circle pursuit stomp, which missed at 60fps and
+landed every time at 30. Five separate durations authored in 30Hz frames, in one
+chain; see findings.md for the derivation.
+
+Verified by automated test, not yet by the user:
+
+- Nine press delays from 5 to 45 vsyncs. Before: 0 of 9 connect. After: 9 of 9,
+  within 1-3 vsyncs of the 30fps arm at every delay.
+- Confirmed with the VM running free and the pad on the wall clock
+  (`python tools/stomptest.py --presets off nopursuit full`), which is a
+  different instrument from the frame-stepped sweep and agrees with it.
+- The charge and ultimate oracles are unchanged to the vsync, so nothing that
+  already worked moved.
+
+`nopursuit` is the 16-group v12 set, kept as a named preset so this can be
+switched off without editing anything.
+
+**It inherits v12's input-timing flag** - nothing here clears it.
 
 ## The state 157 trap
 
