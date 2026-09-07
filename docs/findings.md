@@ -4050,3 +4050,47 @@ particle system's alpha ramp and position rate resisted every constant hunt.
    "mouths do not move at all" has never been A/B'd against the unpatched game.
 3. `0017D940` is a per-tick countdown in seconds in the effect-node region and
    is the strongest single candidate for "blasts end too fast" surviving at all.
+
+## 2026-09-07 - WITHDRAWN: blast flash duration, and a probe left live in RAM
+
+`[60FPS - blast flash duration]` (one word at `0017D940`, repointing the load
+at the pool's 1/60) is **withdrawn**. The user reported Goku getting stuck in a
+loop while it was in force.
+
+### The measurement is still sound; the conclusion drawn from it was not
+
+`[node+0x4E4]` really does drain by exactly 1/30 per tick and expire in exactly
+9 ticks at **both** rates - 19 vsyncs unpatched against 10 patched - and the
+repoint really does put it back on 19. None of that is in doubt.
+
+What was wrong was assuming an uncompensated duration is therefore safe to
+double. **A node that lives twice as long is a node something else may still be
+waiting on.** This is the third time this project has hit that shape: gating the
+blast effect update leaked a node whose lifetime never expired and stuck it to
+the character's hands; gating the sequence controller lost the spawn. Extending
+a lifetime is not the inverse of those, it is another way into the same class.
+
+Anything that changes how long an effect node exists now needs a stuck-state
+check in play before it ships, not only a duration measurement.
+
+### The process failure, which is the more important half
+
+`tools/sweep.py` and the ad-hoc probes here disable a probe group by renaming it
+`[off]` **in the file**, and rely on the next `patchctl.apply` to restore the
+original word. The last regression run renamed the group and then called
+`resume()` without applying anything, so the repoint stayed in RAM. The session
+then reported the change as "needs a restart to load" - true of the *named*
+group, false of the word, which was already live in the user's play session.
+
+    live RAM at 0017D940 while the user was playing:  C7818204   (the probe)
+    original:                                          C7818A1C
+
+**Renaming a group does not unpatch it. Only `patchctl.apply` does.** A probe
+must be followed by an apply, and any claim about what the user is running has
+to be a readback, not an inference from the file.
+
+### Not assumed: the loop may predate this
+
+The user notes the stuck loop "has happened a few times", so it is not
+established that this change caused it - only that the change was live and is
+the obvious suspect. It is worth reproducing against the shipped 17 on its own.
