@@ -16,12 +16,12 @@ Running analysis log: **[docs/findings.md](docs/findings.md)** - start at "STATE
 
 ## What the patch covers
 
-17 groups, each compensating one system that the 60Hz loop drives twice as often.
+18 groups, each compensating one system that the 60Hz loop drives twice as often.
 Movement, gravity and knockback; the animation clock; menu and combat input windows; the
 ki aura, particles, effect rotation and the hovering idle; the tween system; blast hit
-cadence and blast effect duration; and the two integer clocks behind everything the game
-*stages* rather than simulates - scripted-sequence waits and the fighter state machine's
-phase timers.
+cadence and blast effect duration; the integer clock behind scripted-sequence waits; and
+the launch-and-pursuit chain - the flight a heavy smash puts someone into, and the five
+frame counts behind the Circle stomp that follows it.
 
 Every group is verified against the unpatched 30fps game as its own oracle: same save
 state, same input, same number of vsyncs. The ones a player can see are confirmed in play
@@ -119,6 +119,7 @@ Ghidra project (once, several minutes):
 | `tools/census.py` | Narrows a static candidate list to the sites that actually execute in a window |
 | `tools/sweep.py` | Changes one site at a time and scores it against two oracles at once |
 | `tools/realclock.py` | Times and photographs a move in real time, with the game running free |
+| `tools/stomptest.py` | Plays the heavy smash and its Circle pursuit stomp on the wall clock, and says whether it connected |
 
 ## How a patch gets written
 
@@ -161,7 +162,7 @@ when a group goes away but does not undo it.
     python tools/patchctl.py --status
     python tools/patchctl.py --off                # stock 60fps, nothing compensated
     python tools/patchctl.py --on full            # everything that ships
-    python tools/patchctl.py --on nophase         # the shipping set minus one group
+    python tools/patchctl.py --on nopursuit       # the shipping set minus the pursuit work
 
 Four rules, each learned by getting it wrong:
 
