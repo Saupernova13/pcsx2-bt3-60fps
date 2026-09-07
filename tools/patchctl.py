@@ -159,14 +159,14 @@ PRESETS = {
     # whose validation has a hole exactly where the symptom is.
     "withphase": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                   + BLAST + BLASTDUR + SEQWAIT + PHASE),
-    # SEQWAIT is WITHDRAWN 2026-09-07 as well, at the user's call, stepping one
-    # more milestone back to v8 after the trap survived withdrawing PHASE. It is
-    # confirmed-good in play for the ultimate's cinematic, so this is a rollback
-    # to isolate a fault, not a verdict on the group.
-    "withseqwait": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-                    + BLAST + BLASTDUR + SEQWAIT),
+    # SEQWAIT was withdrawn briefly on 2026-09-07 to isolate the state 157 trap,
+    # then RESTORED once the user confirmed the trap did not follow it out: the
+    # 15-group set still trapped nothing but the ultimate ended early again.
+    # It is confirmed-good in play and does not touch state transitions.
+    "noseqwait2": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR),
+             + BLAST + BLASTDUR + SEQWAIT),
 }
 
 DISABLED_SUFFIX = " [off]"
