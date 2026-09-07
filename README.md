@@ -30,6 +30,7 @@ want to convert, not a global branch kill. See findings.md for the full table.
 ## Layout
 
     docs/       the guide, and the running findings log
+    ps2_patch_agent_tools/   Agent context and Workflow
     rules/      Analyst and Implementer v4.0 rule sets from the guide author
     ps2ee/      python library (see below)
     tools/      command line entry points
@@ -75,6 +76,13 @@ Ghidra project (once, several minutes):
 | `tools/live.py` | Reads, writes, watches and patches a running PCSX2 over PINE |
 | `tools/deploy.py` | Installs a pnach and enables it, so testing is just "launch and play" |
 | `tools/setup-pcsx2.py` | Reports and adjusts the PCSX2 settings this workflow needs |
+| `tools/tickcount.py` | Finds every integer `field += 1` and `field -= 1` - the game's frame counters |
+| `tools/tickstep.py` | Finds every float `field += 1.0`, including the ones whose 1.0 is hoisted into a register |
+| `tools/phasetimer.py` | Finds the fighter state machine's per-state phase timers |
+| `tools/mkgate.py` | Writes a trampoline that advances an integer counter on even ticks only |
+| `tools/mkhalf.py` | Writes a trampoline that adds 0.5 where the code added 1.0 |
+| `tools/ratediff.py` | Asks every word in RAM whether it still moves at double speed |
+| `tools/realclock.py` | Times and photographs a move in real time, with the game running free |
 
 ## How a patch gets written
 
