@@ -8,7 +8,28 @@ Ghidra static analysis, systematic isolation testing, and a two-role Analyst/Int
 loop. Scope is **battles**: movement, ki, combos, dashes, blast timing, stun, gauges and
 AI must be correct at 60fps.
 
-Running analysis log: **[docs/findings.md](docs/findings.md)**.
+**The patch to use is [`releases/latest/428113C2.pnach`](releases/latest/).** Drop it in
+PCSX2's `cheats/` directory, enable every group, and set `EnableCheats = true`. The file's
+own header lists the groups and what is still not fixed.
+
+Running analysis log: **[docs/findings.md](docs/findings.md)** - start at "STATE OF PLAY".
+
+## What the patch covers
+
+17 groups, each compensating one system that the 60Hz loop drives twice as often.
+Movement, gravity and knockback; the animation clock; menu and combat input windows; the
+ki aura, particles, effect rotation and the hovering idle; the tween system; blast hit
+cadence and blast effect duration; and the two integer clocks behind everything the game
+*stages* rather than simulates - scripted-sequence waits and the fighter state machine's
+phase timers.
+
+Every group is verified against the unpatched 30fps game as its own oracle: same save
+state, same input, same number of vsyncs. The ones a player can see are confirmed in play
+with the game running free, not by frame stepping.
+
+Known not fixed, and stated in the released file's header: an ultimate's beam lands its
+first hit about half a second early, transformations run a few hundred milliseconds long,
+and the pre-fight intro's mouths do not move at all.
 
 ## Why the obvious patch does not work
 
@@ -34,7 +55,8 @@ want to convert, not a global branch kill. See findings.md for the full table.
     rules/      Analyst and Implementer v4.0 rule sets from the guide author
     ps2ee/      python library (see below)
     tools/      command line entry points
-    patches/    the deliverable, plus numbered isolation experiments in exp/
+    patches/    the working pnach, plus numbered isolation experiments in exp/
+    releases/   what to hand someone: latest/ and a directory per tagged release
     ghidra/     PS2_Scoring_Radar and the headless decompiler script
     work/       gitignored: extracted ELF, RAM dumps, Ghidra project, caches
 
@@ -48,12 +70,21 @@ Needs Python 3.11+, and Ghidra with the Emotion Engine extension for decompilati
     python tools/setup-pcsx2.py --enable-pine
     python tools/extract-elf.py            # pull SLUS_216.78 out of the disc image
 
+Development also wants **PCSXROO**, a PCSX2 fork with the debug server this repo drives -
+memory reads and writes, breakpoints, watchpoints, save states, pad injection and
+screenshots over a socket on port 28110. It runs in portable mode, so its `cheats/`,
+`sstates/` and `snaps/` sit next to the executable and never touch the PCSX2 install
+above. Start it detached, so it outlives the shell that launched it:
+
+    pcsxroo-qt.exe -debugserver 28110 -- "path\to\bt3.cso"
+
 Paths are discovered automatically. Override anything by creating `local.json` in the
 repo root:
 
     {
-      "PCSX2_DIR":  "C:/path/to/PCSX2",
-      "GAME_IMAGE": "D:/roms/bt3.cso",
+      "PCSX2_DIR":   "C:/path/to/PCSX2",
+      "PCSXROO_DIR": "C:/path/to/pcsxroo/bin",
+      "GAME_IMAGE":  "D:/roms/bt3.cso",
       "GHIDRA_HOME": "C:/Utils/ghidra"
     }
 
@@ -75,6 +106,8 @@ Ghidra project (once, several minutes):
 | `tools/ramdiff.py` | Differential memory search across save states |
 | `tools/live.py` | Reads, writes, watches and patches a running PCSX2 over PINE |
 | `tools/deploy.py` | Installs a pnach and enables it, so testing is just "launch and play" |
+| `tools/patchctl.py` | Turns groups on and off in a running game, restoring what a disabled one overwrote |
+| `tools/export.py` | Writes the shareable copy: development-only groups dropped, known defects in the header |
 | `tools/setup-pcsx2.py` | Reports and adjusts the PCSX2 settings this workflow needs |
 | `tools/tickcount.py` | Finds every integer `field += 1` and `field -= 1` - the game's frame counters |
 | `tools/tickstep.py` | Finds every float `field += 1.0`, including the ones whose 1.0 is hoisted into a register |
@@ -82,6 +115,9 @@ Ghidra project (once, several minutes):
 | `tools/mkgate.py` | Writes a trampoline that advances an integer counter on even ticks only |
 | `tools/mkhalf.py` | Writes a trampoline that adds 0.5 where the code added 1.0 |
 | `tools/ratediff.py` | Asks every word in RAM whether it still moves at double speed |
+| `tools/eventdiff.py` | Stops both arms at the same event instead of the same time, and diffs there |
+| `tools/census.py` | Narrows a static candidate list to the sites that actually execute in a window |
+| `tools/sweep.py` | Changes one site at a time and scores it against two oracles at once |
 | `tools/realclock.py` | Times and photographs a move in real time, with the game running free |
 
 ## How a patch gets written
@@ -117,15 +153,33 @@ writing the same address.
 
 ## Testing loop
 
-    python tools/deploy.py patches/exp/007-something.pnach --only "60FPS"
-    # launch PCSX2, boot BT3, load the save state, observe
+Every measurement is an A/B against the unpatched game from the same save state, and
+`patchctl` switches between the two without a restart. It renames groups in the pnach and
+puts back what a disabled one overwrote, because PCSX2 stops rewriting a `patch=1` line
+when a group goes away but does not undo it.
 
-With PCSX2 running and PINE enabled, experiments do not need a restart:
+    python tools/patchctl.py --status
+    python tools/patchctl.py --off                # stock 60fps, nothing compensated
+    python tools/patchctl.py --on full            # everything that ships
+    python tools/patchctl.py --on nophase         # the shipping set minus one group
 
-    python tools/live.py status
-    python tools/live.py fps                   # measure the real logic step rate
-    python tools/live.py apply patches/exp/007-something.pnach
-    python tools/live.py watch 00331D64 00331D60 --seconds 5
+Four rules, each learned by getting it wrong:
+
+- **Load the state, then apply the preset, then run.** Never load again after applying:
+  the save states were captured while patched, so a second load puts the patched words
+  straight back and the "unpatched" arm is not unpatched. Check it ticks 30 times a
+  second.
+- **A screenshot needs a running VM.** Sample on the wall clock; a "frame-advance N,
+  screenshot" loop lets uncounted ticks slip past every sample.
+- **A new group name needs a restart.** The enabled list in
+  `gamesettings/SLUS-21678_428113C2.ini` is read only at boot. Three spare names are
+  carried so an experiment does not cost one.
+- **Shrinking a live group needs a restart too**, because the hooks it drops stay patched
+  in RAM with nothing left to restore them.
+
+When a change is ready to hand over:
+
+    python tools/export.py --release v9-scripted-clocks
 
 ## Notes
 

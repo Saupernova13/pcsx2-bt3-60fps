@@ -6,112 +6,120 @@ Newest sections at the bottom.
 
 ## STATE OF PLAY - read this first
 
-**Working, shipped in `patches/428113C2.pnach`, all four groups verified live over PINE
-and confirmed by the user:**
+Last revised 2026-09-07. **17 groups ship**, in `patches/428113C2.pnach` and
+exported to `releases/latest/`. Every one is verified against the unpatched
+30fps game as its own oracle - same save state, same input, same number of
+vsyncs - and the ones the user can see have been confirmed in play.
 
 | group | what it does |
 |---|---|
-| `60FPS - battle` | battle loop stride 2 -> 1 at `0012BCE4`. The whole 60fps change |
-| `60FPS - animation clock` | halves the animation clock itself in `FUN_0024D410` (supersedes `60FPS - animation rate`, which only halved rates written through `FUN_001C44F8`) |
-| `60FPS - input repeat timing` | doubles the menu auto-repeat delay/rate via `FUN_002577F8` |
-| `60FPS - input timing` | halves the 128 per-button frame counters in `FUN_001D3C10` |
-| `60FPS - aura update rate` | runs the ki aura's update on even frames only while still drawing it every frame, at `FUN_00164860` |
-| `60FPS - airborne motion` | halves the displacement and the ramp of `pos += dir * speed`, at `FUN_001DE000` |
-| `60FPS - airborne vertical` | the same for `pos.y += vy`, at `FUN_001DED78` |
-| `60FPS - airborne residual` | halves the post-hit slide and its decay epsilon, at `FUN_001DFD88` |
-| `60FPS - gravity` | halves the gravity acceleration and the vertical step it drives, at `FUN_001DED28` |
-| `60FPS - effect rotation` | halves the three per-tick effect phase rates in `FUN_00251A48` |
-
-Game speed, animation, menus, grabs, combos and quick-succession input are all correct.
-
-**A fifth group, `60FPS - effect rotation`, was written off here as wrong. That verdict
-was withdrawn on 2026-09-05 - it is correct and is shipped.** The paragraph below is kept
-for the reasoning it records, not for its conclusion.
-
-> ~~It is wrong. Revert it.~~ It was deployed 2026-08-22 without ever being confirmed by the user.
-On 2026-08-24 its target was frozen outright (all ten phase stores nopped, phases verified
-motionless for 150 frames) and the user reported **no visible change at all**, so it
-compensates something invisible. It is also incomplete on its own terms - four of the
-eleven per-tick constants in that function. See "The ki aura at 2x" at the bottom.
+| `60FPS - battle` | battle loop stride 2 -> 1 at `0012BCE4`. The whole 60fps change; everything else compensates for it |
+| `60FPS - animation clock` | halves the animation clock itself, at the step and getter sites around `FUN_001C47A4` / `FUN_001C4920` |
+| `60FPS - input repeat timing` | doubles the menu auto-repeat delay and rate, `FUN_002577F8` |
+| `60FPS - input timing` | halves the 128 per-button frame counters, `FUN_001D3C10` |
+| `60FPS - aura update rate` | updates the ki aura on even frames while still drawing it every frame, `FUN_00164860` |
+| `60FPS - effect rotation` | halves the three per-tick effect phase rates, `FUN_00251A48` |
+| `60FPS - tween duration` | one word: the tween system's hard-coded 30.0 becomes 60.0, `FUN_00267AC8` |
+| `60FPS - particle update rate` | gates the particle ageing pass on frame parity, `FUN_00167258` |
+| `60FPS - hover bob` | halves the pi/30-per-tick sine phase behind the hovering idle |
+| `60FPS - airborne motion` | halves `pos += dir * speed` and its ramp, `FUN_001DE000` |
+| `60FPS - airborne vertical` | the same for `pos.y += vy`, `FUN_001DED78` |
+| `60FPS - airborne residual` | halves the post-hit slide and its decay epsilon, `FUN_001DFD88` |
+| `60FPS - gravity` | halves the gravity acceleration and the vertical step it drives, `FUN_001DED28` |
+| `60FPS - blast hit cadence` | gates the hitbox tick counter `H[0x0A]`, so multi-hit attacks land at their authored spacing |
+| `60FPS - blast effect duration` | halves 19 coupled per-tick steps in the two effect classes that draw a ki blast |
+| `60FPS - sequence wait` | counts scripted-sequence waits down on even ticks - camera cuts, mouth lines, fades, beam releases |
+| `60FPS - state phase timers` | advances 22 of the fighter state machine's 28 phase counters on even ticks - charge lengths, recoveries |
 
 **Read "The engine has no timestep" further down before anything else.** The
-game has no delta anywhere; it is a fixed 30Hz tick loop now ticking at 60Hz, so
-*everything* is 2x until it is individually halved. Nothing self-corrects.
+game has no delta anywhere. It is a fixed 30Hz tick loop now ticking at 60Hz,
+so *everything* is 2x until it is individually compensated. Nothing
+self-corrects.
 
-**FIXED 2026-09-04: airborne motion.** Three more groups are shipped -
-`60FPS - airborne motion`, `60FPS - airborne vertical`, `60FPS - airborne residual`.
-Airborne movement never went through the skeleton at all, which is why every attempt
-aimed at root motion failed. See "Airborne motion, solved" at the bottom for the full
-derivation and the numbers.
+### The three shapes a fix takes, and when each is right
 
-The short version: the position round-trip through the root bone is real, and it is how
-*ground* movement works, but during a launched flight the root delta is exactly `0.0000`
-every tick while the fighter still moves. The airborne displacement comes from three
-separate per-tick channels on the fighter itself, all of them uncompensated:
+1. **Halve a constant.** Right when a per-tick quantity is a float with its own
+   step: `effect rotation`, `gravity`, `hover bob`, `blast effect duration`.
+2. **Gate on frame parity.** Right when a system only *advances state*, and the
+   draw is separate or still reachable: `aura update rate`,
+   `particle update rate`, `blast hit cadence`, `sequence wait`,
+   `state phase timers`. It is **wrong** for anything that *constructs*
+   something each frame - see the withdrawn groups below.
+3. **Double a duration.** Right when a length is authored in seconds and
+   converted with a hard-coded 30. Only `tween duration` qualifies so far.
 
-| routine | what it adds per tick |
-|---|---|
-| `FUN_001DE000` | `pos += dir(+0x90) * speed(+0xA8)` |
-| `FUN_001DED78` | `pos.y += vy(+0xAC)` |
-| `FUN_001DFD88` | `pos += residual(+0x80)`, then shrinks it by a fixed epsilon |
+### Withdrawn - kept in the repo pnach as a record, stripped from releases
 
-Each has a *rate* as well as a *value*, and both halves need halving. The first two get
-their value from `FUN_001DBFF8(current, target, step)`, a move-toward-by-at-most-step
-helper; halving only the applied displacement leaves the ramp and the decay running at
-double rate, so a knockback ends in half the real time.
+- `60FPS - blast effect rate` gated the two effect updates. They rebuild the
+  beam geometry every frame, so gating leaves nothing to draw and leaks nodes
+  whose lifetime never expires.
+- `60FPS - blast sequence rate` gated the sequence controller's vtable[0]. That
+  call is what *spawns* the effects, so a charged blast rendered nothing at all
+  and dealt 1520 damage instead of 13680.
+- `60FPS - animation rate` is superseded by `animation clock`. Enable one or the
+  other, never both.
+- `60FPS - EXPERIMENT halve root motion` deliberately breaks ground movement.
 
-**Do not re-open these, they are settled by measurement, not by argument:**
+**Both withdrawn gates failed the same way for the same reason: an effect that
+is gated is an effect that does not get built.**
 
-- **It is step SIZE, not step COUNT.** Call counters on the gameplay path read *identically*
-  on the ground and in the air.
-- **The ki aura is not a second bug.** It tracks a character whose motion was 2x.
-- **The render chain is followers all the way down.** `fighter+0x15A0` <- `model+0x970`
-  <- `bone[0]+0x40`. Do not walk it again; it is mapped in full below.
-- **Root motion is the ground channel only.** The 2026-09-02 halve-root-motion experiment
-  failed because it halved a channel that reads zero in the air.
-
-**FIXED 2026-09-05: falling.** `60FPS - gravity` is shipped. Free fall never went through
-`FUN_001DED78`, the vertical channel the first airborne fix patched - it has its own
-routine, `FUN_001DED28`, with the acceleration and the terminal velocity as plain data
-words. Per-tick acceleration is now 0.2315 against 0.4630, and the applied height change
-is exactly half the stored speed on every tick.
-
-**`60FPS - effect rotation` is reinstated, and this log's earlier verdict on it is
-withdrawn.** It was written off after a 2026-08-24 freeze test showed no visible change,
-but that test was run on the ground. In an airborne hover its three phase rates are the
-only cleanly uncompensated per-tick quantities left in the fighter's model.
-
-**Still open:**
+### Still wrong
 
 | defect | status |
 |---|---|
-| **Airborne idle animation reported as 2x.** | The body animation clock, the pose, the fighter struct and the model all measure correct in the air. Effect rotation was the one real 2x left and is now shipped; it may be the fix. See "airborne idle animation: what was ruled out". |
-| Circling an opponent cruises at 0.80 of its 30fps speed, where before the fix it was 1.91. | measured, root cause narrowed to a target value rather than the step; refinement, not defect |
+| An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
+| Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
+| Pre-fight intro: mouths do not move at all | Not a speed problem |
+| Death cameras, Perfect Barrier, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
+| Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
+| Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
 Everything else measures between 0.95 and 1.05 against the 30fps oracle.
 
-**FIXED 2026-08-24: the ki aura.** See the milestone at the bottom. The lever was a
-pass that runs too often, not a constant - `vtable[0]` in this engine is update AND draw,
-so the hook skips the update half on odd frames and falls through to the draw.
+### Do not re-open these - settled by measurement, not by argument
 
-**Superseded - the ki aura, now fixed.** It was the user's oldest open report, and the one
-previous sessions kept mis-answering with `60FPS - effect rotation`. Proven to be an
-uncompensated per-tick quantity by the 30fps oracle; five candidate systems have now been
-eliminated by direct visual test. Read "The ki aura at 2x" at the bottom before touching
-it, and **do not trust `tools/findmotion.py`** - its sweep detector was blind (see the
-same section).
+- **It is step SIZE, not step COUNT.** Call counters on the gameplay path read
+  identically on the ground and in the air.
+- **The ki aura is not a second bug.** It tracks a character whose motion was 2x.
+- **The render chain is followers all the way down.** `fighter+0x15A0` <-
+  `model+0x970` <- `bone[0]+0x40`. It is mapped in full below.
+- **Root motion is the ground channel only.** During a launched flight the root
+  delta is exactly `0.0000` every tick while the fighter still moves.
+- **The charge meters are already correct.** `0031C4AC` and `0031C63C` both fill
+  at +180 a second at either rate.
+- **The animation clock works inside cinematics too.** Goku's model advances
+  `+0x138` by 2.0 a tick unpatched and 1.0 a tick patched, and every clip that
+  ends naturally ends at the same real time in both arms.
 
-**Two claims elsewhere in this file are now known to be wrong.** "There is no master
-framerate variable" - the effect system has a per-model 60fps flag at `model+0xA40` bit 24,
-which is never set. "Three `time += rate` sites exist in the whole binary" - there are 620
-in-place float accumulates, 74 of them per-tick countdowns.
+### Two claims elsewhere in this file are wrong
 
-**Before doing anything, read "Instrument notes for future agents" at the very bottom.**
-Two measurement traps in this codebase produce confident wrong answers.
+"There is no master framerate variable" - the effect system has a per-model
+60fps flag at `model+0xA40` bit 24, which is never set. "Three `time += rate`
+sites exist in the whole binary" - there are 620 in-place float accumulates.
 
-**Never trust a deploy you have not read back.** The pnach silently wrote one byte per
-line for its entire existence because `extended` takes its size from the address's top
-nibble. `python tools/apply-live.py --check` is the verification step.
+### Instruments, and the traps that cost the most time
+
+`tools/ratediff.py` asks every word in RAM whether it still moves at double
+speed. `tools/tickcount.py`, `tools/tickstep.py` and `tools/phasetimer.py` find
+the counters statically; `tools/mkgate.py` and `tools/mkhalf.py` write the
+trampolines. `tools/realclock.py` times a move with the game running free.
+
+- **A screenshot needs a running VM.** Any "frame-advance N, screenshot" loop
+  lets uncounted ticks slip past every sample. Sample on the wall clock instead.
+- **Check that the unpatched arm ticks 30 times a second.** The save states were
+  captured while patched, so loading one *after* disabling the patch puts the
+  patched words straight back.
+- **Shrinking a live group leaves its dropped hooks in RAM**, because patchctl
+  can only restore addresses the pnach still names. Shrink, then restart.
+- **A new group name needs a restart** - the ini's enabled list is read at boot.
+- **Never trust a deploy you have not read back.** `extended` writes one byte
+  per line, not four; `python tools/apply-live.py --check` verifies.
+- **Test inputs must cover the held path.** Three sessions of blast measurements
+  tapped a button the player holds, and that blind spot cleared a group which
+  breaks the game outright.
+
+**Before doing anything, also read "Instrument notes for future agents" further
+down.**
 
 ---
 
@@ -3680,13 +3688,22 @@ needs fixing.
   time. Its timestep `0031C4F0` is tween-driven and equally correct. The charge
   is not what runs fast.
 
-### The one lead not yet followed
+### The one lead not yet followed - followed on 2026-09-07, and wrong
 
 `FUN_00158F00` decides whether the sequence advances by asking whether an
 animation is still playing (`FUN_00206C20`, on `[obj+0x24]` and the bytes at +4
-and +5). If the cinematic waits on an animation whose clock is not the battle
-animation clock this patch already fixes, that wait is the 49 ticks. Finding
-which animation object that is, and how its clock advances, is the next step.
+and +5). The guess was that the cinematic waits on an animation whose clock the
+patch does not fix.
+
+**It does not.** `FUN_00206C20` is not an animation query at all - it compares a
+character id against the ranges 0x12D..0x130 and 0x139..0x13C. And the animation
+clock *is* correct inside the cinematic: Goku's model advances `+0x138` by 2.0 a
+tick unpatched and 1.0 a tick patched, and every clip that ends naturally ends
+at the same real time in both arms.
+
+The wait is in `FUN_00158980`'s sibling `FUN_00158850`, and it is an integer
+countdown, not an animation. See "the two clocks behind everything the game
+stages" below.
 
 ## 2026-09-07 - the user's full defect list
 
@@ -3867,3 +3884,62 @@ patch is still in RAM.
 
 Order that works: load the state, apply the preset, run. Never load again after
 applying.
+
+## 2026-09-07 - MILESTONE: the blasts keep their real timing
+
+Shipped as `releases/v9-scripted-clocks/` and deployed to the user's PCSX2: 17
+groups, 424 patch lines, validated. The two new groups are `60FPS - sequence
+wait` and `60FPS - state phase timers`.
+
+### Confirmed in play, not by frame stepping
+
+The instrument that matters here is `rtcharge` - the game running free at 100%
+speed at both rates, the button going down on the wall clock, the opponent's HP
+polled on the wall clock. That is the same clock the player is sitting through.
+Held Super Kamehameha from save state 1, L2 for half a second and then L2 +
+Triangle held down:
+
+| | unpatched 30fps | patched 60fps |
+|---|---|---|
+| ticks in six seconds | 181 | 363 |
+| the six hits land at | 2.92 3.05 3.19 3.32 3.45 3.59 s | 2.89 3.02 3.15 3.29 3.42 3.55 s |
+
+A 24-frame filmstrip of the same two runs matches shot for shot to within one
+0.3s frame: title card, charge ball, lightning, spikes, the beam, the white
+flash, 12420 damage, and the aura afterwards. Nothing sticks to Goku's hands and
+nothing fails to render.
+
+The frame-stepped oracle agrees: first hit at 176 vsyncs unpatched, 115 with the
+rest of the patch, **175** with this. Six hits, 10900 damage and eight-vsync
+spacing in all three.
+
+### No regression
+
+| check | unpatched | patched |
+|---|---|---|
+| mashed rush, three seconds | 4 hits / 2160 damage | 4 hits / 2160 damage |
+| the rush's fourth hit lands at | 122 vsyncs | 114 vsyncs |
+| forward walk, two seconds | 1.45 units | 1.50 units |
+
+### The ultimate, and where it stands
+
+The Angry Kamehameha from save state 8, to its first hit: 191 vsyncs unpatched,
+124 with the rest of the patch, **161** with `sequence wait`. Every staged beat
+before the beam launch now lands within two vsyncs of the unpatched game - the
+title card, the arm, the ball, the camera cut, the release. What is left is the
+flight itself: 27 game ticks in both arms, which is half the real time.
+
+That last half second is not an integer tick counter and not a per-tick float
+step. Both classes were enumerated statically and swept exhaustively:
+
+| class | how many | how they were tested | result |
+|---|---|---|---|
+| integer `field += 1` / `-= 1` | 513 binary-wide, 91 executing during the flight | gated to even ticks one at a time | none moves the first hit; eight break it outright |
+| float `field += 1.0` | 140 binary-wide, including hoisted constants | all halved together | no change |
+| the fighter state's own phase timer | reaches 28 at the hit in **both** arms | gated | no change - it is a passenger, not the driver |
+| the beam node's own clocks (`FUN_00184BD8`, `+0xA8` age against `+0xAC` life) | the whole function's hoisted 1.0 halved | gated and halved | no change |
+
+Whatever schedules that hit is neither. The next thing to try is the collision
+itself: `001CE8DC` applies the damage, called from `001CE888`; walking up from
+there to whatever decides the hitbox has arrived is the remaining thread.
+
