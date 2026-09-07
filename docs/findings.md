@@ -6,8 +6,16 @@ Newest sections at the bottom.
 
 ## STATE OF PLAY - read this first
 
-Last revised 2026-09-07. **17 groups ship**, in `patches/428113C2.pnach` and
-exported to `releases/latest/`. Every one is verified against the unpatched
+Last revised 2026-09-07. **16 groups ship** (was 17 - see the rollback below),
+in `patches/428113C2.pnach` and exported to `releases/latest/`.
+
+> **Build confidence - read `releases/STATUS.md` before shipping anything.**
+> `v11-back-to-v8-set` (15 groups) is the **DEFINITELY FINE** baseline; its
+> ultimate blast ends early and that is an accepted tradeoff, not a bug.
+> `v12-restore-sequence-wait` (16 groups) is fine but carries a **standing flag
+> for a potential input timing issue**, inherited by every later build until it
+> is explicitly cleared. `v9` (17 groups) is **DO NOT USE** - the state 157 trap.
+> `[60FPS - state phase timers]` is withdrawn. Every one is verified against the unpatched
 30fps game as its own oracle - same save state, same input, same number of
 vsyncs - and the ones the user can see have been confirmed in play.
 
