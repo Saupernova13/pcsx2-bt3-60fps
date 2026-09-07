@@ -22,7 +22,7 @@ from ps2ee import config
 from ps2ee.eemem import ElfImage
 
 FRAME_COUNTER = 0x00331D64
-MAX_REPLAY = 4
+AT_LOOKAHEAD = 3
 
 
 def is_branch(word: int) -> bool:
@@ -48,18 +48,15 @@ def gate(elf: ElfImage, site: int, at: int):
     load, step = elf.u32(site), elf.u32(site + 4)
     if is_branch(elf.u32(site - 4)):
         raise ValueError(f"{site:08X} sits in a delay slot")
-    replay = []
-    ret = None
-    for a in range(site + 8, site + 8 + 4 * (MAX_REPLAY + 1), 4):
+    # Return to the instruction after the add. It can never be a delay slot -
+    # the instruction before it is the add - so no replay is needed at all.
+    ret = site + 8
+    for a in range(ret, ret + 4 * AT_LOOKAHEAD, 4):
         word = elf.u32(a)
-        if is_branch(word):
-            ret = a
-            break
         if touches_at(word):
-            raise ValueError(f"{site:08X}: {a:08X} uses $at, which the gate needs")
-        replay.append(word)
-    if ret is None:
-        raise ValueError(f"{site:08X}: no branch within {MAX_REPLAY} instructions")
+            raise ValueError(f"{site:08X}: {a:08X} reads $at, which the gate clobbers")
+        if is_branch(word):
+            break
 
     words = [
         (load, "reload the counter"),
@@ -70,7 +67,6 @@ def gate(elf: ElfImage, site: int, at: int):
         (0x00000000, "nop"),
         (step, "even tick: count"),
     ]
-    words += [(w, "replay displaced") for w in replay]
     words += [(0x08000000 | (ret >> 2), f"j 0x{ret:X}"), (0x00000000, "nop")]
     lines = [(at + 4 * i, w, note) for i, (w, note) in enumerate(words)]
     lines.append((site, 0x08000000 | (at >> 2), f"gate -> {at:08X}"))

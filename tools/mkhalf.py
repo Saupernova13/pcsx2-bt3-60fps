@@ -19,6 +19,8 @@ import _bootstrap  # noqa: F401
 from ps2ee import config
 from ps2ee.eemem import ElfImage
 
+SCRATCH_SLOT = 0x000F0FF0        # one word to park $f31 in
+
 
 def parts(word: int):
     """(func, fd, fs, ft) of a single-precision add.s/sub.s."""
@@ -42,19 +44,31 @@ def is_branch(word: int) -> bool:
 
 
 def trampoline(site: int, at: int, word: int) -> list[tuple[int, int, str]]:
+    """Ten words that add half instead of one, using $f31 as the constant.
+
+    The site's own destination register cannot always be the scratch - plenty of
+    these are `add.s $fX, $fX, $fONE` - so 0.5 goes into $f31 and $f31 is saved
+    to the scratch zone and put back around it. That costs two memory accesses
+    and works at every site regardless of which registers it uses.
+    """
     func, fd, fs, ft = parts(word)
-    if fd == fs:
-        raise ValueError(f"{site:08X}: destination is also the source, no free scratch")
+    if 31 in (fd, fs):
+        raise ValueError(f"{site:08X}: uses $f31, which the trampoline borrows")
     op = "add" if func == 0 else "sub"
-    half = 0x46000000 | (fd << 16) | (fs << 11) | (fd << 6) | func
+    half = 0x46000000 | (31 << 16) | (fs << 11) | (fd << 6) | func
     back = 0x08000000 | ((site + 4) >> 2)
+    save = SCRATCH_SLOT
     return [
-        (at + 0x00, 0x3C013F00, "lui $at, 0x3f00           0.5"),
-        (at + 0x04, 0x44810000 | (fd << 11), f"mtc1 $at, $f{fd}"),
-        (at + 0x08, 0x00000000, "nop                       mtc1 use delay"),
-        (at + 0x0C, half, f"{op}.s $f{fd}, $f{fs}, $f{fd}   half step"),
-        (at + 0x10, back, f"j 0x{site + 4:X}"),
-        (at + 0x14, 0x00000000, "nop"),
+        (at + 0x00, 0x3C010000 | (save >> 16), "lui $at, scratch"),
+        (at + 0x04, 0xE03F0000 | (save & 0xFFFF), "swc1 $f31, (scratch)   borrow it"),
+        (at + 0x08, 0x3C013F00, "lui $at, 0x3f00        0.5"),
+        (at + 0x0C, 0x4481F800, "mtc1 $at, $f31"),
+        (at + 0x10, 0x00000000, "nop                    mtc1 use delay"),
+        (at + 0x14, half, f"{op}.s $f{fd}, $f{fs}, $f31  half step"),
+        (at + 0x18, 0x3C010000 | (save >> 16), "lui $at, scratch"),
+        (at + 0x1C, 0xC03F0000 | (save & 0xFFFF), "lwc1 $f31, (scratch)   give it back"),
+        (at + 0x20, back, f"j 0x{site + 4:X}"),
+        (at + 0x24, 0x00000000, "nop"),
         (site, 0x08000000 | (at >> 2), f"{op}.s -> j {at:08X}"),
     ]
 
@@ -78,7 +92,7 @@ def main() -> int:
             raise SystemExit(f"{site:08X} sits in a delay slot - hook it another way")
         for addr, word, note in trampoline(site, at, elf.u32(site)):
             print(f"patch=1,EE,{addr:08X},word,{word:08X} // {note}")
-        at += 0x18
+        at += 0x28
     return 0
 
 
