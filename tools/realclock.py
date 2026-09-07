@@ -73,6 +73,16 @@ def capture(roo: Roo, preset: str, slot: int, pokes, shots: int, cadence: float)
     time.sleep(1.5)
     roo.pause()
 
+    return load_frames(paths)
+
+
+def load_frames(paths):
+    """Open each queued screenshot, waiting for the capture to actually land.
+
+    The screenshot command only queues the write, so a path can be absent or
+    still zero bytes when we get here; and on Windows the file can exist while
+    the emulator still holds it open.
+    """
     frames = []
     for path in paths:
         image = None
