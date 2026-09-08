@@ -4915,3 +4915,60 @@ Caveat: banishing the opponent could in principle change how the move plays -
 no target to lock onto. It is applied identically to both arms, so the
 comparison stands, but the absolute 1.50s should not be quoted as the game's
 authored length without a passive-CPU state to confirm it.
+
+## 2026-09-09 - Flame Shower Breath, measured properly, and two of my own errors
+
+The user: "my bad. it's L2 + Triangle only for the flame shower breath with Buu.
+I put you in an environment where the cpu does not fight back."
+
+### Correction: the previous section measured the wrong move
+
+Everything under "Buu's Flame Shower Breath: the DURATION is not the bug" was
+measured with `L2+Up+Triangle`, which is a **different Blast 2** - fighter state
+**272**. Flame Shower Breath is `L2+Triangle`, fighter state **262**. The 272
+numbers (1.50s against 1.73s) are real but they describe another move, and the
+"15% long" headline does not apply to Flame Shower Breath. Treat that section as
+a measurement of state 272 and nothing more.
+
+### The real measurement
+
+Save state 5, captured live from the user's own passive-CPU setup (both fighters
+idle, gap 86.5, opponent does not retaliate). Backed up to
+`work/state-backups/slot05-buu-passive-cpu.p2s`.
+
+| arm | state 262 | real time | ticks | CPU reacts |
+|---|---|---|---|---|
+| 30fps unpatched | 130, 130, 130 vsyncs | **2.17 s** | 65 | v82-83 |
+| 60fps patched | 121, 122, 121 vsyncs | **2.02 s** | 121, 122 | v78-79 |
+
+Three trials each, no spread worth reporting. **Flame Shower Breath runs 7%
+fast at 60fps** - 0.15s short over two seconds. The tick counts are 65 against
+121, so this is not an uncompensated per-tick clock either: it is being held for
+approximately the right real time and falling slightly short.
+
+So for BOTH of Buu's blasts now measured, **duration is very nearly correct**.
+Whatever "blasts are way too fast" is, it is not the length of these two states.
+
+### Travel speed is still unmeasured, and three instruments failed at it
+
+Recorded because each failure was mine, and each looked convincing first:
+
+1. **"Impact" via the opponent's fighter state.** At 60fps the opponent left
+   idle 10 vsyncs after the shot at *every* gap tested - 20, 30, 45, 60, 86.5 -
+   which cannot be a travelling projectile, and at 30fps it never happened at
+   all. That looked like a dramatic result. It was not a hit: the **damage
+   counter at 0033371C never moves in either arm**, so nothing connects, and the
+   state change was the CPU reacting to being shot at.
+2. **Forcing the target's position every vsync** to control the gap. Fighting
+   the game's own physics every frame is not a controlled experiment; setting the
+   position once and leaving it alone changed nothing here, but the earlier
+   numbers were taken with the harness interfering.
+3. **Tracking the blast on screen.** The brightest-region centroid is swamped by
+   the muzzle flash and the camera move - 56,000 pixels of "blast" at one point.
+   A small projectile needs a tracker that is not a global centroid.
+
+The instrument that would settle it is the one not yet built: **find the
+projectile in RAM** - a float triple that appears when the shot is fired and
+moves smoothly away from the shooter - and read its position per vsync.
+`tools/findmotion.py` is the right starting point. Distance covered per real
+second is then unambiguous, which none of the above is.
