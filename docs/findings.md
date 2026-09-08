@@ -78,7 +78,8 @@ is gated is an effect that does not get built.**
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
 | Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
 | Pre-fight intro: mouths do not move at all | Not a speed problem |
-| Death cameras, Perfect Barrier, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
+| Perfect Barrier's camera spins twice as fast | **Measured 2026-09-08**, on the camera itself. The cinematic's *length* is right; the camera orbit inside it finishes by vsync 36 and then sits, while the 30fps one is still moving at 58. Camera at `*(0x002FEBD0)`; oracle and full write chain in the 2026-09-08 section. Animator not yet found |
+| Death cameras, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
@@ -4293,3 +4294,114 @@ approach happens at the **teleport**, not during the dive, so the number
 measured the teleport placement and was blind to everything after it. The HP
 drop was the only honest signal. A metric that does not move when the thing it
 scores obviously moves is broken, not stable.
+
+## 2026-09-08 - Cell's Perfect Barrier: the camera located and measured, NOT fixed
+
+The user set the player character to Cell and asked for the Perfect Barrier
+ultimate (L2 + Down + Triangle in Max Power) to be tested before and after, "see
+at every frame where the camera is, fix the issue". Their description of the
+defect is precise and worth quoting, because it is what a numeric trace has to
+reproduce before it can be trusted:
+
+> at 30fps the camera smoothly spins around Cell, from the back to the front,
+> with him getting into his crouch-like position as the camera animates. At
+> 60fps he gets into his crouched-ball position well before the camera even
+> starts rotating, so for a few milliseconds the camera is in place and not
+> rotating while he is already posed.
+
+**The camera was found and the defect measured. It was not fixed.** What follows
+is the state of it, so the next attempt starts from the oracle and not from
+scratch.
+
+### Reproduction
+
+Save state 4 is Cell vs SSJ Gohan, both idle. Hold `L2` for 400 vsyncs, then
+`L2+Down+Triangle`, and poll until Cell reaches state 264. The command press is
+outside the measured window, so the tick-versus-vsync bias cannot reach it.
+State 264 lasts 240 vsyncs at 30fps and 228 at 60 - the cinematic's overall
+length is already right, which is `sequence wait` doing its job. The defect is
+entirely inside a correctly-timed cinematic.
+
+### Where the camera is
+
+    0x002FEBD0            pointer to the camera object (0x01874620 here)
+    cam + 0x00 .. 0x30    the 4x4 view matrix; +0x20 forward, +0x30 position
+    cam + 0x260           the authored eye position
+    cam + 0x270           the authored direction
+
+and the chain that fills it, recovered by write watchpoint at each step:
+
+    fighter+0x430  --Vec4Copy-->  cam+0x260  --FUN_0023ead0-->  FUN_0023e608
+                                                             -->  view matrix
+
+`fighter+0x430` is a copy of `fighter+0x420`, and has two writers: `001C6D40`
+(the ordinary camera follow) and `0023EC80` (which turns out to be the
+camera-vs-geometry raycast, not the animator). **The animator that drives the
+orbit during a cinematic has not been found.**
+
+Note the frustum planes at `0x0031BE10`-`0x0031BE60` are *not* the camera,
+though they rotate with it and a naive "find a rotating unit vector" scan finds
+them first. `FUN_00130ba8` builds them from the camera each frame.
+
+### The measurement
+
+Camera forward vector, degrees from its value at the start of the cinematic,
+per vsync, deterministic (frame-advance, no screenshots):
+
+     vsync     8     12     16     20     24     36     48     58
+     30fps  59.2   92.3  126.4  156.7  169.9  152.5  146.0  144.5
+     60fps  86.4  133.0  151.8  159.3  162.3  164.2  164.4  164.4
+
+Both arms end up in the same place - the 30fps camera settles near (13.1, 6.3,
+-27.3) and the 60fps one at (13.5, 6.2, -27.0) - but the 60fps camera **arrives
+by vsync 36 and is frozen from there**, while the 30fps camera is still moving
+at vsync 58. It is roughly twice as fast: 60fps at v12 is where 30fps is at
+v22-24.
+
+That is exactly the reported symptom. The camera finishes its spin early and
+then holds, so the pose - which is correctly timed - is still running while the
+camera sits still.
+
+**Total absolute rotation error against the 30fps arm: 446.6 degree-vsyncs.**
+That number is the oracle. Any candidate fix has to move it down.
+
+### The dead end, recorded in full
+
+`[60FPS - camera follow]` was written, measured, and **withdrawn**. It halved
+the lerp at `FUN_001C6C20` that converges `fighter+0x420`, plus the per-tick
+ramp of that lerp's rate at `$gp-0x7208` (0.0133333, which is 0.4/30).
+
+The per-tick defect it fixes is real and was measured cleanly - vsyncs for
+`fighter+0x420` to settle within 1.0 of the 30fps value went 42/32 at 30fps,
+22/15 at 60fps, 40/35 with the fix - and it caused no regression. It simply
+**does not move the camera**. Applied and unapplied, the camera rotation table
+above is identical to the decimal. During a cinematic the orbit comes from
+somewhere else and overwrites it.
+
+Two further things learned building it, both worth keeping:
+
+- **The exact compensation `k' = 1 - sqrt(1-k)` broke the game.** It is the
+  correct algebra for an exponential lerp taken twice as often, and it matched
+  the dolly as well as halving did, but it reproducibly stopped the charge and
+  the ultimate landing a hit at all, while plain `k/2` left both oracles
+  unchanged to the vsync. The cause was not pinned down - the suspicion is a
+  rate above 1.0 somewhere, where `1-k` goes negative and the EE's non-IEEE
+  `sqrt.s` takes the absolute value, turning a "snap immediately" rate into
+  zero - but the rates sampled in ordinary play only reached 0.632, so that is
+  a hypothesis and not a finding.
+- **A screenshot contact sheet cannot measure this.** Scoring tiles by image
+  difference gave 13.34 for one pair of runs and 1.92 for the same configuration
+  on the next, and the control - the *same* preset captured twice - scored 6.78
+  against itself while the cross-arm score was 5.30 to 11.41. The between-arm
+  signal sits inside the run-to-run noise, because at 30fps a one-vsync sampling
+  slip during a fast camera move lands on a different animation frame. Every
+  conclusion drawn from those sheets was withdrawn. The per-vsync memory trace
+  above is deterministic and reproduces to the decimal.
+
+### What to do next
+
+Find what writes `fighter+0x430` during state 264 specifically. The two known
+writers are the follow lerp (ruled out) and a raycast (not an animator), so
+there is a third path that only runs for cinematics - most likely the same
+scripted-sequence machinery that `[60FPS - sequence wait]` already paces, but
+stepping a camera track by a per-tick amount rather than counting a wait down.

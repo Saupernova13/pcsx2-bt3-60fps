@@ -46,6 +46,10 @@ KNOWN_BROKEN: list[str] = [
     "halved and none of them moves it",
     "a transformation runs a few hundred milliseconds LONG - the opposite sign, "
     "so a different cause",
+    "the camera spins twice as fast inside an ultimate's cinematic. The cut "
+    "timings are correct, so the sequence lands on time, but the orbit between "
+    "them finishes early and then holds - most visible on Cell's Perfect "
+    "Barrier, where he is fully posed while the camera sits still",
     "in the pre-fight intro the characters' mouths do not move at all",
 ]
 
