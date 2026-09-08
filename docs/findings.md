@@ -6,8 +6,8 @@ Newest sections at the bottom.
 
 ## STATE OF PLAY - read this first
 
-Last revised 2026-09-07. **16 groups ship** (was 17 - see the rollback below),
-in `patches/428113C2.pnach` and exported to `releases/latest/`.
+Last revised 2026-09-08. **19 groups ship**, in `patches/428113C2.pnach` and
+exported to `releases/latest/`.
 
 > **Build confidence - read `releases/STATUS.md` before shipping anything.**
 > `v11-back-to-v8-set` (15 groups) is the **DEFINITELY FINE** baseline; its
@@ -37,6 +37,9 @@ vsyncs - and the ones the user can see have been confirmed in play.
 | `60FPS - blast hit cadence` | gates the hitbox tick counter `H[0x0A]`, so multi-hit attacks land at their authored spacing |
 | `60FPS - blast effect duration` | halves 19 coupled per-tick steps in the two effect classes that draw a ki blast |
 | `60FPS - sequence wait` | counts scripted-sequence waits down on even ticks - camera cuts, mouth lines, fades, beam releases |
+| `60FPS - knockback flight` | doubles the three launch durations a heavy smash puts someone into, `FUN_001E9590` |
+| `60FPS - pursuit timing` | the five frame counts and the intercept lead behind the Circle pursuit stomp |
+| `60FPS - camera pacing` | halves the camera blend rate and counts scripted camera moves down on even ticks, `FUN_001C69C8` / `001C5720` |
 | `60FPS - state phase timers` | advances 22 of the fighter state machine's 28 phase counters on even ticks - charge lengths, recoveries |
 
 **Read "The engine has no timestep" further down before anything else.** The
@@ -78,7 +81,6 @@ is gated is an effect that does not get built.**
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
 | Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
 | Pre-fight intro: mouths do not move at all | Not a speed problem |
-| Perfect Barrier's camera spins twice as fast | **Measured 2026-09-08**, on the camera itself. The cinematic's *length* is right; the camera orbit inside it finishes by vsync 36 and then sits, while the 30fps one is still moving at 58. Camera at `*(0x002FEBD0)`; oracle and full write chain in the 2026-09-08 section. Animator not yet found |
 | Death cameras, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
@@ -4297,6 +4299,12 @@ scores obviously moves is broken, not stable.
 
 ## 2026-09-08 - Cell's Perfect Barrier: the camera located and measured, NOT fixed
 
+> **Superseded the same day - see "the camera, FIXED" at the end of this
+> file.** The measurement below is sound and the oracle it defines is the one
+> the fix was scored against; the conclusion that the animator was elsewhere is
+> wrong. There is no separate cinematic animator. Kept because the two dead ends
+> it records are still worth not repeating.
+
 The user set the player character to Cell and asked for the Perfect Barrier
 ultimate (L2 + Down + Triangle in Max Power) to be tested before and after, "see
 at every frame where the camera is, fix the issue". Their description of the
@@ -4405,3 +4413,118 @@ writers are the follow lerp (ruled out) and a raycast (not an animator), so
 there is a third path that only runs for cinematics - most likely the same
 scripted-sequence machinery that `[60FPS - sequence wait]` already paces, but
 stepping a camera track by a per-tick amount rather than counting a wait down.
+
+## 2026-09-08 - the camera, FIXED, and it was never a Cell problem
+
+The user's instruction was to re-evaluate the camera from scratch, with the
+observation that "this would also probably be a global fix for all attacks on
+all characters, and not strictly just Cell. Cell is just our clearest working
+example to observe." That reframing is what solved it. The previous attempt hunted
+for a Cell-specific cinematic animator and never found one, because there isn't
+one: there is a single camera update that every camera in the game goes through,
+and it is wrong twice.
+
+### First, the harness was lying
+
+`movieshot.py` and `stomptest.py` both did **loadstate -> apply preset ->
+loadstate again**, the second load commented "so the patch is live from frame
+one". `README` states the opposite rule and states it for a reason. Save state 4
+- the Cell state - was captured while patched, so the second load wrote
+`[60FPS - battle]` straight back:
+
+    slot 4 off  load -> apply          30.0 ticks/s   0012BCE4 = 24040002
+    slot 4 off  load -> apply -> LOAD  60.0 ticks/s   0012BCE4 = 24040001
+
+The "30fps" arm of every contact sheet ever taken of Perfect Barrier was running
+at 60fps. Slot 9 was captured *unpatched* and is immune, which is why the pursuit
+stomp measured on it is unaffected, and the deterministic memory trace was written
+separately and was always correct - the 2026-09-08 rotation table reproduces to
+the decimal. Fixed in both tools.
+
+**Check the tick rate of the unpatched arm inside the harness that will do the
+measuring, not in a separate script that happens to get it right.**
+
+### The camera, actually
+
+`FUN_001C69C8` updates every camera object in the game, once per tick per
+fighter. It builds a target for this tick and then lerps the camera's euler
+angles - `fighter+0x420`, wrapped into +-pi and copied to `fighter+0x430`, which
+is what `FUN_00207DD0` hands to the view matrix - toward it:
+
+    cur += wrap(target - cur) * $f20
+
+Both halves are per-tick and neither was compensated.
+
+**The chase.** `$f20` is the blend rate. Broken at `001C6C20` in both arms it
+reads exactly `0.20000`, tick after tick - so at 60fps it is applied twice as
+often and the camera converges in half the real time, then sits still. It is
+also reused further down at `001C6CD4` for the look direction, so one halving
+fixes both. The rate is *pinned* during a cinematic, which is why the withdrawn
+`[60FPS - camera follow]` group - which halved the per-tick **ramp** of that rate
+at `$gp-0x7208` - correctly had no effect at all. It was compensating a ramp that
+never runs here.
+
+**The target.** A scripted camera move counts `fighter+0x558` down once a tick
+from a length in `fighter+0x55C`, and `FUN_001c4f68` builds the target from
+`1.0 - remaining/total`. The length is authored in 30Hz frames:
+
+    off   +0x558  8 6 4 2 0 ...      16 vsyncs, 0.27s
+    full  +0x558  8 4 0 ...           8 vsyncs, 0.13s
+
+9 frames for Perfect Barrier, 30 for the camera move before it. One site advances
+it, `001C5714`-`001C5728`, and it is the same site for every scripted camera move
+in the game.
+
+The proof that the target and not the chase carries the shape: broken at
+`001C6C20`, the target vector is **identical tick for tick between the arms** -
+`[-42.63 -19.11 -50.94] [-42.55 -17.58 -41.54] [-39.60 -16.22 -33.16]` at 30fps
+against `[-42.65 -19.25 -50.95] [-42.58 -17.76 -41.55] [-39.63 -16.43 -33.17]` at
+60. A track playing at the same rate per tick, in both arms.
+
+### The oracle, and why one fix was never going to do it
+
+Mean absolute **orientation** error against the 30fps camera - the angle between
+the two arms' forward vectors at the same vsync, which is the honest measure;
+"degrees rotated from each arm's own start" hides a divergence that is already
+present at vsync 0.
+
+    arm                      shot 1     whole cinematic
+    unpatched 60fps           22.96                9.62
+    halve the blend only      12.84                5.87
+    gate the move only        14.01                6.32
+    both                       1.52                1.57
+
+Neither half is a fix on its own, and either one alone looks like a
+disappointment. Peak error goes 89.3 -> 4.2 degrees. The orbit stops moving at
+vsync 66 where the 30fps orbit stops at 70, against 34 unpatched.
+
+**It is global, and this was measured, not assumed.** Goku's ultimate from save
+state 8 needs no input whatsoever - the whole window is frame-advance from a load,
+so nothing can bias it - and the mean error goes 5.00 -> 1.93 with the peak
+14.6 -> 0.7.
+
+In play, photographed at 0.12s on the wall clock with the VM free: the fixed arm
+matches the 30fps arm tile for tile through the orbit - behind and above at
+mid-crouch, then the low front angle fully crouched - where unpatched 60fps is a
+whole beat ahead at tile 3 and already firing at tile 4. That is the reported
+symptom and it is gone.
+
+### No regression
+
+    arm             charge   melee  ultimate   pursuit stomp
+    off (30fps)        168    None       191   CONNECTED 1.22s
+    nocamera (v13)      99    None       161   CONNECTED 1.09s
+    full (v14)          99    None       161   CONNECTED 1.11s
+
+`melee` returns None in every arm including 30fps - a pre-existing limitation of
+that oracle on that save state, not something this touched. The **ordinary**
+battle camera, holding a direction for 120 vsyncs, improves from 3.71 to 2.88
+degrees mean error; halving a global blend rate could have made it sluggish and
+it does not.
+
+### What this closes and what it does not
+
+The `KNOWN NOT FIXED` header entry for the camera is removed. The ultimate's beam
+still lands ~0.5s early - and note that it moves a camera *cut* with it, which is
+the residual bump at vsync 132 in the Goku trace above. That is the beam defect
+showing through the camera, not the camera.
