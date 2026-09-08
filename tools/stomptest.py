@@ -36,10 +36,11 @@ def play(roo: Roo, preset: str, slot: int, delay_s: float, tap_s: float,
     roo.flush_input()
     roo.loadstate(slot)
     time.sleep(1.0)
+    # Apply LAST and never load again. Some save states were captured while
+    # patched, so a reload after apply writes the patched words straight back
+    # and the "unpatched" arm silently runs at 60fps. Slot 4 does exactly that.
     patchctl.apply(roo, patchctl.PRESETS[preset], quiet=True)
-    roo.flush_input()
-    roo.loadstate(slot)              # reload, so the patch is live from frame one
-    time.sleep(1.0)
+    time.sleep(0.3)
     pair = B.resolve(roo)
     me, foe = pair[0].fighter, pair[1].fighter
 
