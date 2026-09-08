@@ -3,10 +3,14 @@
 Which build to trust, and why. Set by testing **in play**, not by measurement.
 Newest at the top. `releases/latest/` currently holds **v15**.
 
+**v14 and v15 were both confirmed in play by the user on 2026-09-08** - the Cell
+Perfect Barrier camera and the cut-in mouth. v14's star is cleared. Neither
+confirmation touches v12's input-timing flag, which still stands.
+
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
-| `v15-mouth-clock` | 20 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `mouth clock`; inherits v12's flag and v14's star |
-| `v14-camera-pacing` | 19 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `camera pacing`; inherits v12's flag. **Starred pending the user's own play-test** |
+| `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
+| `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
 | `v13-pursuit-stomp` | 18 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds the two pursuit groups; inherits v12's flag |
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
@@ -121,7 +125,8 @@ reason. The hit counters land on identical vsyncs either way, so the schedule is
 untouched - but this half is **not independently verified as an improvement**,
 only as the same correction for the same cause. Worth a look in play.
 
-**It inherits v12's input-timing flag and v14's unverified camera fix.**
+**Confirmed in play by the user, 2026-09-08.** It still inherits v12's
+input-timing flag, which nothing here clears.
 
 ## The state 157 trap
 

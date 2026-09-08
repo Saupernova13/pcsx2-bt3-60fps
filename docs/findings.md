@@ -9,6 +9,11 @@ Newest sections at the bottom.
 Last revised 2026-09-08. **20 groups ship**, in `patches/428113C2.pnach` and
 exported to `releases/latest/`.
 
+**v14 and v15 are confirmed in play by the user, 2026-09-08.** The Cell Perfect
+Barrier camera and the cut-in mouth are both fixed on the user's own hardware,
+not just on the oracle. v14's star is cleared. Neither confirmation touches
+v12's input-timing flag, which still stands unverified.
+
 > **Build confidence - read `releases/STATUS.md` before shipping anything.**
 > `v11-back-to-v8-set` (15 groups) is the **DEFINITELY FINE** baseline; its
 > ultimate blast ends early and that is an accepted tradeoff, not a bug.
@@ -4654,3 +4659,32 @@ a `patch_reload` are only evidence if nothing else wrote them.**
 
 `patchctl --status` now names any group the emulator will ignore and says to add
 the line and restart. It writes nothing - that ini is the user's.
+
+
+## 2026-09-08 - confirmed in play: the camera and the mouth
+
+The user, on their own hardware: "the fix you tried on cell worked. the mouth
+movement fix worked."
+
+That closes two defects that had been open since the first report against the
+17-group patch, and it clears the star v14 was carrying. Both were fixed against
+the frame-advance oracle first and then held up in play, which is the order this
+project has settled on - but note that the oracle has been wrong before, and the
+only reason to trust these now is that they were played.
+
+What it does **not** clear:
+
+- **v12's input-timing flag** still stands. Nothing since v12 has tested it.
+- **The Galick Cannon fade.** Defect 7 of the 2026-09-07 list had two halves:
+  the mouth finishing early, and the fade to white ending early and revealing the
+  animation still running behind it. Only the mouth half is fixed. The fade is a
+  scripted-sequence beat and is still in the "predicted, not measured" row.
+- **The pre-fight intro mouths**, which do not move at all rather than stopping
+  early. Different symptom, never A/B'd, and it is still unknown whether the
+  intro even uses the same clip player.
+- **v13's pursuit stomp** has still not been play-tested.
+
+The v15 half that remains unverified is the *second* track object, `009212F0`,
+which drives the radial speed-line effect in Goku's ultimate. It changed on 90 of
+170 vsyncs and the hit schedule did not move, so it is the same correction for
+the same cause - but nobody has looked at whether that shot reads better.
