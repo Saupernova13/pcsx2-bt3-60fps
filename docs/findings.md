@@ -9,10 +9,14 @@ Newest sections at the bottom.
 Last revised 2026-09-08. **20 groups ship**, in `patches/428113C2.pnach` and
 exported to `releases/latest/`.
 
-**v14 and v15 are confirmed in play by the user, 2026-09-08.** The Cell Perfect
-Barrier camera and the cut-in mouth are both fixed on the user's own hardware,
-not just on the oracle. v14's star is cleared. Neither confirmation touches
-v12's input-timing flag, which still stands unverified.
+**v13, v14 and v15 are confirmed in play by the user, 2026-09-08.** The pursuit
+stomp, the Cell Perfect Barrier camera, and the mouths - cut-in and pre-fight
+intro both. v14's star is cleared. None of it touches v12's input-timing flag,
+which still stands unverified.
+
+**Deploy `releases/latest/`, never the working pnach.** See the 2026-09-08
+section at the bottom: an install running the working pnach has five groups on
+that must never be on, and it fails silently.
 
 > **Build confidence - read `releases/STATUS.md` before shipping anything.**
 > `v11-back-to-v8-set` (15 groups) is the **DEFINITELY FINE** baseline; its
@@ -86,7 +90,7 @@ is gated is an effect that does not get built.**
 |---|---|
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
 | Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
-| Pre-fight intro: mouths do not move at all | Not a speed problem, and still **not A/B'd** against the unpatched game. The in-battle cut-in mouth is fixed by `mouth clock`; whether the intro uses the same player is untested |
+| ~~Pre-fight intro: mouths do not move at all~~ | **FIXED** by `mouth clock`, confirmed in play 2026-09-08. It was the same clip player after all, and it was a speed problem - the track ran out before the intro's first line. The old "not a speed problem" reading was wrong |
 | Death cameras, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
@@ -4688,3 +4692,64 @@ The v15 half that remains unverified is the *second* track object, `009212F0`,
 which drives the radial speed-line effect in Goku's ultimate. It changed on 90 of
 170 vsyncs and the hit schedule did not move, so it is the same correction for
 the same cause - but nobody has looked at whether that shot reads better.
+
+## 2026-09-08 - the EmuDeck install was running the working pnach
+
+The user, after a session of confirmations: "I just booted up my PCSX2 emudeck
+install, and everything is broken beyond belief."
+
+It was, and it had nothing to do with any fix. The install was running
+`patches/428113C2.pnach` - the **working** file - with every group in it enabled:
+
+| group | what having it on does |
+|---|---|
+| `60FPS - animation rate` | superseded by `animation clock`. **Both on = QUARTER speed animation** |
+| `60FPS - EXPERIMENT halve root motion` | deliberately breaks ground movement. That is what it is for |
+| `60FPS - blast effect rate` | WITHDRAWN: gating skips the geometry rebuild, so the beam is not drawn |
+| `60FPS - blast sequence rate` | WITHDRAWN: skips the controller step that SPAWNS the effects, so a charged blast renders nothing and deals no damage |
+| `60FPS - state phase timers` | WITHDRAWN: the state 157 trap |
+
+Quarter-speed animation, no beams, broken ground movement and a state trap, all
+at once. Every one of those is a documented, deliberate hazard; they were simply
+all switched on together.
+
+### How, and why it went unseen for days
+
+`deploy.py` enabled **every group in whatever pnach it was handed**:
+
+    groups = args.only if args.only else [g.name for g in source.groups]
+
+`export.py` exists precisely to drop those five, and `releases/latest/` has
+always been correct. The working pnach had been deployed instead, at least as
+far back as 2026-09-05 judging by `work/cheat-backups/`.
+
+It went unseen because **every measurement in this project runs against
+PCSXROO**, which reads a different cheats directory and a different per-game ini.
+The dev instance was correct throughout; the user's actual install was not. Two
+emulators, two configs, and only one of them was ever being tested.
+
+Two guards now, both cheap:
+
+- `config.NEVER_SHIP` holds the five names once. `export.py` drops them and
+  `deploy.py` refuses to enable them, printing the `releases/latest/` command
+  instead. `--only` still selects a subset; `--force-development` overrides.
+- `patchctl --status` names any group missing from PCSXROO's own enable list,
+  which is the mirror-image failure found earlier the same day.
+
+### What the confirmations actually settled
+
+`v13`, `v14` and `v15` all confirmed in play: the pursuit stomp after a heavy
+smash, the Cell Perfect Barrier camera, and the mouths.
+
+**The pre-fight intro mouths are fixed too**, which retires a wrong reading. That
+row had said "not a speed problem" since the first defect list, on the strength
+of the symptom alone - mouths that never move at all, rather than mouths that
+stop early. It was never A/B'd, and it was wrong: same clip player, same 2.0 rate
+a tick, and the track simply ran out before the intro's first line. The lesson is
+the ordinary one - a symptom that looks qualitatively different is not evidence
+of a different cause until something measures it.
+
+Still open, and none of it touched by any of this: v12's input-timing flag, the
+Galick Cannon fade, the ultimate's beam landing early, transformations running
+long, the character-switch sky. The user also reports "some camera angles/speeds
+seem off" - separate from the mouth work, and not yet characterised.
