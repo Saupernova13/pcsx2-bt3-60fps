@@ -28,6 +28,7 @@ gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 //   60FPS - pursuit timing
 //   60FPS - camera pacing
 //   60FPS - mouth clock
+//   Widescreen 19.5:9 - S24 Ultra
 //
 // KNOWN NOT FIXED:
 //   an ultimate's beam lands its first hit about half a second early. The cinematic up to the launch is now correct to within two vsyncs; what is left is the flight, and it is neither an integer tick counter nor a per-tick float step - every one of those in the game has been gated or halved and none of them moves it
@@ -593,3 +594,41 @@ patch=1,EE,000F13B4,word,08093CF7 // j 0x24f3dc
 patch=1,EE,000F13B8,word,00000000 // nop
 patch=1,EE,0024ED2C,word,0803C4E0 // add.s -> j 000F1380   the +0x34 clock
 patch=1,EE,0024F3D4,word,0803C4E8 // add.s -> j 000F13A0   the +0x44 clock
+
+// Widescreen for the Galaxy S24 Ultra's 3120x1440 panel - 19.5:9, or 2.166667.
+// Adapted 2026-09-08 from the stock [Widescreen 16:9] in PCSX2's own
+// resources/patches.zip, which is three words:
+//
+//   002FE4CC  1.166667 -> 1.555167    a projection scale, 7/6 at 4:3
+//   002FE594  298.6667 -> 398.1227    the same constant x256, second path
+//   00130BF0  lui $at, 0x3F40 -> 0x3F10   an INSTRUCTION: 0.75 -> 0.5625
+//
+// The third one gives the rule away. 0.75 is 3/4 and 0.5625 is 9/16, so that
+// immediate is 1/aspect, and the two data floats are scaled by
+// aspect / (4:3) - the factor by which the horizontal field of view widens.
+//
+// The model reproduces the stock patch from first principles: for 16:9 it
+// yields 3FC71C72 and lui 0x3F10, against the shipped 3FC70FB6 and 0x3F10. The
+// only difference is that the official patch rounded 4/3 to 1.333.
+//
+// For 19.5:9 the widen factor is exactly 1.625:
+//   002FE4CC  7/6      x 1.625 = 1.895833
+//   002FE594  298.6667 x 1.625 = 485.333333
+//   00130BF0  1 / (19.5/9)     = 0.461538
+//
+// lui only sets the top 16 bits, so the last one lands on 0.4609375 rather than
+// 0.4615385 - 0.13% narrow, about a third of a pixel across a 3120-wide panel.
+// Fixing that would cost a trampoline for no visible gain.
+//
+// NEVER RUN THIS TOGETHER WITH THE STOCK [Widescreen 16:9]. Both write the same
+// three addresses every frame and the result is whichever wins the race. Turn
+// the stock one off in the per-game ini's [Patches] section first.
+//
+// PCSX2 has no 19.5:9 display aspect, so set Aspect Ratio to Stretch and give it
+// a 19.5:9 window or fullscreen target. At any other display aspect this patch
+// renders a correctly-wide FOV into the wrong shape.
+[Widescreen 19.5:9 - S24 Ultra]
+description=Widescreen hack retargeted from 16:9 to the S24 Ultra's 19.5:9 panel. Turn the stock Widescreen 16:9 patch OFF.
+patch=1,EE,002FE4CC,word,3FF2AAAB // projection scale  7/6 * 1.625 = 1.895833
+patch=1,EE,002FE594,word,43F2AAAB // the same, x256    = 485.333333
+patch=1,EE,00130BF0,word,3C013EEC // lui $at, 0x3EEC   = 0.4609375, for 1/(19.5/9)
