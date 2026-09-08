@@ -23,6 +23,21 @@ PATCHES = REPO / "patches"
 # --- target game -----------------------------------------------------------
 
 SERIAL = "SLUS-21678"
+
+# Groups that exist in the working pnach and must NEVER be enabled in a real
+# install. Two of them are withdrawn because gating deleted the beam, one is the
+# state 157 trap, one deliberately breaks ground movement, and `animation rate`
+# is a superseded alternative to `animation clock` - both on together give
+# QUARTER speed animation. Handing the working pnach to deploy.py enables every
+# group in it, which is exactly how an install ends up broken beyond belief.
+NEVER_SHIP = [
+    "60FPS - animation rate",
+    "60FPS - EXPERIMENT halve root motion",
+    "60FPS - blast effect rate",
+    "60FPS - blast sequence rate",
+    "60FPS - state phase timers",
+]
+
 CRC = "428113C2"
 ELF_NAME = "SLUS_216.78"
 GAME = "Dragon Ball Z: Budokai Tenkaichi 3 (USA)"
