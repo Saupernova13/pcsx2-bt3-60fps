@@ -32,10 +32,9 @@ import patchctl
 from ps2ee import config
 from ps2ee.pnach import Pnach
 
-# Present in the repo pnach, never in a shared copy.
-DEVELOPMENT_ONLY = ["60FPS - animation rate", "60FPS - EXPERIMENT halve root motion",
-                    "60FPS - blast effect rate", "60FPS - blast sequence rate",
-                    "60FPS - state phase timers"]
+# Present in the repo pnach, never in a shared copy. One list, in config, because
+# deploy.py has to refuse the same names.
+DEVELOPMENT_ONLY = config.NEVER_SHIP
 
 # Stated plainly at the top of the shared file rather than left to be discovered.
 KNOWN_BROKEN: list[str] = [
