@@ -16,7 +16,7 @@ Running analysis log: **[docs/findings.md](docs/findings.md)** - start at "STATE
 
 ## What the patch covers
 
-19 groups, each compensating one system that the 60Hz loop drives twice as often.
+20 groups, each compensating one system that the 60Hz loop drives twice as often.
 Movement, gravity and knockback; the animation clock; menu and combat input windows; the
 ki aura, particles, effect rotation and the hovering idle; the tween system; blast hit
 cadence and blast effect duration; the integer clock behind scripted-sequence waits; the
@@ -164,7 +164,7 @@ when a group goes away but does not undo it.
     python tools/patchctl.py --status
     python tools/patchctl.py --off                # stock 60fps, nothing compensated
     python tools/patchctl.py --on full            # everything that ships
-    python tools/patchctl.py --on nocamera        # the shipping set minus the camera work
+    python tools/patchctl.py --on nomouth         # the shipping set minus the mouth clock
 
 Four rules, each learned by getting it wrong:
 
@@ -172,11 +172,18 @@ Four rules, each learned by getting it wrong:
   the save states were captured while patched, so a second load puts the patched words
   straight back and the "unpatched" arm is not unpatched. Check it ticks 30 times a
   second.
-- **A screenshot needs a running VM.** Sample on the wall clock; a "frame-advance N,
-  screenshot" loop lets uncounted ticks slip past every sample.
-- **A new group name needs a restart.** The enabled list in
-  `gamesettings/SLUS-21678_428113C2.ini` is read only at boot. Three spare names are
-  carried so an experiment does not cost one.
+- **A screenshot needs a running VM - but a paused one is only queued, not lost.**
+  `screenshot()` while paused writes no file; `frame_advance(1)` then flushes it. So a
+  `screenshot, frame_advance(1)` loop costs exactly one vsync a sample and gives a film
+  as deterministic as memory, aligned frame for frame between the arms. That is how the
+  mouth was measured. What does not work is sampling on the wall clock and hoping - or
+  `frame_advance(N), screenshot` without the flush, where the file is a stale frame.
+- **A new group name needs a restart, and the ini is PCSXROO's own.** The enabled list is
+  read only at boot, and it lives at `<pcsxroo>/bin/gamesettings/SLUS-21678_428113C2.ini`
+  - the emulator's data root, NOT under `inis/`, and NOT the file `config.game_ini()` and
+  `deploy.py` write, which belongs to the installed PCSX2. A group missing from that list
+  applies nothing and reports nothing; `patchctl --status` now says so. Three spare names
+  are carried there so an experiment does not cost a restart.
 - **Shrinking a live group needs a restart too**, because the hooks it drops stay patched
   in RAM with nothing left to restore them.
 

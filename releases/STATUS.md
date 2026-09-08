@@ -1,11 +1,12 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v14**.
+Newest at the top. `releases/latest/` currently holds **v15**.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
-| `v14-camera-pacing` | 19 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `camera pacing`; inherits v12's flag |
+| `v15-mouth-clock` | 20 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `mouth clock`; inherits v12's flag and v14's star |
+| `v14-camera-pacing` | 19 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `camera pacing`; inherits v12's flag. **Starred pending the user's own play-test** |
 | `v13-pursuit-stomp` | 18 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds the two pursuit groups; inherits v12's flag |
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
@@ -88,6 +89,39 @@ Also in this build: `movieshot.py` and `stomptest.py` no longer reload the save
 state after applying a preset. Save state 4 was captured while patched, so that
 reload put `[60FPS - battle]` back and the "30fps" arm ran at 60fps. Slot 9 was
 captured unpatched, so the v13 pursuit results are unaffected.
+
+## v15 - mouth clock
+
+Adds `[60FPS - mouth clock]`: two hooks, at `0024ED2C` and `0024F3D4`, halving
+the per-tick rate of the game's **second** clip player. That player drives the
+keyframe tracks a scripted cut-in uses - the mouth among them - and its rate is
+2.0 a tick, so at 60fps a track burned its keyframe array in half the real time
+and held the last key.
+
+Measured per vsync on Vegeta (Scouter)'s Final Galick Cannon, save state 3, on a
+frame-advance film aligned to the first vsync of state 287:
+
+| arm | transitions | first | last | span |
+|---|---|---|---|---|
+| 30fps unpatched | 10 | v43 | v163 | 2.00s |
+| 60fps, v14's 19 groups | 12 | v43 | v115 | 1.20s |
+| 60fps, this build | 14 | v43 | v167 | 2.07s |
+
+5.00 open/close transitions a second against 10.00 - exactly 2x - and with the
+group the final phrase, which v14 skips entirely, plays again. Every one of the
+unpatched arm's ten beats lands within two vsyncs.
+
+No regression: `hitclock.py --baselines` is byte-identical with the group on,
+neither hook fires at all in ordinary battle, and the whole-frame difference from
+the 30fps reference over the Vegeta cut-in is unchanged at 3.46.
+
+It does change Goku's ultimate, on 90 of 170 vsyncs: the second track object
+drives that shot's radial speed-line effect, which was running at 2x for the same
+reason. The hit counters land on identical vsyncs either way, so the schedule is
+untouched - but this half is **not independently verified as an improvement**,
+only as the same correction for the same cause. Worth a look in play.
+
+**It inherits v12's input-timing flag and v14's unverified camera fix.**
 
 ## The state 157 trap
 
