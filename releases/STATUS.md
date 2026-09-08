@@ -1,10 +1,11 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v13**.
+Newest at the top. `releases/latest/` currently holds **v14**.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v14-camera-pacing` | 19 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `camera pacing`; inherits v12's flag |
 | `v13-pursuit-stomp` | 18 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds the two pursuit groups; inherits v12's flag |
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
@@ -56,6 +57,37 @@ Verified by automated test, not yet by the user:
 switched off without editing anything.
 
 **It inherits v12's input-timing flag** - nothing here clears it.
+
+## v14 - camera pacing
+
+One group, `[60FPS - camera pacing]`, and it is not a Cell fix - it is the
+camera system. `FUN_001C69C8` updates every camera in the game and lerps its
+euler angles toward a per-tick target; both the blend rate (`$f20`, a flat 0.20
+a tick) and the scripted camera-move countdown (`fighter+0x558`, a length in
+`fighter+0x55C` authored in 30Hz frames) are per-tick and were uncompensated.
+
+Mean absolute camera orientation error against the 30fps arm, Cell's Perfect
+Barrier, shot 1: **22.96 degrees -> 1.52**. Peak 89.3 -> 4.2. Halving the blend
+alone gives 12.84 and gating the move alone 14.01, so **neither half is a fix on
+its own** and `nocamera` (the 18-group v13 set) is kept as a named preset for
+diffing.
+
+Global, measured rather than assumed: on Goku's ultimate from save state 8,
+which takes no input at all, mean error goes 5.00 -> 1.93 and peak 14.6 -> 0.7.
+
+Confirmed by contact sheet at 0.12s on the wall clock: the fixed arm matches the
+30fps arm tile for tile through the orbit, where unpatched 60fps is a beat ahead.
+
+No regression - charge 99, ultimate 161, pursuit stomp still connects, and the
+**ordinary** battle camera improves from 3.71 to 2.88 degrees rather than going
+sluggish.
+
+**It inherits v12's input-timing flag** - nothing here clears it.
+
+Also in this build: `movieshot.py` and `stomptest.py` no longer reload the save
+state after applying a preset. Save state 4 was captured while patched, so that
+reload put `[60FPS - battle]` back and the "30fps" arm ran at 60fps. Slot 9 was
+captured unpatched, so the v13 pursuit results are unaffected.
 
 ## The state 157 trap
 
