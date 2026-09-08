@@ -30,6 +30,7 @@ gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 // KNOWN NOT FIXED:
 //   an ultimate's beam lands its first hit about half a second early. The cinematic up to the launch is now correct to within two vsyncs; what is left is the flight, and it is neither an integer tick counter nor a per-tick float step - every one of those in the game has been gated or halved and none of them moves it
 //   a transformation runs a few hundred milliseconds LONG - the opposite sign, so a different cause
+//   the camera spins twice as fast inside an ultimate's cinematic. The cut timings are correct, so the sequence lands on time, but the orbit between them finishes early and then holds - most visible on Cell's Perfect Barrier, where he is fully posed while the camera sits still
 //   in the pre-fight intro the characters' mouths do not move at all
 //
 // Everything above is verified against the unpatched 30fps game as its
