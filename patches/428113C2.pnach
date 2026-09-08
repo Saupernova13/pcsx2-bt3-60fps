@@ -818,3 +818,52 @@ patch=1,EE,001F3754,word,3C013E00 // rise step 0.25 -> 0.125
 patch=1,EE,001F3798,word,24030008 // rise length 4 -> 8 steps
 patch=1,EE,001E769C,word,28430029 // dive stall after 20 -> 40 ticks
 patch=1,EE,001DE918,word,4614A300 // lead x2: mov.s $f12,$f20 -> add.s $f12,$f20,$f20
+
+// The camera, found 2026-09-08 - and it is one system, not a Cell problem. Every
+// camera in the game is updated by FUN_001C69C8, which builds a target for this
+// tick and then lerps the camera's euler angles toward it: cur += wrap(target -
+// cur) * $f20. Both halves of that are per-tick and neither is compensated.
+//
+//   the chase   $f20 is the blend rate, 0.20 a tick, measured identical in both
+//               arms. At 60fps it is applied twice as often, so the camera
+//               converges in half the real time and then sits still.
+//   the target  a scripted camera move counts fighter+0x558 down once a tick
+//               from a length in fighter+0x55C that is authored in 30Hz frames
+//               - 9 for Cell's Perfect Barrier, 30 for the move before it. The
+//               progress the target is built from is 1 - remaining/total, so
+//               the whole move plays in half its real time.
+//
+// Neither fix works alone: halving the blend alone leaves 12.84 degrees of mean
+// orientation error against the 30fps camera and gating the move alone leaves
+// 14.01, against 22.96 unpatched. Together they leave 1.52. That is the whole
+// visible defect - the camera reaching its mark early and holding while the
+// character is still animating - and it is fixed for every attack and every
+// character at once, because both sites are shared by the entire game.
+//
+// $f20 is halved on the lerp path only, after the branch that chooses between
+// lerping and snapping, so a scripted cut still snaps. It covers the look
+// direction too, which is lerped with the same rate further down.
+[60FPS - camera pacing]
+description=Pace scripted camera moves and the camera blend by real time, not by tick.
+patch=1,EE,000F1320,word,3C013F00 // 0.5f
+patch=1,EE,000F1324,word,44810000 // $f0 = 0.5f
+patch=1,EE,000F1328,word,0260202D // replay 001C6C14 move $a0,$s3 (also the mtc1 hazard filler)
+patch=1,EE,000F132C,word,4600A502 // halve the camera blend rate
+patch=1,EE,000F1330,word,08071B07 // back to the lerp call
+patch=1,EE,000F1334,word,03A0282D // replay 001C6C18 move $a1,$sp, in the delay slot
+patch=1,EE,000F1340,word,3C010033 // frame counter
+patch=1,EE,000F1344,word,8C211D64 // lw $at, global frame counter
+patch=1,EE,000F1348,word,30210001 // andi $at, $at, 1
+patch=1,EE,000F134C,word,14200002 // odd tick: hold
+patch=1,EE,000F1350,word,00000000 // nop
+patch=1,EE,000F1354,word,2442FFFF // replay 001C5720 addiu $v0,$v0,-1 - even tick only
+patch=1,EE,000F1358,word,10400003 // counter reached zero
+patch=1,EE,000F135C,word,AE420098 // replay 001C5728 sw $v0,0x98($s2) - always stores
+patch=1,EE,000F1360,word,080715D7 // still counting: the original branch target
+patch=1,EE,000F1364,word,00000000 // nop
+patch=1,EE,000F1368,word,080715CB // finished: the original fall-through
+patch=1,EE,000F136C,word,00000000 // nop
+patch=1,EE,001C6C14,word,0803C4C8 // -> 0F1320  halve the blend rate on the lerp path
+patch=1,EE,001C6C18,word,00000000 // nop
+patch=1,EE,001C5720,word,0803C4D0 // -> 0F1340  gate the camera-move countdown
+patch=1,EE,001C5724,word,00000000 // nop

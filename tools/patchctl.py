@@ -126,6 +126,16 @@ PHASE = ["60FPS - state phase timers"]
 # 9, within 1-3 vsyncs of the 30fps arm at every delay.
 PURSUIT = ["60FPS - knockback flight", "60FPS - pursuit timing"]
 
+# The camera, found 2026-09-08. FUN_001C69C8 updates every camera in the game by
+# lerping its euler angles toward a target built for this tick, and both halves
+# are per-tick: the blend rate $f20 (0.20 a tick) is applied twice as often, and
+# a scripted camera move counts fighter+0x558 down once a tick from a length
+# authored in 30Hz frames. Halving the blend alone leaves 12.84 degrees of mean
+# orientation error against the 30fps camera, gating the move alone 14.01,
+# against 22.96 unpatched - together, 1.52. One group, because neither half is
+# correct on its own.
+CAMERA = ["60FPS - camera pacing"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -136,7 +146,7 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # the names of groups that do not exist yet, to save a restart later.
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
-                  + BLASTDUR + SEQWAIT + PHASE + PURSUIT + SPARES)
+                  + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + SPARES)
 
 PRESETS = {
     "off": [],
@@ -180,8 +190,12 @@ PRESETS = {
     # work has a named baseline to be diffed against without editing a preset.
     "nopursuit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                   + BLAST + BLASTDUR + SEQWAIT),
+    # The 18-group set v13 shipped, kept so the camera work has a named
+    # baseline to be diffed against without editing a preset.
+    "nocamera": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQWAIT + PURSUIT),
+             + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA),
 }
 
 DISABLED_SUFFIX = " [off]"
