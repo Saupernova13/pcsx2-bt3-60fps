@@ -867,3 +867,53 @@ patch=1,EE,001C6C14,word,0803C4C8 // -> 0F1320  halve the blend rate on the lerp
 patch=1,EE,001C6C18,word,00000000 // nop
 patch=1,EE,001C5720,word,0803C4D0 // -> 0F1340  gate the camera-move countdown
 patch=1,EE,001C5724,word,00000000 // nop
+
+// Mouth movement, found 2026-09-08. The cut-in speech is not skeletal
+// animation - [60FPS - animation clock] already paces that correctly, and the
+// three "time += rate" sites it hooks really are the only ones on the
+// model+0xB40 controller. This is a SECOND clip player in the same module,
+// with its own clocks, and it was missed because it keys on a different struct.
+//
+// A track object carries a keyframe array at +0x28 whose key times are plain
+// shorts, a key index at +0x40, a key count at +0x42, and two float clocks:
+// +0x34, stepped in the jump-table case at 0024ED20 (FUN_0024ECBC dispatches on
+// the track type at +0x18 through the table at 002F27B0), and +0x44, stepped in
+// FUN_0024F264. Both advance by the track's rate at +0x2C once per tick, and
+// that rate is 2.0 - the same 60Hz authoring as every other BT3 clip. At 60fps
+// the track therefore burns 120 keyframe units a second instead of 60, runs off
+// the end of its key array in half the real time, and holds the last key. That
+// is a mouth that stops mid-sentence.
+//
+// Hook the add itself, not the rate load: 0024F290 branches straight to
+// 0024F3D0, past any hook on the load, and would keep the full rate on that
+// path. Each trampoline then replays what the hook's delay slot got wrong - the
+// compare at 0024ED30 saw the un-added time, and the store at 0024F3D8 wrote the
+// raw rate into +0x44. Nothing reads +0x44 between that store and the re-store.
+//
+// Measured per vsync on Vegeta (Scouter)'s Final Galick Cannon, save state 3,
+// with a deterministic frame-advance film aligned on the first vsync of state
+// 287. The mouth makes 5.00 open/close transitions a second unpatched and
+// exactly 10.00 patched, and dies at vsync 115 instead of 163. With this group
+// it runs to vsync 167 and every one of the ten unpatched beats lands within two
+// vsyncs. Only two track objects exist - 009212F0 and 00921360 - and neither
+// site fires at all in ordinary battle, so nothing outside a scripted cut-in is
+// touched. 009212F0 is the "cycling countdown still at 2x" left unexplained on
+// 2026-09-07; it is a track of this same player.
+[60FPS - mouth clock]
+description=Halve the cut-in keyframe clock, so scripted mouth and face tracks play at their real speed.
+patch=1,EE,000F1380,word,3C083F00 // lui $t0, 0x3f00        0.5f
+patch=1,EE,000F1384,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F1388,word,46040842 // mul.s $f1, $f1, $f4    rate *= 0.5
+patch=1,EE,000F138C,word,46010000 // add.s $f0, $f0, $f1    replay 0024ED2C
+patch=1,EE,000F1390,word,46001036 // c.le.s $f2, $f0        replay 0024ED30 - the delay slot compared the old time
+patch=1,EE,000F1394,word,08093B4D // j 0x24ed34
+patch=1,EE,000F1398,word,00000000 // nop
+patch=1,EE,000F13A0,word,3C083F00 // lui $t0, 0x3f00
+patch=1,EE,000F13A4,word,44882000 // mtc1 $t0, $f4
+patch=1,EE,000F13A8,word,46040002 // mul.s $f0, $f0, $f4    rate *= 0.5
+patch=1,EE,000F13AC,word,46000800 // add.s $f0, $f1, $f0    replay 0024F3D4
+patch=1,EE,000F13B0,word,E6000044 // swc1 $f0, 0x44($s0)    re-store - the delay slot wrote the raw rate
+patch=1,EE,000F13B4,word,08093CF7 // j 0x24f3dc
+patch=1,EE,000F13B8,word,00000000 // nop
+patch=1,EE,0024ED2C,word,0803C4E0 // add.s -> j 000F1380   the +0x34 clock
+patch=1,EE,0024F3D4,word,0803C4E8 // add.s -> j 000F13A0   the +0x44 clock
