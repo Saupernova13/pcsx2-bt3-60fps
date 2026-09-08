@@ -91,7 +91,11 @@ is gated is an effect that does not get built.**
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
 | Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
 | ~~Pre-fight intro: mouths do not move at all~~ | **FIXED** by `mouth clock`, confirmed in play 2026-09-08. It was the same clip player after all, and it was a speed problem - the track ran out before the intro's first line. The old "not a speed problem" reading was wrong |
-| Death cameras, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
+| ~~Death of an ordinary character: camera revolves too fast (item 3)~~ | **Solved**, reported by the user 2026-09-08 as fixed by earlier work. Never measured; closed on play |
+| ~~Character switch: the sky stops rotating (item 5)~~ | **Solved**, reported by the user 2026-09-08. Never measured; closed on play |
+| Death by a body-erasing attack: camera too fast, cuts weirdly (item 2) | **ASSUMED solved\*** - not checked by anyone. The user expects it to have gone with items 3 and 5. Asterisked deliberately: nothing has verified it |
+| The Galick Cannon fade to white ends early (item 7b) | Still live, re-confirmed by the user 2026-09-08. A scripted-sequence beat that `sequence wait` should have moved and did not |
+| **Real-time blast travel speed** (item 1) | **NOT solved**, confirmed by the user 2026-09-08: blasts still travel way too fast. Never fixed - `airborne motion` and friends fixed the FIGHTER's position integration, and projectiles were only ASSUMED to share that path. `ki blast + beam travel: procedural motion, open` has stood since 2026-08-22 |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
@@ -1305,7 +1309,7 @@ self-corrects. This is the single most important fact for anyone continuing.
 | input windows | `n++` per tick | shipped |
 | menu auto-repeat | `n++` per tick | shipped |
 | aura, impact effects | animation clock on non-fighter models | `60FPS - animation clock` |
-| ki blast + beam travel | procedural motion | open |
+| ki blast + beam travel | procedural motion | **still open 2026-09-08** - see the note below |
 | beam duration | `n--` per tick | open |
 | airborne motion, knockback, falling | procedural motion | open |
 | camera convergence (`FUN_00122168`) | per-tick lerp | open, nobody has complained |
@@ -4819,3 +4823,44 @@ To use it: add `Enable = Widescreen 19.5:9 - S24 Ultra` under `[Cheats]`, delete
 `Enable = Widescreen 16:9` from `[Patches]`, restart, and set the display Aspect
 Ratio to Stretch against a 19.5:9 output. PCSX2 has no 19.5:9 display aspect, so
 at any other output shape this renders a correctly-wide FOV into the wrong box.
+
+
+## 2026-09-08 - status from the user, and blast travel is still the big one
+
+Three of the reported defects closed on play rather than on measurement, and one
+that had drifted into "semi-confirmed" came back as definitely broken.
+
+| item | what the user says |
+|---|---|
+| 3 - ordinary death camera | solved |
+| 5 - character-switch sky | solved |
+| 2 - body-erasing death camera | not checked. **Assumed** solved, asterisked |
+| 1 - real-time blast travel | **"definitely still the issue ... blasts traveling way too fast"** |
+
+Items 3 and 5 were on the "predicted, not measured" row - `sequence wait` and
+`camera pacing` were expected to move them and now evidently did. They are closed
+on the user's word, with no oracle behind them; item 2 is closed on nothing at
+all and is marked with an asterisk so that stays visible.
+
+### Blast travel was never fixed, and the record half-hid that
+
+Item 1 read "blasts end too fast and travel too fast". The *duration* half got
+attention - `blast hit cadence`, `blast effect duration`, `sequence wait` - and
+the user's feedback then became "blasts generally seem to last longer",
+recorded as **semi-confirmed**. That phrasing let the untouched half drift out of
+view. Travel speed has never been fixed and never been claimed as fixed: the
+class table has said `ki blast + beam travel | procedural motion | open` since
+2026-08-22.
+
+The one substantive lead is also a warning. On 2026-08-22 the reasoning was
+"airborne movement is position integrated per loop iteration with no delta-time
+term, and projectiles use the same path, so this is one bug, not two". The
+airborne half was then fixed - four groups, all confirmed - but that shared-path
+claim was **never tested**, and the same section carries a later correction:
+"position integrated per loop iteration was a guess and no such integrator
+exists". So the projectile's motion path is genuinely unidentified. Inheriting
+the airborne conclusion would be inheriting a guess that was already retracted.
+
+A blast that travels at 2x also changes dodge timing, which makes it the highest
+priority open item: it is the only one left that changes how the game plays
+rather than how it looks.
