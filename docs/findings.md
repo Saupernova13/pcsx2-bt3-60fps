@@ -4864,3 +4864,54 @@ the airborne conclusion would be inheriting a guess that was already retracted.
 A blast that travels at 2x also changes dodge timing, which makes it the highest
 priority open item: it is the only one left that changes how the game plays
 rather than how it looks.
+
+## 2026-09-08 - Buu's Flame Shower Breath: the DURATION is not the bug
+
+Save state 1 (the user's, versus, CPU active, Buu vs an aggressive opponent).
+`L2+Up+Triangle` after about 60 ticks of L2 charge puts Buu in **state 272**,
+which is the move. Measured from state entry to state exit, in vsyncs, which are
+real time at either rate.
+
+### The scene as saved cannot answer the question
+
+With the CPU live the 30fps arm is not reproducible:
+
+    charge 80 ticks   272 lasted  50, 138, 50, 138, 50, 138 vsyncs
+    charge 60 ticks   272 lasted  90, 132, 90, 132, 90, 90, 90, 132
+
+Both values end cleanly in idle, so neither is an "interrupted" run in the
+obvious sense. The split tracks a **one-vsync difference in when the move
+starts** - 87 vs 88 vsyncs of waiting for Buu to become idle. The CPU fires its
+own beam (state 271) and whether the two interact decides the length. A test bed
+where one vsync of phase changes the answer by 47% is not a test bed.
+
+The 60fps arm was stable at 98 vsyncs throughout, which is exactly the trap: one
+arm looking clean says nothing if the other is bimodal.
+
+### With the opponent removed, both arms are clean
+
+Teleporting the opponent to (4000, 0, 4000) every vsync - no clash, no
+interruption, both arms identical treatment:
+
+| arm | state 272 | real time | ticks |
+|---|---|---|---|
+| 30fps unpatched | 90, 92, 90 vsyncs | **1.50 s** | 45, 46, 45 |
+| 60fps patched | 104, 104, 104 vsyncs | **1.73 s** | 104, 104, 104 |
+
+**The move is 15% LONGER at 60fps, not shorter.** Duration is not the defect
+here. Note also the tick counts: 45 against 104. A raw per-tick count would give
+45 in both arms and finish in half the real time; this one is being held for
+approximately the right real time already - `sequence wait` doing its job - and
+overshooting slightly, the same sign as the transformation overshoot.
+
+### What this does and does not settle
+
+It settles that **this move's duration is fine**. It says nothing about
+**projectile travel speed**, which is the actually-open item: Flame Shower Breath
+is a breath attack, not a travelling ki blast, so it never exercises the
+projectile path at all. Those need a blast that visibly crosses the gap.
+
+Caveat: banishing the opponent could in principle change how the move plays -
+no target to lock onto. It is applied identically to both arms, so the
+comparison stands, but the absolute 1.50s should not be quoted as the game's
+authored length without a passive-CPU state to confirm it.
