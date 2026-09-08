@@ -3,15 +3,23 @@
 Which build to trust, and why. Set by testing **in play**, not by measurement.
 Newest at the top. `releases/latest/` currently holds **v15**.
 
-**v14 and v15 were both confirmed in play by the user on 2026-09-08** - the Cell
-Perfect Barrier camera and the cut-in mouth. v14's star is cleared. Neither
-confirmation touches v12's input-timing flag, which still stands.
+**v13, v14 and v15 are all confirmed in play by the user, 2026-09-08** - the
+pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
+mouths, in the cut-in AND in the pre-fight intro. v14's star is cleared.
+None of it touches v12's input-timing flag, which still stands.
+
+> **Deploy `releases/latest/`, never `patches/428113C2.pnach`.** The working
+> pnach carries five groups that must never be enabled, and `deploy.py` used to
+> turn on every group in whatever file it was given. The user's EmuDeck install
+> had been running all 24 of them - quarter-speed animation, no beams, broken
+> ground movement, the state 157 trap - since at least 2026-09-05, while every
+> test ran against PCSXROO. `deploy.py` now refuses them.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
-| `v13-pursuit-stomp` | 18 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds the two pursuit groups; inherits v12's flag |
+| `v13-pursuit-stomp` | 18 | **CONFIRMED IN PLAY** | correct | Adds the two pursuit groups. Confirmed 2026-09-08; inherits v12's flag |
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
 | `v10-withdraw-phase-timers` | 16 | superseded | correct | Identical group list to v12 |
