@@ -4972,3 +4972,80 @@ projectile in RAM** - a float triple that appears when the shot is fired and
 moves smoothly away from the shooter - and read its position per vsync.
 `tools/findmotion.py` is the right starting point. Distance covered per real
 second is then unambiguous, which none of the above is.
+
+## 2026-09-09 - Flame Shower Breath decomposed, and the projectile still not found
+
+The user's framing, which is the right one: "you are NEVER fixing singular
+things. you are fixing global systems, just with me giving you specific
+examples." So the question is what global system Flame Shower Breath is an
+example of. The honest answer today is that **it is not an example of the
+blast-speed bug at all**.
+
+### The move is 93% correct, and its phases say where the 7% goes
+
+State 262 splits into three phases, delimited by resets of the state machine's
+phase counter at `fighter+0x3D8`:
+
+| phase | 30fps | 60fps | ratio |
+|---|---|---|---|
+| 0 | 62 vsyncs (30 ticks) | 61 vsyncs (60 ticks) | **0.98** |
+| 1 | 52 vsyncs (25 ticks) | 46 vsyncs (45 ticks) | 0.88 |
+| 2 | 16 vsyncs (7 ticks) | 14 vsyncs (13 ticks) | 0.88 |
+| whole | 130 vsyncs | 121 vsyncs | 0.93 |
+
+`fighter+0x3D8` itself runs at a clean **2x** - 22 against 43 at the same vsync,
+1.95 - so it is one of the counters the withdrawn `[60FPS - state phase timers]`
+group would have gated. **But the phases do not end when it hits a threshold**:
+phase 0 is correct to within one vsync while its counter reaches 23 against 45.
+Something real-time-correct ends these phases - almost certainly the animation
+clock, which is already fixed. Gating `+0x3D8` here would therefore change
+nothing, which is consistent with that group having been withdrawn for causing
+state traps rather than for being needed.
+
+A 7% shortfall spread as 0.98 / 0.88 / 0.88 is not the signature of an
+uncompensated per-tick clock. Those produce 0.50. Nothing inside this move is
+running at double speed, and a frame-by-frame film against the 30fps arm shows
+the two tracking each other throughout.
+
+**Conclusion: Flame Shower Breath does not exhibit the reported bug.** It is a
+breath attack; nothing in it travels. It was never going to be an example of
+"blasts travel too fast", and 7% is not what a player perceives as "way too
+fast".
+
+### The projectile: visible, and still not located in memory
+
+A plain `Triangle` ki blast DOES produce a travelling projectile, and a
+per-vsync film shows it crossing the screen. Screen-space tracking of the
+brightest blob:
+
+    30fps  x = 934 880 838 676 616 533 495 367 then settles ~363
+    60fps  x = 898 835 636 500 457 381 373 351 328 283 208 176 162 then ~170
+
+The 60fps blast ends up far further across. That **looks** like the bug, and it
+is the best evidence so far - but it is not proof: the early samples are
+contaminated by the muzzle flash (6,920 bright pixels at one point), the
+projectile shrinks with perspective as it recedes, and neither arm's "settle" is
+known to be the projectile rather than an impact effect. Do not quote these
+numbers as a measured speed ratio.
+
+Three searches for the projectile's world position all failed:
+
+1. **Constant-velocity scan** over 29MB - floats whose deltas are equal across
+   four consecutive vsyncs. Returned only the aura phases (the familiar
+   0.10 / 0.23 / 0.27 per tick) and some integer counters read as floats.
+2. **Fast-mover scan** - dropped the constant-velocity requirement, kept
+   anything moving >0.5 units a vsync in a plausible world range, at three
+   different times into the flight. The best candidates sat at the *opponent's*
+   position, not in transit.
+3. **Targeted region trace** of `00916000-0091A000` per vsync, looking for a
+   word that starts near the shooter's x of 225.5 and sweeps toward the target's
+   281. **Zero hits in either arm.**
+
+So the projectile is not a plain float triple in the region searched. It may be
+inside an effect node, packed, or stored relative to something. The effect
+system is already partly mapped - `[60FPS - blast effect duration]` halves 19
+per-tick steps in "the two effect classes that draw a ki blast" - so the next
+move is to find the node that *owns* a live blast and walk its fields, rather
+than scanning RAM blind again.
+
+**No fix. Nothing shipped from this session's blast work.**
