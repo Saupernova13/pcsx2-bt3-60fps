@@ -30,6 +30,14 @@ SERIAL = "SLUS-21678"
 # is a superseded alternative to `animation clock` - both on together give
 # QUARTER speed animation. Handing the working pnach to deploy.py enables every
 # group in it, which is exactly how an install ends up broken beyond belief.
+# Groups that belong in a shared copy but must NOT be switched on for you.
+# A display-aspect hack is a preference, not a fix, and this one additionally
+# conflicts with PCSX2's own [Widescreen 16:9] - both write the same three
+# addresses every frame. Installed, listed, off until the user says otherwise.
+OPTIONAL = [
+    "Widescreen 19.5:9 - S24 Ultra",
+]
+
 NEVER_SHIP = [
     "60FPS - animation rate",
     "60FPS - EXPERIMENT halve root motion",

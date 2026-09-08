@@ -4753,3 +4753,69 @@ Still open, and none of it touched by any of this: v12's input-timing flag, the
 Galick Cannon fade, the ultimate's beam landing early, transformations running
 long, the character-switch sky. The user also reports "some camera angles/speeds
 seem off" - separate from the mouth work, and not yet characterised.
+
+## 2026-09-08 - widescreen retargeted from 16:9 to 19.5:9
+
+The user's install runs PCSX2's own `[Widescreen 16:9]`, from
+`resources/patches.zip`. They asked for the same thing aimed at the Galaxy S24
+Ultra's 3120x1440 panel - 19.5:9, or 2.166667.
+
+The stock patch is three words, and the third gives the rule away:
+
+| address | stock (4:3) | 16:9 | what it is |
+|---|---|---|---|
+| `002FE4CC` | 1.166667 | 1.555167 | projection scale, 7/6 |
+| `002FE594` | 298.6667 | 398.1227 | the same constant x256 |
+| `00130BF0` | `lui $at,0x3F40` | `lui $at,0x3F10` | an INSTRUCTION: 0.75 -> 0.5625 |
+
+0.75 is 3/4 and 0.5625 is 9/16, so that immediate is **1/aspect**, and the two
+data floats scale by **aspect / (4/3)** - how much the horizontal field of view
+widens. The model reproduces the stock patch from first principles: fed 16:9 it
+returns `3FC71C72` and `lui 0x3F10`, against the shipped `3FC70FB6` and
+`0x3F10`. The immediate matches bit for bit; the float differs only because the
+official patch rounded 4/3 to 1.333.
+
+For 19.5:9 the widen factor is exactly 1.625, giving `3FF2AAAB`, `43F2AAAB` and
+`lui $at,0x3EEC`. `lui` sets only the top 16 bits, so the last lands on
+0.4609375 against an ideal 0.4615385 - 0.13% narrow, about a third of a pixel
+across 3120. A trampoline would fix that for no visible gain.
+
+### How far it is verified, and how far it is not
+
+**Verified exactly, at the arithmetic.** `00130BF0` feeds `$f20` two
+instructions later (`mtc1` then `mul.s $f20,$f02,$f20`). Breakpointing after
+that multiply, with the group off and on:
+
+    4:3     $f20 = 0.6495191
+    19.5:9  $f20 = 0.3991836      ratio 0.61458, predicted 0.61458
+
+**Not verified on screen.** No render test this session could distinguish the
+aspects - and crucially it could not distinguish the *official 16:9 values*
+from stock either. A live poke of the shipped 16:9 constants left the aura's
+bounding box identical to 4:3, so the null result is a property of the test, not
+of the constants: these are consumed at scene entry, and every quick path
+(save-state load, mid-session toggle) shows the projection the state was
+captured with. Seeing it needs a battle entered fresh after boot.
+
+Two mistakes worth recording, both from trusting a metric over a check:
+
+- The first scale-fit searched **horizontal** rescale only, over a band that is
+  almost entirely flat green field. The objective was degenerate - error at the
+  best scale equalled error at scale 1.0 - and it happily reported "no change"
+  for every arm. A fit whose objective is flat has not measured anything.
+- A frame captured with an extra 30 frame-advances was read as an aspect
+  difference. It was aura animation. Arms must run the same number of frames.
+
+### Shipping
+
+`config.OPTIONAL` is a third list beside `NEVER_SHIP`: groups that belong in the
+shared file but must not be switched on for the user. `export.py` keeps them,
+`deploy.py` installs them and leaves them out of the enable list. A display
+preference is not a fix, and this one additionally **conflicts with the stock
+[Widescreen 16:9]** - both write the same three addresses every frame, so
+whichever the cheat engine writes last wins.
+
+To use it: add `Enable = Widescreen 19.5:9 - S24 Ultra` under `[Cheats]`, delete
+`Enable = Widescreen 16:9` from `[Patches]`, restart, and set the display Aspect
+Ratio to Stretch against a 19.5:9 output. PCSX2 has no 19.5:9 display aspect, so
+at any other output shape this renders a correctly-wide FOV into the wrong box.

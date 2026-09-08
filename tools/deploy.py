@@ -74,7 +74,8 @@ def main() -> int:
             print(f"  {problem}")
         return 1
 
-    groups = args.only if args.only else [g.name for g in source.groups]
+    groups = args.only if args.only else [g.name for g in source.groups
+                                          if g.name not in config.OPTIONAL]
 
     # Handing this the WORKING pnach enables every group in it, five of which
     # must never be on in a real install: two withdrawn blast groups, the state
