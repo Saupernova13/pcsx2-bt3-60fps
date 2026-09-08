@@ -457,10 +457,10 @@ patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 // restores it. The counter still decrements every tick, so unlike a parity gate
 // this cannot leave a fighter stuck in the state.
 [60FPS - knockback flight]
-description=Double the launch-flight durations behind a heavy smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590).
-patch=1,EE,001E9614,word,2402001E // move D6 launch: 15 -> 30 ticks
-patch=1,EE,001E962C,word,24020064 // move D5 launch: 50 -> 100 ticks
-patch=1,EE,001E963C,word,24020040 // move DF launch: 32 -> 64 ticks
+description=Double the launch-flight durations behind a heavy smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590). The three constants are dispatched on fighter+0x948, the STATE, not on a character or a move - every character launched into 213/214/223 is covered.
+patch=1,EE,001E9614,word,2402001E // fighter STATE 214 launch: 15 -> 30 ticks
+patch=1,EE,001E962C,word,24020064 // fighter STATE 213 launch: 50 -> 100 ticks
+patch=1,EE,001E963C,word,24020040 // fighter STATE 223 launch: 32 -> 64 ticks
 
 // The Circle pursuit, found 2026-09-07 - the stomp that follows a heavy smash.
 // Four separate 30Hz frame counts and one lead prediction, all in the same
