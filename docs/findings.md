@@ -6,7 +6,7 @@ Newest sections at the bottom.
 
 ## STATE OF PLAY - read this first
 
-Last revised 2026-09-08. **19 groups ship**, in `patches/428113C2.pnach` and
+Last revised 2026-09-08. **20 groups ship**, in `patches/428113C2.pnach` and
 exported to `releases/latest/`.
 
 > **Build confidence - read `releases/STATUS.md` before shipping anything.**
@@ -40,6 +40,7 @@ vsyncs - and the ones the user can see have been confirmed in play.
 | `60FPS - knockback flight` | doubles the three launch durations a heavy smash puts someone into, `FUN_001E9590` |
 | `60FPS - pursuit timing` | the five frame counts and the intercept lead behind the Circle pursuit stomp |
 | `60FPS - camera pacing` | halves the camera blend rate and counts scripted camera moves down on even ticks, `FUN_001C69C8` / `001C5720` |
+| `60FPS - mouth clock` | halves the cut-in keyframe clock, the second clip player, at `0024ED2C` / `0024F3D4` - scripted mouth and face tracks |
 | `60FPS - state phase timers` | advances 22 of the fighter state machine's 28 phase counters on even ticks - charge lengths, recoveries |
 
 **Read "The engine has no timestep" further down before anything else.** The
@@ -80,7 +81,7 @@ is gated is an effect that does not get built.**
 |---|---|
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
 | Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
-| Pre-fight intro: mouths do not move at all | Not a speed problem |
+| Pre-fight intro: mouths do not move at all | Not a speed problem, and still **not A/B'd** against the unpatched game. The in-battle cut-in mouth is fixed by `mouth clock`; whether the intro uses the same player is untested |
 | Death cameras, the character-switch sky, the Galick Cannon fade | All scripted-sequence beats, so `sequence wait` should have moved them. **Predicted, not measured** - not reachable from the save states on hand. The death cameras need versus |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
@@ -4528,3 +4529,128 @@ The `KNOWN NOT FIXED` header entry for the camera is removed. The ultimate's bea
 still lands ~0.5s early - and note that it moves a camera *cut* with it, which is
 the residual bump at vsync 132 in the Goku trace above. That is the beam defect
 showing through the camera, not the camera.
+
+## 2026-09-08 - the mouth, and the second clip player nobody had looked at
+
+The user's report: "Mouth movements are NOT aligned. They always stop too early.
+Load into a training battle with Vegeta (SScouter) and keep performing his Final
+Galick Cannon (l2, up, triangle) ... in the 30fps version his mouth animates the
+whole sequence. It cuts halfway in the 60fps patch."
+
+Fixed. `[60FPS - mouth clock]`, two words plus two trampolines.
+
+### The instrument that made it tractable
+
+Every previous attempt at this failed on the oracle, not the search. Screenshots
+were being taken on the wall clock, because the README says a screenshot needs a
+running VM - which is true. What nobody had tried is that **a screenshot issued
+while paused is queued, and `frame_advance(1)` flushes it**. Verified three times
+in a row: `exists=False` after the request, `exists=True` after one advance.
+
+That turns the picture into a per-vsync signal as deterministic as memory. The
+film charges on the wall clock, presses the command, pauses, frame-advances to
+the exact first vsync of state 287, and from there does screenshot,
+`frame_advance(1)`, screenshot - so each sample costs exactly one vsync in both
+arms and the two films are aligned frame for frame.
+
+With the mouth box at x 0.486-0.522, y 0.538-0.574 and "open" defined as more
+than 12% of the box darker than its own 75th percentile minus 45:
+
+| arm | open/close transitions | first | last | span | rate |
+|---|---|---|---|---|---|
+| 30fps unpatched | 10 | v43 | v163 | 120 vsyncs = 2.00s | **5.00 /s** |
+| 60fps, 19 groups | 12 | v43 | v115 | 72 vsyncs = 1.20s | **10.00 /s** |
+| 60fps + this group | 14 | v43 | v167 | 124 vsyncs = 2.07s | - |
+
+**Exactly 2.00x.** That single number is the whole diagnosis: a track advanced
+once per tick, authored in 30Hz frames, that runs off the end of its data and
+holds. Not a camera problem, not a sequence problem - the cinematic itself is
+already the right length in both arms.
+
+The earlier metrics all failed for the same reason: they averaged. Whole-frame
+difference, mean luma, mean abs change in a box - the mouth is about 0.1% of the
+frame, so every one of them measured the aura and the banner instead. Counting
+*state transitions of a thresholded box* is what separated the arms.
+
+### What the mouth actually is
+
+Not skeletal animation. `[60FPS - animation clock]` already paces the
+`model+0xB40` controller correctly and its three `time += rate` sites really are
+the only ones on that controller. This is a **second clip player in the same
+module**, keyed on a different struct, and it had never been looked at. The
+2026-09-07 note "the clip-player cluster is the first place to look for mouth
+animation" was pointing at the right module and was never followed up.
+
+A track object:
+
+| field | meaning |
+|---|---|
+| `+0x18` | track type - dispatched through the 15-entry jump table at `002F27B0` |
+| `+0x1C` | key index written by the type-3 case |
+| `+0x28` | keyframe array; key times are plain `lhu` shorts |
+| `+0x2C` | **rate, advanced per tick. It is 2.0** |
+| `+0x30` | clip length |
+| `+0x34` | clip time, stepped at `0024ED2C` |
+| `+0x40` / `+0x42` | current key index / key count, `sh` at `0024F334` |
+| `+0x44` | track time, stepped at `0024F3D4` |
+
+Two step sites, both `time += [track+0x2C]` once per tick, both at rate 2.0 - the
+usual BT3 60Hz authoring. At 60fps a track burns 120 keyframe units a second
+instead of 60, walks off the end of its key array in half the real time, and
+holds the last key. A mouth that stops mid-sentence.
+
+Only **two track objects exist**: `009212F0` and `00921360`. Vegeta's cut-in uses
+`00921360`; Goku's ultimate uses both. `009212F0` is the "cycling countdown still
+running at 2x" that 2026-09-07 flagged and could not explain - it is a track of
+this same player, and it is now explained and fixed.
+
+### Hook the add, not the rate load
+
+`0024F290` branches straight to `0024F3D0`, past any hook placed on the
+`lwc1 $f0, 0x2c($s0)`, and that path would keep the full rate. Hooking the `add.s`
+itself catches every path into it. The cost is that each trampoline has to repair
+what the hook's delay slot did with stale data: at `0024ED2C` the delay slot is
+the `c.le.s` compare, which saw the un-added time, so the trampoline redoes it;
+at `0024F3D4` the delay slot is `swc1 $f0, 0x44($s0)`, which stores the raw rate,
+so the trampoline stores again. Nothing reads `+0x44` in between - the next
+instruction is `ld $s0, ($sp)`.
+
+### Blast radius, measured rather than argued
+
+- Neither site fires **at all** in ordinary battle: a breakpoint on `0024ED2C`
+  with a 6-second wait, sixty times over, never hit. Nothing outside a scripted
+  cut-in is touched.
+- `tools/hitclock.py --baselines` with the group on is **byte-identical** to
+  without: 6 hits, 8940 damage, first 32, last 64, span 32.
+- On Goku's ultimate the group does change the picture, on 90 of 170 vsyncs. That
+  is the second track, `009212F0`, driving the radial speed-line effect, which was
+  running at 2x for the same reason. The hit counters land on identical vsyncs in
+  both 60fps arms, so the schedule is untouched; only the effect's own phase moved.
+  Not independently verified as an improvement, but it is the same correction for
+  the same cause.
+- On the Vegeta cut-in the whole-frame difference from the 30fps reference is
+  unchanged to three significant figures - 3.46 against 3.46 - so nothing else in
+  that shot moved.
+
+### The hour this cost, so it does not happen again
+
+`config.game_ini()` points at the user's installed PCSX2 under EmuDeck.
+**PCSXROO does not read that file.** It is a separate portable build and keeps
+its per-game settings in `<pcsxroo>/bin/gamesettings/SLUS-21678_428113C2.ini` -
+at the data root, not under `inis/`. That file's `[Cheats] Enable` list is read
+at **boot**, and it is what carries the `60FPS - spare 1/2/3` names that
+`ENABLED_IN_INI` mirrors.
+
+A group whose name is missing there applies nothing and says nothing. Worse,
+`patchctl --status` reported it `ON`, because ON there only ever meant "in
+ENABLED_IN_INI" - so the pnach was right, the words were right, patchctl said ON,
+and the A/B scored the unpatched game twice in a row. `deploy.py` wrote the name
+into the EmuDeck ini, which the running emulator never reads.
+
+One self-inflicted error inside that: after injecting the same sixteen words into
+an already-enabled group as a bisect, the words stayed in RAM, and reading them
+back looked like the group had started working. It had not. **Words in RAM after
+a `patch_reload` are only evidence if nothing else wrote them.**
+
+`patchctl --status` now names any group the emulator will ignore and says to add
+the line and restart. It writes nothing - that ini is the user's.
