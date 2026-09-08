@@ -144,9 +144,17 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # What the ini enables. A group must carry one of these names to apply at all,
 # and this list can only be changed by restarting the emulator - so it holds
 # the names of groups that do not exist yet, to save a restart later.
+# The cut-in keyframe clock, found 2026-09-08. A second clip player, separate
+# from the model+0xB40 controller that [60FPS - animation clock] already paces.
+# Its track objects step a float clock by the track's rate at +0x2C once per
+# tick, and that rate is 2.0, so at 60fps a track burns its keyframe array in
+# half the real time and holds the last key - a mouth that stops mid-sentence.
+MOUTH = ["60FPS - mouth clock"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
-                  + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + SPARES)
+                  + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -194,8 +202,10 @@ PRESETS = {
     # baseline to be diffed against without editing a preset.
     "nocamera": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT),
+    "nomouth": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA),
+             + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
 }
 
 DISABLED_SUFFIX = " [off]"
