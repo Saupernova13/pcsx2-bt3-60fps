@@ -227,6 +227,37 @@ def status() -> None:
         name = _base_name(group.name)
         on = group.name == name and name in ENABLED_IN_INI
         print(f"  [{'ON ' if on else 'off'}] {name}  ({len(group.lines)} lines)")
+    warn_unenabled(pnach)
+
+
+def warn_unenabled(pnach=None) -> list[str]:
+    """Groups the emulator will ignore however correct the pnach is.
+
+    PCSXROO reads its [Cheats] Enable list from its OWN per-game ini - not the
+    installed PCSX2's, which is what config.game_ini() and deploy.py write - and
+    it reads it at BOOT. A group whose name is missing there applies nothing and
+    says nothing: patchctl reports it ON, the words never appear in RAM, and the
+    measurement quietly scores the unpatched game. That cost an hour on
+    2026-09-08. This is the check that would have caught it.
+    """
+    try:
+        enabled = config.roo_enabled_cheats()
+    except FileNotFoundError:
+        return []
+    if not enabled:
+        return []
+    if pnach is None:
+        _, pnach = read_pnach()
+    present = {_base_name(g.name) for g in pnach.groups}
+    missing = [n for n in ENABLED_IN_INI if n in present and n not in enabled]
+    if missing:
+        print("")
+        print(f"  !! not enabled in {config.roo_game_ini()}")
+        for name in missing:
+            print(f"     {name}")
+        print("     Add an 'Enable = <name>' line there and RESTART the emulator;")
+        print("     until then these groups apply nothing at all.")
+    return missing
 
 
 def original_word(elf: ElfImage, addr: int) -> int:

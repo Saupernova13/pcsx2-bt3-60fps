@@ -183,3 +183,32 @@ def roo_cheat_file() -> Path:
 
 def roo_snaps_dir() -> Path:
     return pcsxroo_dir() / "snaps"
+
+
+def roo_game_ini() -> Path:
+    """PCSXROO's own per-game settings, which is NOT game_ini().
+
+    game_ini() points at the user's installed PCSX2 (EmuDeck). PCSXROO is a
+    separate, portable build and keeps its per-game settings under its data
+    root, not under inis/. The [Cheats] Enable list there is read at boot and is
+    what decides whether a pnach group applies at all - a group missing from it
+    is silently ignored, however correct the pnach is.
+    """
+    return pcsxroo_dir() / "gamesettings" / f"{SERIAL}_{CRC}.ini"
+
+
+def roo_enabled_cheats() -> list[str]:
+    """The group names PCSXROO will honour, as of its last boot."""
+    path = roo_game_ini()
+    if not path.exists():
+        return []
+    names, in_cheats = [], False
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_cheats = stripped.lower() == "[cheats]"
+            continue
+        if in_cheats and stripped.lower().startswith("enable"):
+            names.append(stripped.split("=", 1)[1].strip())
+    return names
+
