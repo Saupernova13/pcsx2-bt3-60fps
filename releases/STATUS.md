@@ -167,6 +167,23 @@ second mover, not yet found. And Frieza's "I might die this time" is untested.
 the 30fps oracle at three ranges and as shipped from the pnach, but not yet
 seen in play. **Inherits v12's input-timing flag.**
 
+## v17 - spawned projectile flight
+
+Adds `[60FPS - blast object travel]`. Frieza's summoned rocks - and everything
+else on the same object class - advanced `position += direction * 37.037` per
+**tick**, identical in both arms, so they crossed the gap in half the real time.
+The fix hooks the one `Vec3Add` both code paths converge on and halves the
+advance.
+
+Verified as shipped from the pnach, at three ranges, against the 30fps oracle:
+impact moved 103 -> 106, 113 -> 124, 118 -> 134 against 30fps's 110 / 128 / 137.
+Inert at idle and for plain ki blasts, so it cannot double-compensate with
+`[60FPS - projectile travel]`. Buu's charged blast is untouched by it, vsync for
+vsync - that beam is a different subsystem and is still unfixed.
+
+**Starred pending the user's own play-test.** **Inherits v12's input-timing
+flag.**
+
 ## The state 157 trap
 
 Goku parks in fighter state 157 (`FUN_001E6DC8`), an airborne dash/flight state,
