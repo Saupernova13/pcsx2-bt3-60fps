@@ -157,11 +157,12 @@ MOUTH = ["60FPS - mouth clock"]
 # here that changes how the game PLAYS - it halves the time to dodge.
 PROJECTILE = ["60FPS - projectile travel"]
 OBJFLIGHT = ["60FPS - blast object travel"]
+BEAMFLIGHT = ["60FPS - beam object travel"]
 
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
-                  + PROJECTILE + OBJFLIGHT + SPARES)
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SPARES)
 
 PRESETS = {
     "off": [],
@@ -215,7 +216,10 @@ PRESETS = {
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-             + PROJECTILE + OBJFLIGHT),
+             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT),
+    "nobeam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT),
     "noobj": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
               + PROJECTILE),
