@@ -5410,3 +5410,75 @@ vector, and doubling the tick rate doubles the distance covered per second. The
 fix is always to halve the advance at the one `Vec3Add` the update converges on,
 never to touch the stored delta - that field is read by other things and, on the
 rock class, recomputed from a step scalar.
+
+## 2026-09-09 - the Galick Cannon fade: measured, mechanism confirmed, not fixed
+
+Vegeta (Scouter)'s Final Galick Cannon, save state 3, filmed per vsync with a
+screenshot-and-flush film, scoring the fraction of pixels above luma 235.
+
+| arm | fade window | length | in seconds |
+|---|---|---|---|
+| 30fps (`off`, tick 29.1/s) | v443 .. v498 | 56 vsyncs | **0.93s** |
+| 60fps (`full`, tick 56.8/s) | v435 .. v463 | 29 vsyncs | **0.48s** |
+
+**28 ticks either way.** The fade to white is a per-tick duration and runs in
+half its real time at 60fps, exactly the shape of every other defect here.
+
+### Why it looks the way the user describes it
+
+The move's own timeline is *correctly paced*. Filming the fighter states across
+the whole 650-vsync ultimate:
+
+| beat | 30fps | 60fps |
+|---|---|---|
+| state 287 (cut-in) | v3 | v3 |
+| state 302/314 (rush) | v179 | v178 |
+| rush ends, 208 | v491 | v489 |
+| back to idle | v657 | v651 |
+
+Every beat lands within a few vsyncs of the 30fps arm. So the sequence around
+the fade is right and the fade alone is short: at 30fps it ends at v498, *after*
+the rush transition at v491, and covers it; at 60fps it ends at v463, twenty-six
+vsyncs before the transition at v489, and the animation is left playing in the
+open. That is precisely "the fade ends too early, revealing the animation still
+playing behind it".
+
+### Eliminated
+
+- **The game's own dormant 60fps effect switch.** `FUN_00251A48` and
+  `FUN_00250DE8` branch on `model+0xA40` bit 24 and load 60.0 / 2.0 / 0.5
+  instead of 30.0 / 1.0 / 1.0. Nopping the branch at `00251AD8` so the 60fps
+  path always runs leaves the fade at **29 vsyncs**, unchanged. This reproduces
+  the 2026-09-05 result from a different direction; the path really is inert.
+- **The `seconds * 30.0` sites that fire at the fade.** A breakpoint census of
+  all 145 `lui rX, 0x41F0` sites, taken at v418 where the fade is set up, leaves
+  five: `00165D84` (x25), `00251ACC` (x10), `00166B20`, `0018352C`, `00183A54`.
+  Flipping the four non-switch sites to 0x4270 (60.0) leaves the fade at **29
+  vsyncs**, unchanged.
+- **Any integer per-tick countdown.** Scanning all of RAM for a u32 that falls
+  by exactly one per tick across the plateau, with a starting value between 16
+  and 40 (a 28-tick counter must be in that band), returns **zero** words. The
+  duration is not an integer countdown.
+- **Float ramps and alpha humps.** Both scans are swamped by the GS packet
+  buffers at `003Exxxx`, `0044xxxx` and `006Bxxxx-007Dxxxx`, which are rebuilt
+  every frame. The few candidates in the game heap (`0187BB58`, `0187D280`)
+  trace to reused scratch - their values jump between garbage, and at one point
+  `0187BB58` holds 37.033, the projectile speed constant - and their writers are
+  a generic buffer fill at `ra 001319E0`.
+
+### The instrument that made this tractable
+
+`fadequick.py`: film only v415..v515 at 1/8 scale and report the span above half
+the peak white fraction. One run is about two and a half minutes against roughly
+ten for the full film, and it reproduces the full film's numbers exactly. Any
+further attempt on this should use it rather than filming the whole move.
+
+### Where to go next
+
+The duration is not a counter and not one of the 30.0 conversions, so the
+remaining candidates are a float accumulator inside an effect node - the same
+place the 2026-09-06 launch flash ended up - or a beat inside the scripted
+sequence that `[60FPS - sequence wait]` does not reach. The sequence is the
+better bet precisely *because* the surrounding beats are correctly paced: a wait
+that the group already halves would move with them, so a fade that does not move
+is likely being timed by a different counter in the same machinery.
