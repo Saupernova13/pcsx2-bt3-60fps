@@ -995,3 +995,14 @@ patch=1,EE,000F13CC,word,46046302 // mul.s $f12, $f12, $f4  halve the per-tick s
 patch=1,EE,000F13D0,word,0805DA8D // j 0x176a34
 patch=1,EE,000F13D4,word,00000000 // nop
 patch=1,EE,00176A2C,word,0803C4F0 // lwc1 -> j 000F13C0
+
+[60FPS - blast object travel]
+description=Halve the per-tick advance of spawned projectiles - Frieza's summoned rocks and everything else on the same object class - so they cross the gap in real time rather than twice as fast.
+patch=1,EE,000F13E0,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
+patch=1,EE,000F13E4,word,0080302D // move $a2, $a0          a2 = the position
+patch=1,EE,000F13E8,word,3C013F00 // lui $at, 0x3f00        0.5f
+patch=1,EE,000F13EC,word,0C048974 // jal 0x1225d0           dst = a2 + a1 * $f12
+patch=1,EE,000F13F0,word,44816000 // mtc1 $at, $f12         (delay slot)
+patch=1,EE,000F13F4,word,080570A5 // j 0x15c294             past the original add
+patch=1,EE,000F13F8,word,00000000 // nop
+patch=1,EE,0015C28C,word,0803C4F8 // jal Vec3Add -> j 000F13E0
