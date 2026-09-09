@@ -5049,3 +5049,80 @@ move is to find the node that *owns* a live blast and walk its fields, rather
 than scanning RAM blind again.
 
 **No fix. Nothing shipped from this session's blast work.**
+
+## 2026-09-09 - projectile travel: found, measured at exactly 2x, and FIXED
+
+The user's framing again: find the global system, not the single move. This one
+delivered.
+
+### The measurement that made it findable
+
+Two things unlocked it, both the user's suggestions. **Training mode** so the
+opponent does not retaliate, and **"get up high in the sky and far"** so the
+projectile is in flight long enough to time. Three save states were built by
+flying Buu back and up from the user's own passive-CPU scene:
+
+    slot 7   gap 420      slot 6   gap 657      slot 2   gap 842
+
+The clock is the opponent's reaction, and the gap is fixed, so flight time
+against range separates the wind-up from the travel:
+
+| arm | fit |
+|---|---|
+| 30fps | 28.4 vsyncs fixed + gap / **14.02** units-per-vsync |
+| 60fps | 27.2 vsyncs fixed + gap / **28.05** units-per-vsync |
+
+Fitted against measurements at three ranges, predicting 58/75/88 against an
+actual 58/76/88. The fixed term is the wind-up before launch and is already
+correctly paced. **The travel term is 2.000x.**
+
+That ratio is the whole finding. A single-range measurement gives 1.49x and
+looks like a partial bug; it is only 1.49 because a constant 28-vsync wind-up is
+mixed in. Range-sweep, then fit - one distance would have hidden it.
+
+### The system
+
+`00176A2C`, inside the effect-node update:
+
+    00176A2C  lwc1 $f12, 0x20($s2)   the node class's step, in units PER TICK
+    00176A34  jal  Vec3Scale         temp = [node+0x30] (velocity) * $f12
+    00176A44  jal  Vec3Add           [node+0x10] (position) += temp
+
+`pos += vel * step` once a tick, no delta-time term. For a plain ki blast the
+step is **27.7778 units a tick and identical in both arms** - which is exactly
+why real-time speed doubles. `node+0x5B4` next door is a per-tick lifetime
+countdown, so the blast also expires in half the real time; speed and lifetime
+cancel and the blast covers its authored *distance*, which is why "does it
+reach" tests could never see this and only *timing* could.
+
+Finding it needed the position first. Three earlier scans failed because the
+flight was short and slow; from slot 6 the projectile moves 28 units a vsync and
+a constant-velocity scan finds it immediately. Its writers turned out to be
+struct copies (`00176434`, `0012DFEC`) and then the VU0 vector library
+(`00121ECC`, which capstone renders as garbage) - the integrator was only
+reachable through the library caller's `$ra`, `00176A4C`.
+
+### The fix, and what it covers
+
+`[60FPS - projectile travel]`: one hook, halving `$f12`. Verified **as shipped
+from the pnach**, not just as a live poke:
+
+| gap | 30fps | 60fps without | 60fps with |
+|---|---|---|---|
+| 420 | 58 | 42 | **57** |
+| 657 | 76 | 51 | **74** |
+| 842 | 88 | 57 | **87** |
+
+A breakpoint on the site never fires in an idle battle, so nothing outside a
+live projectile is touched.
+
+**It does NOT cover every blast.** Buu's charged `L2+Up+Triangle` (state 272)
+launches a projectile that moves 37 units a vsync, and a breakpoint on
+`00176A2C` gets **zero hits** during its flight - checked twice, at two
+different times, with the launch confirmed by state. There is a second mover.
+Chasing it stalled: the charged move's own firing window is fragile (70 ticks of
+charge fires at 60fps but not 30; 95 and 110 fire at 30fps but not 60), and a
+watchpoint on the best candidate landed on stack memory at `01FFE44C`, whose
+writer at `001AC87C` is building vectors on `$sp`. Not found yet.
+
+Frieza's "I might die this time" is untested - it needs a character-select trip.
