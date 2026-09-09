@@ -1,7 +1,7 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v15**.
+Newest at the top. `releases/latest/` currently holds **v16**.
 
 **v13, v14 and v15 are all confirmed in play by the user, 2026-09-08** - the
 pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
@@ -17,6 +17,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v16-projectile-travel` | 21 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
 | `v13-pursuit-stomp` | 18 | **CONFIRMED IN PLAY** | correct | Adds the two pursuit groups. Confirmed 2026-09-08; inherits v12's flag |
@@ -135,6 +136,34 @@ only as the same correction for the same cause. Worth a look in play.
 
 **Confirmed in play by the user, 2026-09-08.** It still inherits v12's
 input-timing flag, which nothing here clears.
+
+## v16 - projectile travel
+
+`[60FPS - projectile travel]`, one hook at `00176A2C`. The effect-node update
+steps `pos += vel * step` once a tick with no delta-time term, and for a plain ki
+blast that step is 27.7778 units a tick in BOTH arms - so every projectile
+crossed the ground at exactly double speed at 60fps.
+
+Measured from training-mode scenes at three ranges, timing flight by the
+opponent's reaction, and fitting flight = fixed + gap/speed:
+
+| gap | 30fps | 60fps before | 60fps after |
+|---|---|---|---|
+| 420 | 58 vsyncs | 42 | **57** |
+| 657 | 76 | 51 | **74** |
+| 842 | 88 | 57 | **87** |
+
+The travel term is 2.000x and the fix puts every range within two vsyncs of the
+unpatched game. Verified as shipped from the pnach, not only as a live poke.
+
+**This is the first fix in this project that changes how the game plays rather
+than how it looks** - a blast at double speed halves the time to dodge it.
+
+Two limits, both stated rather than hidden. It does **not** cover Buu's charged
+`L2+Up+Triangle`, whose projectile this integrator never touches - there is a
+second mover, not yet found. And Frieza's "I might die this time" is untested.
+
+**Inherits v12's input-timing flag.**
 
 ## The state 157 trap
 
