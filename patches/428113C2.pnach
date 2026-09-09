@@ -1017,3 +1017,18 @@ patch=1,EE,000F1410,word,44816000 // mtc1 $at, $f12         (delay slot)
 patch=1,EE,000F1414,word,08055803 // j 0x15600c             past the original add
 patch=1,EE,000F1418,word,00000000 // nop
 patch=1,EE,00156004,word,0803C500 // jal Vec3Add -> j 000F1400
+
+// The fullscreen fade node, found 2026-09-09. FUN_00172810 is the game's fade
+// service: an RGBA at data+0x00, a fade-in counter at +0x10 over +0x34 frames, a
+// hold at +0x44, and a fade-out counter at +0x18 over +0x38 frames, with the
+// blend it hands the renderer at +0x30. Every phase steps once per tick with no
+// timestep, so at 60fps every fade in the game took half its real time.
+// Its init, FUN_00172718, is where callers hand it durations in SECONDS and it
+// multiplies by a hard-coded 30.0 - the same shape as the tween constructor. One
+// word there doubles all three phases and leaves the blend curve exact, because
+// the divisors at +0x34/+0x38 are copies of the same doubled counts. The 180-tick
+// hold cap is a separate literal and needs doubling on its own.
+[60FPS - screen fade]
+description=Convert the fullscreen fade node's phase durations from seconds at 30Hz to seconds at 60Hz, so a fade to white or black lasts the real time it was authored for and still covers what it is there to cover.
+patch=1,EE,00172744,word,3C014270 // lui $at, 0x4270      30.0 -> 60.0, seconds to frames
+patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 frames

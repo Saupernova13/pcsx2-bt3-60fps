@@ -159,10 +159,16 @@ PROJECTILE = ["60FPS - projectile travel"]
 OBJFLIGHT = ["60FPS - blast object travel"]
 BEAMFLIGHT = ["60FPS - beam object travel"]
 
+# The fullscreen fade node, found 2026-09-09. FUN_00172810 fades a colour in,
+# holds it, and fades it out, counting all three phases one frame per tick. At
+# 60fps every fade in the game runs in half its real time - which is why the
+# Galick Cannon's white flash lifted before the transition it exists to cover.
+SCREENFADE = ["60FPS - screen fade"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
-                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SPARES)
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -216,7 +222,11 @@ PRESETS = {
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT),
+             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE),
+    # The 21-group set without the fade, so the fade has a named A/B baseline.
+    "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT),
     "nobeam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                + PROJECTILE + OBJFLIGHT),
