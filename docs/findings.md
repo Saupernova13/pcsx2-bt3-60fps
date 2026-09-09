@@ -5482,3 +5482,143 @@ sequence that `[60FPS - sequence wait]` does not reach. The sequence is the
 better bet precisely *because* the surrounding beats are correctly paced: a wait
 that the group already halves would move with them, so a fade that does not move
 is likely being timed by a different counter in the same machinery.
+
+## 2026-09-09 - the Galick Cannon fade: it is the fade SERVICE, and it is fixed
+
+`[60FPS - screen fade]`, two words. The fade is not specific to Vegeta, to the
+Galick Cannon, or to ultimates: `FUN_00172810` is the game's **fullscreen fade
+service**, and its callers hand it durations in **seconds**.
+
+### What the earlier section got wrong
+
+The 2026-09-09 entry above reports "28 ticks either way" and calls the fade
+correctly paced in ticks but short in real time. The direction was right and the
+number was not. `fadequick.py` scores the span above **half the peak** white
+fraction, and the fade saturates the screen - so that window measures the
+*plateau*, not the fade. Filming the mean luma per vsync instead gives the real
+shape, and it is the same in both arms:
+
+| phase | 30fps | 60fps |
+|---|---|---|
+| ramp up | 6 ticks | 6 ticks |
+| plateau | 26 ticks | 25 ticks |
+| ramp down | 14 ticks | 14 ticks |
+
+**~46 ticks either way**, which is 92 vsyncs at 30fps and 46 at 60fps. Every one
+of the four earlier eliminations still stands; they were all looking for a
+28-tick control that does not exist.
+
+**The scan that finally worked, and why the earlier ones could not.** A float
+scan for the blend was run across v438-v450 - inside the plateau, where the
+blend is pinned and *nothing moves*. Re-running the identical scan across the
+fade-OUT instead put the answer on the first page.
+
+### The node
+
+Filming a 256-byte window every vsync and printing only the fields that move:
+
+```
+data+0x00..0x0C   255,255,255,255    the colour, as floats
+data+0x10         15 .. 0            fade-in counter, -1.0 per tick
+data+0x34         15.0               fade-in duration (the divisor)
+data+0x14                            hold counter, -1.0 per tick
+data+0x44         0 .. 180           hold cap, +1 per tick
+data+0x18         30 .. 0            fade-out counter, -1.0 per tick
+data+0x38         30.0               fade-out duration (the divisor)
+data+0x30         blend handed to the renderer
+node+0x01         phase: 0 in, 1 hold, 2 out
+node+0x28         002C3C58, the vtable
+node+0x38         the data block
+```
+
+`+0x30` is `counter/duration` in phase 0 and `1.0 - counter/duration` in phase 2,
+which is why the screen saturates until the blend crosses ~0.55 in either
+direction - the white is drawn over-bright, alpha 128 on the PS2's 0-128 scale.
+
+### The bug, and why one word fixes all of it
+
+The node's init, `FUN_00172718` (vtable `002C3C58` slot `+0x04`), is handed a
+descriptor and converts it:
+
+```
+00172744  lui   at, 0x41F0       ; 30.0
+00172780  mul.s f2, f2, f3       ; +0x10 = fade-in  seconds * 30
+0017278C  mul.s f0, f0, f3       ; +0x14 = hold     seconds * 30
+00172794  mul.s f1, f1, f3       ; +0x18 = fade-out seconds * 30
+001727A4  swc1  f2, 0x34($s0)    ; the divisors are copies of the same counts
+001727A8  swc1  f1, 0x38($s0)
+```
+
+**The same defect as the tween constructor at `00267AC8`, in a second
+general-purpose service.** A caller asks for seconds; the constructor assumes 30
+ticks make one. Changing the 30.0 to 60.0 doubles all three counts *and* the
+divisors together, so the blend curve is bit-identical and only its rate halves.
+The 180-tick hold cap at `001728C8` is a separate literal and is doubled on its
+own.
+
+    patch=1,EE,00172744,word,3C014270 // 30.0 -> 60.0
+    patch=1,EE,001728C8,word,28430168 // hold cap 180 -> 360
+
+### That the callers speak seconds is not an inference
+
+The static descriptors are in the ELF. `FUN_001725F4` copies `002ECCC0` per
+player; `FUN_001729F0` reads `002ECCF0`:
+
+| descriptor | colour | fade-in | hold | fade-out |
+|---|---|---|---|---|
+| `002ECCC0` | 255,255,255 alpha 128 | **0.5 s** | **1.0 s** | **0.5 s** |
+| `002ECCF0` | 255,255,255 alpha 0 | **1.0 s** | 0 | **1.0 s** |
+
+Round authored seconds, not frame counts. The Galick Cannon's own node measures
+15 and 30 frames - 0.5 s and 1.0 s - built on the stack by the caller rather
+than from either static block. The three call sites into the service are
+`00156FD4` (beam-object module, `FUN_00156E24`), `0015B9E4` (blast-object
+module, `FUN_0015B92C`) and `0017268C` (the per-player block above); all three
+enclosing functions are in the 0-callers group, reached from the effect script.
+
+### Verified
+
+Filmed per vsync on save state 3, scored on mean luma, **through the shipped
+pnach group** and not a memory poke:
+
+| arm | full white | lifts at | scene behind it | dark by |
+|---|---|---|---|---|
+| 30fps oracle | v446..v495 (50) | v508 | mean 170 | v524 |
+| 60fps before | v437..v460 (24) | v476 | **mean 90 - the animation** | - |
+| 60fps after | v443..v491 (49) | v504 | mean 168 | v519 |
+
+The fall is value-for-value the 30fps curve over the same 28 vsyncs. The
+remaining 3-5 vsyncs is the emulator running at 56.7 ticks/s against an ideal
+58.6, not the patch.
+
+Directly on the node, `nofade` against `full`:
+
+    nofade   in 15f out 30f   blend 1.000 0.933 0.867   step 1/15
+    full     in 30f out 60f   blend 1.000 0.967 0.933   step 1/30
+
+**No regression.** The move's own beats are unchanged vsync for vsync across all
+eleven state transitions of the 700-vsync ultimate:
+
+    v0:11/11 v2:287/11 v177:302/314 v488:11/208 v517:11/217 v557:11/220
+    v593:11/219 v616:11/216 v617:11/228 v644:11/56 v646:11/11
+
+identical under `nofade` and `full`. The fade is cosmetic and moves no beat.
+
+### What this does not cover
+
+Not every impact flashes the screen. **Frieza's rocks and Buu's charged blast do
+not construct a fade node at all** - a breakpoint on `FUN_00172810` through both
+moves, in both arms, never fires. So no second *visual* sample was available
+without a character-select run. The globality claim rests on the fix being at
+the seconds-to-frames conversion every caller passes through, which is stronger
+than a second sample would have been, but it is worth knowing that a move
+looking wrong in this way may simply not be using this service.
+
+### A four-site variant, measured and not shipped
+
+Halving each per-tick step instead - `00172880`, `00172960`, `00172994` - reads
+identically (white v443..v491, dark by v519). It is not shipped because the
+fade-out's 1.0 does double duty as both the step and the 1.0 in
+`blend = 1.0 - counter/duration`, so it needs `add.s $f2, $f2, $f2` inserted into
+one of the two nops at `001729AC` to rebuild it. Two words with no inserted
+instruction beat five with one.
