@@ -1032,3 +1032,33 @@ patch=1,EE,00156004,word,0803C500 // jal Vec3Add -> j 000F1400
 description=Convert the fullscreen fade node's phase durations from seconds at 30Hz to seconds at 60Hz, so a fade to white or black lasts the real time it was authored for and still covers what it is there to cover.
 patch=1,EE,00172744,word,3C014270 // lui $at, 0x4270      30.0 -> 60.0, seconds to frames
 patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 frames
+
+// The rush struggle, found 2026-09-10. Two rush attacks collide, both fighters
+// enter state 250 (FUN_001F47C8) and rotate their sticks; the game counts hits
+// into fighter+0xE50 and at 001D945C simply compares the two counts to pick a
+// winner. Every part of that is authored in ticks: the struggle is exactly 88
+// ticks in both arms, and hits land on fixed tick cadences plus one every-tick
+// path taken while the fighter's rotation bit is up.
+// The player's hands do not speed up with the tick rate, but the AI's do. The
+// CPU has no stick - FUN_001D4370 branches on fighter+0x1278 and feeds an
+// AI-driven fighter synthetic input from +0x127C/+0x1280/+0x1284 instead of the
+// pad - and it steps that synthetic stick through cardinal directions once per
+// tick, so at 60fps it rotates twice as fast in real time. Measured with both
+// sticks turned at a true 5 rotations a second: 30fps ends 66-59 to the player,
+// 60fps ends 53-47 to the CPU. The outcome flips.
+// This gates ONLY the AI's rotation, on the state's own tick counter, using the
+// game's own human/AI flag. The player's input is untouched.
+[60FPS - rush struggle]
+description=Honour the CPU's synthetic stick rotation every other tick in a rush struggle, so the AI cannot out-rotate the player twice as fast at 60fps as it does at 30.
+patch=1,EE,000F1500,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
+patch=1,EE,000F1504,word,10600005 // beqz $v1, 0x000F151C   human: unchanged
+patch=1,EE,000F1508,word,00000000 // nop
+patch=1,EE,000F150C,word,8C830964 // lw $v1, 0x964($a0)     the state's tick counter
+patch=1,EE,000F1510,word,30630001 // andi $v1, $v1, 1
+patch=1,EE,000F1514,word,14600003 // bnez $v1, 0x000F1524   odd tick: not rotating
+patch=1,EE,000F1518,word,00000000 // nop
+patch=1,EE,000F151C,word,080753CC // j 0x1d4f30             even tick: the real query
+patch=1,EE,000F1520,word,00000000 // nop
+patch=1,EE,000F1524,word,03E00008 // jr $ra
+patch=1,EE,000F1528,word,0000102D // move $v0, $zero        (delay slot)
+patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
