@@ -5126,3 +5126,60 @@ watchpoint on the best candidate landed on stack memory at `01FFE44C`, whose
 writer at `001AC87C` is building vectors on `$sp`. Not found yet.
 
 Frieza's "I might die this time" is untested - it needs a character-select trip.
+
+## 2026-09-09 - the charged blast: also exactly 2x, and a SECOND mover
+
+Buu's `L2+Up+Triangle` (state 272), measured the same way as the ki blast:
+training scenes on the ground at three ranges, 60 ticks of charge - the one
+charge that fires in both arms - and the opponent's reaction as the clock.
+
+| gap | 30fps impact | 60fps impact | 30fps state 272 | 60fps state 272 |
+|---|---|---|---|---|
+| 86.5 | v64 | v44 | 124 vsyncs | 101 |
+| 341.7 | v78 | v51 | 136 | 108 |
+| 598.6 | v92 | v58 | 150 | 114 |
+
+Fitting impact = pre-launch + gap/speed, and it fits to the vsync at all three:
+
+| arm | pre-launch | travel |
+|---|---|---|
+| 30fps | 59.3 vsyncs | **18.29** units/vsync |
+| 60fps | 41.6 vsyncs | **36.58** units/vsync |
+
+**Travel is 2.000x, again.** So this is the same class of defect as the ki blast
+and the global picture is now clear: *every* projectile motion path in this game
+integrates position per tick with no delta-time term.
+
+Two further findings:
+
+- **The pre-launch phase is ALSO too fast** - 59.3 against 41.6 vsyncs, a ratio
+  of 1.42. That is separate from travel and is not the wind-up seen on the ki
+  blast, which matched between arms (28.4 vs 27.2). Unexplained.
+- **`[60FPS - projectile travel]` does not touch this move.** Impact is v44/51/58
+  with the group on and v44/51/58 with it off, identical. A breakpoint on
+  `00176A2C` gets zero hits during the flight. **There is a second mover.**
+
+### The second mover is not found, and three candidates are ruled out
+
+1. **`00176A2C`**, the effect-node integrator that v16 fixes. Zero hits during
+   this move's flight, checked at two different times with the launch confirmed
+   by fighter state.
+2. **`0018510C`** in `FUN_00184BD8`, which is a real per-tick advance -
+   `[obj+0xB8] += $f20`, clamped at `[obj+0xC0]`, with the object's world
+   position built as `direction([obj+0x90]) * that distance + origin([obj+0x80])`.
+   It looked exactly right. Hooked and halved: the site **does** execute during
+   the move, six times out of six, and impact stayed at v44/51/58. So that
+   scalar is the beam's drawn length, not what carries the hit.
+3. **Stack temporaries at `01FFExxx`**, which two scans landed on because render
+   transforms rewrite them every frame with large deltas. Excluding the top of
+   RAM removes them; it also removed every candidate, so the position is not a
+   moving vec3 in the searched region.
+
+Every writer found so far is a struct **copy** - `00176434`, `0012DFEC`,
+`001555DC` - each reading its source from `[obj+0x38]`, and each feeding a
+render node rather than owning the motion. The authoritative object is behind
+that pointer and has not been walked.
+
+Frieza's "I might die this time" is still untested and is the obvious next
+subject: the user reports it as the most extreme case, and rocks that visibly
+cross the screen are a better tracking target than a beam.
