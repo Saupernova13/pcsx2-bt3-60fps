@@ -67,7 +67,10 @@ self-corrects.
    `state phase timers`. It is **wrong** for anything that *constructs*
    something each frame - see the withdrawn groups below.
 3. **Double a duration.** Right when a length is authored in seconds and
-   converted with a hard-coded 30. Only `tween duration` qualifies so far.
+   converted with a hard-coded 30. `tween duration` (`00267AC8`) and
+   `screen fade` (`00172744`) both qualify - two general-purpose services
+   with the same constant. **Look for this shape first in anything that
+   takes a duration from a caller.**
 
 ### Withdrawn - kept in the repo pnach as a record, stripped from releases
 
@@ -94,8 +97,8 @@ is gated is an effect that does not get built.**
 | ~~Death of an ordinary character: camera revolves too fast (item 3)~~ | **Solved**, reported by the user 2026-09-08 as fixed by earlier work. Never measured; closed on play |
 | ~~Character switch: the sky stops rotating (item 5)~~ | **Solved**, reported by the user 2026-09-08. Never measured; closed on play |
 | Death by a body-erasing attack: camera too fast, cuts weirdly (item 2) | **ASSUMED solved\*** - not checked by anyone. The user expects it to have gone with items 3 and 5. Asterisked deliberately: nothing has verified it |
-| The Galick Cannon fade to white ends early (item 7b) | Still live, re-confirmed by the user 2026-09-08. A scripted-sequence beat that `sequence wait` should have moved and did not |
-| **Real-time blast travel speed** (item 1) | **NOT solved**, confirmed by the user 2026-09-08: blasts still travel way too fast. Never fixed - `airborne motion` and friends fixed the FIGHTER's position integration, and projectiles were only ASSUMED to share that path. `ki blast + beam travel: procedural motion, open` has stood since 2026-08-22 |
+| ~~The Galick Cannon fade to white ends early (item 7b)~~ | **FIXED\*** by `screen fade`, v19. Not a sequence beat at all: `FUN_00172810` is the game's fullscreen fade SERVICE and its init converts seconds to frames with a hard-coded 30.0. Measured, not play-tested |
+| ~~**Real-time blast travel speed** (item 1)~~ | **FIXED\*** across three movers - `projectile travel` (v16, ki blasts), `blast object travel` (v17, Frieza's rocks), `beam object travel` (v18, Buu's charged blast). Each measured at exactly 2x and halved at the one `Vec3Add` its two code paths converge on. Measured, not play-tested. What is left is a separate ~5-vsync pre-launch animation defect |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
@@ -3737,21 +3740,24 @@ play, recorded verbatim in substance so no item gets lost between sessions.
 
 ### Still wrong, and running fast
 
-| # | What the player sees |
-|---|---|
-| 1 | Blasts end too fast and travel too fast - **including explosive waves** |
-| 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly |
-| 3 | Death of an ordinary character: the camera revolves around the corpse too fast |
-| 4 | Camera is still too fast in some attack animations - Perfect Barrier named |
-| 5 | Character switch: the sky stops rotating about a second in |
-| 6 | Pre-fight intro: mouths do not move at all; some intro animations are too fast or too slow for the camera |
-| 7 | Vegeta's scouter "Final Galick Cannon": the start animation's mouth movement finishes early, and after the rush sequence the fade to white ends too early, revealing the animation still playing behind it |
+Status column updated 2026-09-09. **\*** = measured fixed against the 30fps
+oracle but **not yet confirmed in play by the user**.
+
+| # | What the player sees | Status |
+|---|---|---|
+| 1 | Blasts end too fast and travel too fast - **including explosive waves** | *ends* fixed and confirmed in play (v12-v15). *travels* **FIXED\*** by v16/v17/v18, three movers. **Explosive waves were never separately checked** |
+| 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly | **ASSUMED solved\*** - nobody has ever checked it |
+| 3 | Death of an ordinary character: the camera revolves around the corpse too fast | **CLOSED**, user-confirmed 2026-09-08 |
+| 4 | Camera is still too fast in some attack animations - Perfect Barrier named | **CLOSED**, user-confirmed 2026-09-08 (v14). But the user reported a *new* "some camera angles/speeds seem off" the same day - uncharacterised, open |
+| 5 | Character switch: the sky stops rotating about a second in | **CLOSED**, user-confirmed 2026-09-08 |
+| 6 | Pre-fight intro: mouths do not move at all; some intro animations are too fast or too slow for the camera | mouths **CLOSED**, user-confirmed 2026-09-08 (v15). **The intro animation pacing half was never addressed** |
+| 7 | Vegeta's scouter "Final Galick Cannon": the start animation's mouth movement finishes early, and after the rush sequence the fade to white ends too early, revealing the animation still playing behind it | 7a mouth **CLOSED**, user-confirmed 2026-09-08. 7b fade **FIXED\*** by v19 |
 
 ### Running slow - overcompensated
 
-| # | What the player sees |
-|---|---|
-| 8 | Cell's Perfect -> Super Perfect transformation lasts roughly 0.3s longer than it should. Frieza final -> 100% likewise. Reads as a consistent transformation overshoot of a few hundred milliseconds. |
+| # | What the player sees | Status |
+|---|---|---|
+| 8 | Cell's Perfect -> Super Perfect transformation lasts roughly 0.3s longer than it should. Frieza final -> 100% likewise. Reads as a consistent transformation overshoot of a few hundred milliseconds. | **UNTOUCHED.** Opposite sign to everything else here, so a different cause; never investigated |
 
 ### What the list has in common
 

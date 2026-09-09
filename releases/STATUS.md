@@ -1,7 +1,12 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v16**.
+Newest at the top. `releases/latest/` currently holds **v19**.
+
+> **\*** means fixed and verified by measurement against the 30fps oracle -
+> same save state, same input, same number of vsyncs - but **not yet confirmed
+> in play by the user**. A star is provisional: nothing is settled here until it
+> has been played. **v16, v17, v18 and v19 are all starred.**
 
 **v13, v14 and v15 are all confirmed in play by the user, 2026-09-08** - the
 pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
@@ -17,6 +22,9 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v19-screen-fade` | 24 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
+| `v18-beam-object-travel` | 23 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `beam object travel` - Buu's charged blast and its class crossed the gap at 2x |
+| `v17-blast-object-travel` | 22 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `blast object travel` - Frieza's summoned rocks and their class crossed the gap at 2x |
 | `v16-projectile-travel` | 21 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
