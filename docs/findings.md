@@ -92,13 +92,14 @@ is gated is an effect that does not get built.**
 | defect | status |
 |---|---|
 | An ultimate's beam lands its first hit ~0.5s early | The cinematic up to the launch matches within two vsyncs; the flight does not. **Neither an integer tick counter nor a per-tick float step** - all 513 of the former and all 140 of the latter have been gated or halved and none moves it |
-| Transformations run a few hundred ms **long** | Opposite sign, so a different cause. Untouched |
+| ~~Transformations run a few hundred ms **long**~~ | **FIXED, confirmed in play 2026-09-09** - and by nothing anyone aimed at it. Never investigated, no group was ever written for it, and nothing in v13..v19 has a mechanism that shortens a transformation. Closed on play, **attribution unknown** |
 | ~~Pre-fight intro: mouths do not move at all~~ | **FIXED** by `mouth clock`, confirmed in play 2026-09-08. It was the same clip player after all, and it was a speed problem - the track ran out before the intro's first line. The old "not a speed problem" reading was wrong |
 | ~~Death of an ordinary character: camera revolves too fast (item 3)~~ | **Solved**, reported by the user 2026-09-08 as fixed by earlier work. Never measured; closed on play |
 | ~~Character switch: the sky stops rotating (item 5)~~ | **Solved**, reported by the user 2026-09-08. Never measured; closed on play |
 | Death by a body-erasing attack: camera too fast, cuts weirdly (item 2) | **ASSUMED solved\*** - not checked by anyone. The user expects it to have gone with items 3 and 5. Asterisked deliberately: nothing has verified it |
-| ~~The Galick Cannon fade to white ends early (item 7b)~~ | **FIXED\*** by `screen fade`, v19. Not a sequence beat at all: `FUN_00172810` is the game's fullscreen fade SERVICE and its init converts seconds to frames with a hard-coded 30.0. Measured, not play-tested |
-| ~~**Real-time blast travel speed** (item 1)~~ | **FIXED\*** across three movers - `projectile travel` (v16, ki blasts), `blast object travel` (v17, Frieza's rocks), `beam object travel` (v18, Buu's charged blast). Each measured at exactly 2x and halved at the one `Vec3Add` its two code paths converge on. Measured, not play-tested. What is left is a separate ~5-vsync pre-launch animation defect |
+| ~~The Galick Cannon fade to white ends early (item 7b)~~ | **FIXED** by `screen fade`, v19, **confirmed in play 2026-09-09**. Not a sequence beat at all: `FUN_00172810` is the game's fullscreen fade SERVICE and its init converts seconds to frames with a hard-coded 30.0 |
+| ~~**Real-time blast travel speed** (item 1)~~ | **FIXED** across three movers. `projectile travel` (v16, ki blasts) and `beam object travel` (v18, Buu's charged blast **and his breath**) are **confirmed in play 2026-09-09**. `blast object travel` (v17, Frieza's rocks) is measured at 1.77x and halved, but the user **feels no change** - correctly, because at play range the rocks are 94% summon animation; see the 2026-09-09 play-test entry. **Explosive waves** are confirmed fixed in play, by which group nobody knows |
+| Frieza's rocks: the ~5-vsync fast **summon** phase | The travel is fixed; the 103-vsync pre-launch animation that dominates the move is not. 98.3 vsyncs at 60fps against 103.2 at 30. This is the part of that move a player can actually see. **The most legible thing still wrong** |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
@@ -3740,24 +3741,25 @@ play, recorded verbatim in substance so no item gets lost between sessions.
 
 ### Still wrong, and running fast
 
-Status column updated 2026-09-09. **\*** = measured fixed against the 30fps
-oracle but **not yet confirmed in play by the user**.
+Status column updated 2026-09-09, after the user's play-test of v16..v19.
+**\*** = measured fixed against the 30fps oracle but **not yet confirmed in play
+by the user**.
 
 | # | What the player sees | Status |
 |---|---|---|
-| 1 | Blasts end too fast and travel too fast - **including explosive waves** | *ends* fixed and confirmed in play (v12-v15). *travels* **FIXED\*** by v16/v17/v18, three movers. **Explosive waves were never separately checked** |
-| 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly | **ASSUMED solved\*** - nobody has ever checked it |
+| 1 | Blasts end too fast and travel too fast - **including explosive waves** | **CLOSED.** *ends* fixed and confirmed in play (v12-v15). *travels* fixed across three movers: ki blasts (v16) and Buu's charged blast + breath (v18) **confirmed in play 2026-09-09**; Frieza's rocks (v17) measured and halved but **still starred - the user feels no change**, see below. **Explosive waves confirmed fixed in play 2026-09-09**, group unattributed |
+| 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly | **ASSUMED solved\*** - nobody has ever checked it. Still the oldest unexamined item on this list |
 | 3 | Death of an ordinary character: the camera revolves around the corpse too fast | **CLOSED**, user-confirmed 2026-09-08 |
 | 4 | Camera is still too fast in some attack animations - Perfect Barrier named | **CLOSED**, user-confirmed 2026-09-08 (v14). But the user reported a *new* "some camera angles/speeds seem off" the same day - uncharacterised, open |
 | 5 | Character switch: the sky stops rotating about a second in | **CLOSED**, user-confirmed 2026-09-08 |
 | 6 | Pre-fight intro: mouths do not move at all; some intro animations are too fast or too slow for the camera | mouths **CLOSED**, user-confirmed 2026-09-08 (v15). **The intro animation pacing half was never addressed** |
-| 7 | Vegeta's scouter "Final Galick Cannon": the start animation's mouth movement finishes early, and after the rush sequence the fade to white ends too early, revealing the animation still playing behind it | 7a mouth **CLOSED**, user-confirmed 2026-09-08. 7b fade **FIXED\*** by v19 |
+| 7 | Vegeta's scouter "Final Galick Cannon": the start animation's mouth movement finishes early, and after the rush sequence the fade to white ends too early, revealing the animation still playing behind it | **CLOSED.** 7a mouth user-confirmed 2026-09-08; 7b fade fixed by v19, **user-confirmed 2026-09-09** |
 
 ### Running slow - overcompensated
 
 | # | What the player sees | Status |
 |---|---|---|
-| 8 | Cell's Perfect -> Super Perfect transformation lasts roughly 0.3s longer than it should. Frieza final -> 100% likewise. Reads as a consistent transformation overshoot of a few hundred milliseconds. | **UNTOUCHED.** Opposite sign to everything else here, so a different cause; never investigated |
+| 8 | Cell's Perfect -> Super Perfect transformation lasts roughly 0.3s longer than it should. Frieza final -> 100% likewise. Reads as a consistent transformation overshoot of a few hundred milliseconds. | **CLOSED, user-confirmed 2026-09-09** - and never investigated, never given a group. Nothing in v13..v19 has a mechanism that shortens a transformation, so **the attribution is unknown**. Closed on play, flagged as unexplained |
 
 ### What the list has in common
 
@@ -5216,9 +5218,18 @@ actual 110/128/137:
 | 30fps | 103.2 vsyncs | **18.75** units/vsync |
 | 60fps | 98.3 vsyncs | **33.19** units/vsync |
 
-**Ratio 1.771x.** The summon phase before launch is correctly paced (1.05x); only
+**Ratio 1.771x.** The summon phase before launch is nearly correct (1.05x); only
 the travel is wrong. At the longest range the rocks land 20 vsyncs - a third of a
-second - early. The user's instinct was right: this is the most legible case.
+second - early.
+
+> **Corrected 2026-09-09, after the play-test.** "The most legible case" was
+> wrong, and wrong in an instructive way: it read the ratio at gap 628 and
+> generalised it. At fighting range the summon phase is 103 of 110 vsyncs, so
+> the travel is **6%** of the move and fixing it moves the impact by 67 ms. The
+> user played v17 and felt nothing, correctly. **A ratio is not an impact** -
+> weight it by the share of the move it owns. And the 1.05x summon, dismissed
+> here as correctly paced, is ~5 vsyncs fast and is the part of this move a
+> player can actually see.
 
 Note the ratio is **not** 2.000 like the other two. The fits are too good for
 that to be noise, so the rocks are either not at constant velocity or partly
@@ -5628,3 +5639,85 @@ fade-out's 1.0 does double duty as both the step and the 1.0 in
 `blend = 1.0 - counter/duration`, so it needs `add.s $f2, $f2, $f2` inserted into
 one of the two nops at `001729AC` to rebuild it. Two words with no inserted
 instruction beat five with one.
+
+## 2026-09-09 - the play-test: three milestones, one invisible fix, two mysteries
+
+The user played v19 on their own EmuDeck install (deploy verified live over
+PINE: `00172744 = 3C014270`, `001728C8 = 28430168` read back out of EE RAM of
+the running process, so the pnach was in force, not merely on disk).
+
+### Confirmed in play - stars cleared
+
+| build | group | what the user confirmed |
+|---|---|---|
+| v16 | `projectile travel` | ki blast travel |
+| v18 | `beam object travel` | Buu's charged blast **and his breath** |
+| v19 | `screen fade` | the Galick Cannon's white flash covers what it should |
+
+The user's word for these is **milestones**. v16 and v18 are the first fixes in
+this project that change how the game *plays* rather than how it looks, and they
+are now confirmed by the only instrument that counts.
+
+**Buu's breath was never measured.** It was not in any oracle, not in any
+save state, and no scan ever touched it. It is fixed because `beam object
+travel` hooks the one `Vec3Add` at `00156004` that the whole object class
+converges on, and the breath is on that class. This is the class-level hook
+paying out on a move nobody tested - the same argument made for `screen fade`
+being global, now with an independent confirmation behind it.
+
+### v17 stays starred - and the numbers say why
+
+Frieza's rocks feel unchanged in play. **The fix is real and the report is also
+right.** Impact is `pre-launch + gap / speed`, and the fitted 30fps split is
+**103.2 vsyncs of summon** against rocks crossing at **18.75 units/vsync**:
+
+| gap | travel share of the whole move | what halving the travel moves |
+|---|---|---|
+| 125 | 6.7 of 110 vsyncs - **6%** | 102 -> 106: **4 vsyncs, 67 ms** |
+| 474 | 25.3 of 128 - 20% | 113 -> 124: 11 vsyncs |
+| 628 | 33.5 of 137 - 24% | 117 -> 134: 17 vsyncs, 0.28 s |
+
+At the range anyone actually fights at, this move is **94% summon animation**.
+The travel fix moves the impact by a seventeenth of a second, which is below the
+floor of what a player can perceive. At gap 628 it recovers a quarter-second and
+would be plainly visible - but nobody fights at 628 units.
+
+**So the remaining legible defect in that move is the summon phase, not the
+travel**: 98.3 vsyncs at 60fps against 103.2 at 30, roughly 5 vsyncs fast and
+uncompensated. That is the same ~5-vsync pre-launch residual measured on Buu's
+charged blast during v18. **It is now the most legible thing still wrong that
+has a known address to start from.**
+
+The lesson is not "the measurement was wrong" - it was right, and it predicted
+this outcome before the play-test. The lesson is that **a ratio is not an
+impact**: a 2x error on 6% of a move is a 6% error on the move. Measure the
+share, not only the ratio, before calling something the most legible case. The
+2026-09-09 entry that called the rocks "the most legible case" was wrong on
+exactly that point - it read the ratio at gap 628 and generalised it.
+
+### Two things fixed that nobody fixed
+
+The user also reports **transformations** (item 8) and **explosive waves** (the
+second half of item 1) correct in play. Both close on that report.
+
+- **Explosive waves** have a candidate: a fourth caller reaching one of the
+  three movers. That is what a class-level hook is meant to do, and the breath
+  result above shows it happening on a move nobody measured.
+- **Transformations running ~0.3s LONG has no candidate at all.** It was the
+  only defect on the list with the opposite sign; it was never investigated and
+  never had a group written for it. Everything that landed in v13..v19 makes
+  things *slower*, which is the wrong direction to cure an overshoot.
+
+Recorded as fixed, and recorded as **unattributed**, deliberately. An
+unattributed fix can regress without anyone knowing which change to look at.
+
+### What this leaves open
+
+1. Frieza's rocks: the ~5-vsync fast **summon** phase (the travel is done).
+2. An ultimate's beam lands its first hit ~0.5s early - still unfound after all
+   513 integer tick counters and all 140 per-tick float steps.
+3. Item 2, death by a body-erasing attack: never checked by anyone.
+4. Item 6's second half, intro animation pacing against the camera.
+5. "Some camera angles/speeds seem off" - reported 2026-09-08, uncharacterised.
+6. v12's input-timing flag, never cleared, inherited by every build since.
+7. The state 157 trap: seen once on v9, never reproduced under control.
