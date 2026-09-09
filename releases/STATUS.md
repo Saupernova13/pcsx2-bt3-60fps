@@ -17,7 +17,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
-| `v16-projectile-travel` | 21 | **FIXED, NOT YET PLAY-TESTED** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
+| `v16-projectile-travel` | 21 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
 | `v13-pursuit-stomp` | 18 | **CONFIRMED IN PLAY** | correct | Adds the two pursuit groups. Confirmed 2026-09-08; inherits v12's flag |
@@ -163,7 +163,9 @@ Two limits, both stated rather than hidden. It does **not** cover Buu's charged
 `L2+Up+Triangle`, whose projectile this integrator never touches - there is a
 second mover, not yet found. And Frieza's "I might die this time" is untested.
 
-**Inherits v12's input-timing flag.**
+**Starred pending the user's own play-test**, like v14 was. Verified against
+the 30fps oracle at three ranges and as shipped from the pnach, but not yet
+seen in play. **Inherits v12's input-timing flag.**
 
 ## The state 157 trap
 
