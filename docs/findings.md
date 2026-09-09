@@ -5250,3 +5250,88 @@ worth testing is that the hit is **scheduled rather than collided** - the
 scripted-sequence machinery (`FUN_00158850`) computing an arrival time from
 range - which would explain why impact is perfectly linear in gap while no
 position write governs it.
+
+## The second mover, found: spawned projectiles advance per tick
+
+Two corrections to the section above, both from re-measuring rather than
+re-reasoning.
+
+**The 1.771x was not real.** It came from fitting slope and intercept jointly
+to three noisy points. Each impact is good to about a vsync, which puts the
+slope ratio at 1.77 +/- 0.18 - 2.000 sits inside that. Fitting the 30fps arm
+with the slope pinned at the directly measured speed gives
+`impact = 103 + gap/18.52` with residuals under a vsync at all three ranges.
+The rocks were always exactly 2x.
+
+**The hit is an arrival, not a schedule.** Filming the rocks from launch to
+impact shows them ending **20 units from the opponent** when the state flips.
+The scheduled-hit idea was wrong; there was a real position to chase.
+
+### Chasing it
+
+The rocks' render positions are written from an origin that is *assigned* each
+tick, so every writer found by watchpoint was a copy. The chain runs:
+
+    FUN_0015BFB8   position(+0x30) += direction(+0x00) * step(+0x58C)
+      -> 0015BAF4  Vec3Copy(sp, [obj+0x30])           the travelling position
+      -> 0014FF50 -> 0014FF90                          effect dispatcher
+      -> 0014EED8  [sp] = pos + dir * spread           per-particle offset
+      -> 00186CB0  assigns it into the rock's origin
+      -> 00184F58  rock render position = origin + local wobble
+
+Every step below `FUN_0015BFB8` is a copy or a small local offset. Two blind
+alleys are worth recording because both produced a *bit-identical* result and
+neither meant "live writes do not work":
+
+- `0014EF50`, halving `[$s3+0x10]`. That field is the per-particle spread
+  (0, -5, -10 with `$f13` = 1.0), not the travel.
+- `0015C248` / `0015C260`, halving the step where it is reloaded. The branch at
+  `0015C240` skips that whole block for the rocks - the site executed **zero**
+  times. Both hooks sat on dead code.
+
+### The mover
+
+`[obj+0x58C]` is **37.037**, and the per-tick delta `[obj+0x50]` has magnitude
+**37.037**, in both the 30fps and 60fps arms. The position advances by exactly
+that much per tick either way, so at 60fps the rocks cover the gap in half the
+real time. It is the same defect shape as every other one in this project: a
+quantity authored per tick, with no timestep to divide it by.
+
+Two paths reach the integrator - one recomputes the delta from the step, one
+reuses it - and they converge on the `jal Vec3Add` at `0015C28C`. Hooking that
+one call covers both. The trampoline swaps the operands and calls the fused
+scale-add `FUN_001225D0(dst, a1, a2) = [a2] + [a1] * $f12` with `$f12` = 0.5.
+
+Note `FUN_001225D0`'s argument order, which cost several wrong turns: the
+scaled operand is `a1` and the base is `a2`.
+
+### Result
+
+Impact clocked by the opponent's state flip, as shipped from the pnach:
+
+| gap | 30fps | 60fps without | 60fps with |
+|-----|-------|---------------|------------|
+| 125 | 110   | 103           | 106        |
+| 474 | 128   | 113           | 124        |
+| 628 | 137   | 118           | 134        |
+
+Travel paces 17.96 units/vsync against 30fps's 18.63, and the position closes
+18.4 per tick where it closed 37.04. The remaining ~4 vsyncs is the summon
+phase, which is a separate and much smaller defect.
+
+### How global it is
+
+Real but bounded. `FUN_0015BFB8` is the update for one projectile object class,
+so every attack built on that class is fixed at once - but it is not the single
+control behind every fast projectile:
+
+- **Idle battle:** the site never fires, so the group is inert in normal play.
+- **Plain ki blasts:** never fire it either, so it cannot double-compensate with
+  `[60FPS - projectile travel]`, which hooks a different class at `00176A2C`.
+- **Buu's charged blast:** `FUN_0015BFB8` does not run for it *at all*. Filmed
+  with and without the group, Buu's blast is identical vsync for vsync - hit at
+  v59, state 272 ending at v117. That beam is a different subsystem and is
+  **still unfixed**.
+
+So there are at least three separate projectile movers in this game. Two are now
+paced correctly; Buu's beam is the third and remains open.
