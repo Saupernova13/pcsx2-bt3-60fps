@@ -5183,3 +5183,70 @@ that pointer and has not been walked.
 Frieza's "I might die this time" is still untested and is the obvious next
 subject: the user reports it as the most extreme case, and rocks that visibly
 cross the screen are a better tracking target than a beam.
+
+## 2026-09-09 - Final Form Frieza: rocks travel 1.77x too fast, and v16 misses them
+
+Navigated to character select from a training save state (pause -> Return to
+Character Select -> Yes), picked **Frieza, Final Form** - the form strip opens
+with Cross on the character, then Cross again - against a passive Ultimate
+Gohan on Wasteland. Scenes saved as slots 0 / 7 / 2 at gaps **125 / 474 / 628**,
+backed up to `work/state-backups/frieza-slot*.p2s`.
+
+`L2+Up+Triangle` puts Frieza in **state 263** for about 100 vsyncs while the
+rocks fly; the moment they land, both fighters enter the hit cinematic (263 ->
+299, opponent -> 308). That transition is a clean impact clock.
+
+| gap | 30fps impact | 60fps impact |
+|---|---|---|
+| 125 | v110 | v102 |
+| 474 | v128 | v113 |
+| 628 | v137 | v117 |
+
+Fitting impact = pre-launch + gap/speed, predicting 109.9/128.5/136.7 against an
+actual 110/128/137:
+
+| arm | pre-launch | rock travel |
+|---|---|---|
+| 30fps | 103.2 vsyncs | **18.75** units/vsync |
+| 60fps | 98.3 vsyncs | **33.19** units/vsync |
+
+**Ratio 1.771x.** The summon phase before launch is correctly paced (1.05x); only
+the travel is wrong. At the longest range the rocks land 20 vsyncs - a third of a
+second - early. The user's instinct was right: this is the most legible case.
+
+Note the ratio is **not** 2.000 like the other two. The fits are too good for
+that to be noise, so the rocks are either not at constant velocity or partly
+compensated. Unexplained.
+
+**`[60FPS - projectile travel]` does not touch it.** Preset `noproj` gives
+impact at v102 / v113 / v117 - identical to `full`, to the vsync, at all three
+ranges. So v16 fixes plain ki blasts and nothing else yet confirmed.
+
+### The second mover: a fourth candidate ruled out
+
+Frieza's rocks were found in RAM easily - nine or more moving vec3s around
+`01ACCxxx` and `01A20xxx`, stepping 37.04 units a vsync, matching the fitted
+speed. Every watchpoint on them still lands in a **copy**: `0015AB90`
+(`ra 0015AB70`), which reads its source from `[obj+0x38]` exactly like
+`00176434` and `001555DC` before it.
+
+Following that chain to the rock's own object (`01ACC320`) found its position
+fields static - the breakpoint only ever yields one object and it is not the one
+in flight - and a direct watchpoint on a moving rock landed at `ra 00184F5C`,
+inside `FUN_00184BD8`, the same module as Buu's beam.
+
+That module was then ruled out as the mover, twice over:
+
+- `0018510C`, `[obj+0xB8] += $f20`: hooked and halved, executes six times out of
+  six during the move, impact unchanged.
+- **`$f20` itself.** It is set to 1.0 at `00184C1C` and used as the per-tick step
+  at *twelve* add/sub sites across the function - the age at `[obj+0x10C]`, the
+  length at `[obj+0xB8]`, and others. Poking `lui $at,0x3f80` to `0x3f00` halves
+  every one of them at once. Impact stayed at v102 / v113 / v117.
+
+So `FUN_00184BD8` draws these effects; it does not carry the hit. Four
+candidates are now eliminated and the mover is still unfound. The next idea
+worth testing is that the hit is **scheduled rather than collided** - the
+scripted-sequence machinery (`FUN_00158850`) computing an arrival time from
+range - which would explain why impact is perfectly linear in gap while no
+position write governs it.
