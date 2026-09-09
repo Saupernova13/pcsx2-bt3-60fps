@@ -156,11 +156,12 @@ MOUTH = ["60FPS - mouth clock"]
 # beam covers twice the ground per real second at 60fps. The first defect fixed
 # here that changes how the game PLAYS - it halves the time to dodge.
 PROJECTILE = ["60FPS - projectile travel"]
+OBJFLIGHT = ["60FPS - blast object travel"]
 
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
-                  + PROJECTILE + SPARES)
+                  + PROJECTILE + OBJFLIGHT + SPARES)
 
 PRESETS = {
     "off": [],
@@ -214,7 +215,10 @@ PRESETS = {
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-             + PROJECTILE),
+             + PROJECTILE + OBJFLIGHT),
+    "noobj": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+              + PROJECTILE),
 }
 
 DISABLED_SUFFIX = " [off]"
