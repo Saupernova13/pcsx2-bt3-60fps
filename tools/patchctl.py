@@ -151,10 +151,16 @@ SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 # half the real time and holds the last key - a mouth that stops mid-sentence.
 MOUTH = ["60FPS - mouth clock"]
 
+# Projectile travel, found 2026-09-09. The effect-node position integrator steps
+# pos += vel * step once a tick with no delta-time term, so every ki blast and
+# beam covers twice the ground per real second at 60fps. The first defect fixed
+# here that changes how the game PLAYS - it halves the time to dodge.
+PROJECTILE = ["60FPS - projectile travel"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
-                  + SPARES)
+                  + PROJECTILE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -204,8 +210,11 @@ PRESETS = {
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT),
     "nomouth": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA),
+    "noproj": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
-             + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
+             + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+             + PROJECTILE),
 }
 
 DISABLED_SUFFIX = " [off]"
