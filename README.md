@@ -16,21 +16,30 @@ Running analysis log: **[docs/findings.md](docs/findings.md)** - start at "STATE
 
 ## What the patch covers
 
-20 groups, each compensating one system that the 60Hz loop drives twice as often.
+24 groups, each compensating one system that the 60Hz loop drives twice as often.
 Movement, gravity and knockback; the animation clock; menu and combat input windows; the
 ki aura, particles, effect rotation and the hovering idle; the tween system; blast hit
 cadence and blast effect duration; the integer clock behind scripted-sequence waits; the
 launch-and-pursuit chain - the flight a heavy smash puts someone into, and the five frame
-counts behind the Circle stomp that follows it; and the camera, whose blend rate and
-scripted move lengths are both counted in ticks.
+counts behind the Circle stomp that follows it; the camera, whose blend rate and scripted
+move lengths are both counted in ticks; the three movers that carry projectiles across
+the ground - ki blasts, spawned objects like Frieza's rocks, and travelling beams like
+Buu's charged blast and his breath; and the fullscreen fade service, which took its phase
+durations in seconds and converted them at 30Hz, so every fade in the game ran in half
+its real time.
 
 Every group is verified against the unpatched 30fps game as its own oracle: same save
 state, same input, same number of vsyncs. The ones a player can see are confirmed in play
 with the game running free, not by frame stepping.
 
 Known not fixed, and stated in the released file's header: an ultimate's beam lands its
-first hit about half a second early, transformations run a few hundred milliseconds long,
-and the pre-fight intro's mouths do not move at all.
+first hit about half a second early; the summon animation before Frieza's rocks - most of
+that move - still runs about five frames fast, as does the wind-up on Buu's charged blast;
+some pre-fight intro animations are paced wrong against the camera; and the camera on a
+body-erasing death has never been re-checked since the camera work landed.
+
+Build-by-build confidence, and what has been confirmed in play rather than only measured,
+is in **[releases/STATUS.md](releases/STATUS.md)**.
 
 ## Why the obvious patch does not work
 

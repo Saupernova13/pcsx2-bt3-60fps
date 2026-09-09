@@ -1,12 +1,18 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v19**.
+Newest at the top. `releases/latest/` currently holds **v20**.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
 > in play by the user**. A star is provisional: nothing is settled here until it
-> has been played. **v16, v17, v18 and v19 are all starred.**
+> has been played. **Only v17 is still starred.**
+
+**v16, v18 and v19 are confirmed in play by the user, 2026-09-09.** Ki blast
+travel, Buu's charged blast *and his breath*, and the screen fade - the user
+calls these milestones. **v17 is not confirmed**: Frieza's rocks still feel
+unchanged in play. The measurements say why, and it is not that the fix failed -
+see the v17 section. It stays starred.
 
 **v13, v14 and v15 are all confirmed in play by the user, 2026-09-08** - the
 pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
@@ -22,10 +28,11 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
-| `v19-screen-fade` | 24 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
-| `v18-beam-object-travel` | 23 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `beam object travel` - Buu's charged blast and its class crossed the gap at 2x |
-| `v17-blast-object-travel` | 22 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `blast object travel` - Frieza's summoned rocks and their class crossed the gap at 2x |
-| `v16-projectile-travel` | 21 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
+| `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
+| `v19-screen-fade` | 24 | **CONFIRMED IN PLAY** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
+| `v18-beam-object-travel` | 23 | **CONFIRMED IN PLAY** | correct | Adds `beam object travel` - Buu's charged blast and its class crossed the gap at 2x |
+| `v17-blast-object-travel` | 22 | **MEASURED, NOT FELT IN PLAY\*** | correct | Adds `blast object travel` - Frieza's summoned rocks and their class crossed the gap at 2x |
+| `v16-projectile-travel` | 21 | **CONFIRMED IN PLAY** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
 | `v13-pursuit-stomp` | 18 | **CONFIRMED IN PLAY** | correct | Adds the two pursuit groups. Confirmed 2026-09-08; inherits v12's flag |
@@ -171,9 +178,9 @@ Two limits, both stated rather than hidden. It does **not** cover Buu's charged
 `L2+Up+Triangle`, whose projectile this integrator never touches - there is a
 second mover, not yet found. And Frieza's "I might die this time" is untested.
 
-**Starred pending the user's own play-test**, like v14 was. Verified against
-the 30fps oracle at three ranges and as shipped from the pnach, but not yet
-seen in play. **Inherits v12's input-timing flag.**
+**Confirmed in play by the user, 2026-09-09.** The star is cleared. Verified
+against the 30fps oracle at three ranges, as shipped from the pnach, and now in
+normal play. **Inherits v12's input-timing flag.**
 
 ## v17 - spawned projectile flight
 
@@ -189,7 +196,26 @@ Inert at idle and for plain ki blasts, so it cannot double-compensate with
 `[60FPS - projectile travel]`. Buu's charged blast is untouched by it, vsync for
 vsync - that beam is a different subsystem and is still unfixed.
 
-**Starred pending the user's own play-test.** **Inherits v12's input-timing
+**It stays starred. The user played it on 2026-09-09 and felt no difference.**
+
+That is not the fix failing - it is the fix being invisible, and the numbers
+predicted it. The move is `pre-launch + gap / speed`, and at 30fps the summon
+phase alone is **103.2 vsyncs**, with the rocks crossing at 18.75 units/vsync:
+
+| gap | travel share of the move | what the fix can move |
+|---|---|---|
+| 125 | 6.7 of 110 vsyncs - **6%** | 102 -> 106, **4 vsyncs (67 ms)** |
+| 474 | 25.3 of 128 - 20% | 113 -> 124, 11 vsyncs |
+| 628 | 33.5 of 137 - 24% | 117 -> 134, 17 vsyncs (0.28 s) |
+
+At the range anyone actually fights at, the rocks are **94% summon animation**,
+and halving the travel error moves the impact by a seventeenth of a second.
+Nobody could feel that. The measurement was sound and so is the user's report.
+
+**What is left to feel is the summon phase itself**: 98.3 vsyncs at 60fps
+against 103.2 at 30, ~5 vsyncs fast, uncompensated, and the same ~5-vsync
+pre-launch defect seen on Buu's charged blast in v18. That is the part of this
+move a player can see, and it is not fixed. **Inherits v12's input-timing
 flag.**
 
 ## v18 - beam object travel
@@ -207,8 +233,10 @@ pre-launch animation, a separate defect.
 Inert at idle, for plain ki blasts and for Frieza's rocks - those re-measure at
 v124, unchanged - so it cannot double-compensate with v16 or v17.
 
-**Starred pending the user's own play-test.** **Inherits v12's input-timing
-flag.**
+**Confirmed in play by the user, 2026-09-09.** The star is cleared. The user
+also confirms **Buu's breath attack** is fixed by this group - a move that was
+never measured, and evidence the hook sits on the class rather than on the one
+blast it was found through. **Inherits v12's input-timing flag.**
 
 ## The state 157 trap
 
@@ -256,5 +284,45 @@ No regression: the ultimate's eleven state transitions land on identical vsyncs
 with the group on and off, so the fade moves no beat. Frieza's rocks and Buu's
 charged blast construct no fade node at all, so it cannot touch them.
 
-**Starred pending the user's own play-test.** **Inherits v12's input-timing
-flag.**
+**Confirmed in play by the user, 2026-09-09.** The star is cleared. The
+Galick Cannon's white flash now covers what it exists to cover. **Inherits
+v12's input-timing flag.**
+
+## Fixed somewhere between v13 and v19, by nothing anyone aimed at it
+
+On 2026-09-09 the user reports that **transformations** and **explosive waves**
+are both correct in play. Neither was ever worked on:
+
+- **Transformations ran ~0.3s LONG** (item 8: Cell Perfect -> Super Perfect,
+  Frieza final -> 100%). The only defect on the list with the opposite sign.
+  Never investigated, never had a group written for it.
+- **Explosive waves** (the second half of item 1) were never separately checked
+  after the travel work; the three movers were measured on ki blasts, rocks and
+  Buu's charged blast only.
+
+The explosive wave is plausibly `[60FPS - projectile travel]` or one of the two
+object movers reaching a fourth caller, which is what a class-level hook is for.
+**The transformation overshoot has no candidate mechanism at all** - nothing in
+v13..v19 lengthens or shortens a transformation, and the fixes that landed in
+that window all make things *slower*, which is the wrong direction for an
+overshoot.
+
+Recorded as fixed because the user played it. **Recorded as unattributed
+because it is: an unattributed fix can regress without anyone knowing why.** If
+a transformation ever runs long again, this is the note to come back to.
+
+## v20 - the shipped header caught up
+
+**No patch change.** `releases/v20-known-issues-refresh/428113C2.pnach` has the
+same 25 groups and the same 279 patch lines as v19, verified line for line.
+
+What changed is the `KNOWN NOT FIXED` block the shared file carries at the top,
+which is the only documentation most people who use this patch will ever read.
+It was still telling them the pre-fight intro's mouths do not move (fixed in
+v15, confirmed 2026-09-08) and that transformations run long (confirmed fixed
+2026-09-09). It now names what is actually left: the ultimate's beam, the fast
+summon phase on Frieza's rocks and Buu's charged blast, the intro animation
+pacing, and the never-re-checked camera on a body-erasing death.
+
+Cut as its own version rather than rewriting v19 in place - a release is a
+record, and v19's file stays as it shipped.
