@@ -165,10 +165,18 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
+# The rush struggle, found 2026-09-10. Two rush attacks collide and both players
+# rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
+# has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
+# AI rotates twice as fast in real time while a human's hands do not - measured
+# at a true 5 rotations a second, the winner flips. This gates only the AI side.
+STRUGGLE = ["60FPS - rush struggle"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
-                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + SPARES)
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                  + STRUGGLE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -222,7 +230,7 @@ PRESETS = {
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE),
+             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
