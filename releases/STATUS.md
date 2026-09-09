@@ -184,6 +184,24 @@ vsync - that beam is a different subsystem and is still unfixed.
 **Starred pending the user's own play-test.** **Inherits v12's input-timing
 flag.**
 
+## v18 - beam object travel
+
+Adds `[60FPS - beam object travel]`. Buu's charged blast runs on a sibling of
+the rock class - `FUN_00155C5C`, `position(+0x60) += delta(+0x80)` - with the
+same 37.037 per-tick delta, set once at launch and identical in both arms. The
+fix hooks the one `Vec3Add` at `00156004` that both code paths converge on.
+
+Verified as shipped from the pnach at two ranges: hit moved 44 -> 45 at gap 86
+and 59 -> 76 at gap 657, against 30fps's 50 and 81. The travel component paces
+18.42 units/vsync in both arms, an exact match; the residual ~5 vsyncs is the
+pre-launch animation, a separate defect.
+
+Inert at idle, for plain ki blasts and for Frieza's rocks - those re-measure at
+v124, unchanged - so it cannot double-compensate with v16 or v17.
+
+**Starred pending the user's own play-test.** **Inherits v12's input-timing
+flag.**
+
 ## The state 157 trap
 
 Goku parks in fighter state 157 (`FUN_001E6DC8`), an airborne dash/flight state,
