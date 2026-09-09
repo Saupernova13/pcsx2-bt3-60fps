@@ -5721,3 +5721,128 @@ unattributed fix can regress without anyone knowing which change to look at.
 5. "Some camera angles/speeds seem off" - reported 2026-09-08, uncharacterised.
 6. v12's input-timing flag, never cleared, inherited by every build since.
 7. The state 157 trap: seen once on v9, never reproduced under control.
+
+## 2026-09-10 - the rush struggle: confirmed doubled, mechanism found, fix unfinished
+
+The user, playing Cell against Devilman, hit a rush struggle - both fighters
+throw a rush attack, they collide, and both players rotate the left stick as
+fast as they can - and reported the CPU's hit count doubled at 60fps. It is
+worse than that: **every part of the minigame is authored in ticks, so at 60fps
+the whole contest runs in half its real time while the player's hands do not
+speed up.**
+
+### Getting the user's state onto the dev rig
+
+Their PCSX2 writes savestate format 0x9A55; PCSXROO reads 0x9A59. Four bumps
+apart - SPU voice decode buffers, then the EE and VU cycle counters widening to
+64 bit - so the dev rig refuses the file, and rewriting the version stamp gets
+as far as `Save state corruption in internal structures`. **The dev rig can no
+longer load anything the user's install produces**, which had quietly blocked
+this whole class of work.
+
+`tools/transplant.py` solves it by not using the file format at all: the fight
+is in EE main memory, the ELF is byte-identical in both builds, and every
+pointer in it is an absolute EE address. Pause PCSXROO at a frame boundary with
+the same game running, write the source's EE RAM and scratchpad over it, resume.
+The fighter states came back 287/284 exactly as the source held them and the
+scene ran. `--save-slot` then writes it out natively, so it is a one-time cost.
+
+### The struggle, located
+
+| what | where |
+|---|---|
+| fighter state | **250**, handler `FUN_001F47C8` from the table at `002C4980` |
+| hit count | **`fighter+0xE50`** - zeroed on entry and on exit, and what the HUD shows as "N Hits!" |
+| the registrar | `FUN_001E11D0`, the only thing that increments it |
+| the state's tick counter | `fighter+0x964` |
+
+Hits are registered on cadences authored in 30Hz frames, selected by character
+attribute bits, plus one every-tick path:
+
+    if QueryCondition(fighter, 0x33, 1)   -> a hit EVERY tick
+    else attribute 0x6A -> every 28 ticks   (001F4958, literal 0x1C)
+         attribute 0x69 -> every  8 ticks   (001F4980, andi 7)
+         attribute 0x68 -> every  5 ticks   (001F49A4, literal 5)
+         otherwise      -> every  4 ticks   (001F49DC, andi 3)
+    and if [fighter+0x3D0] & 1 -> another every 15 ticks (001F49FC, literal 0xF)
+
+Condition 0x33 resolves through the jump table at `002EF070` to a test of bit
+`0x02000000` of **`fighter+0x74C`** (CUR_B in the fighter's own input block).
+That is the rotation event. The player's copy is raised by real stick movement;
+the CPU has no stick, so the AI's synthetic input raises its copy - and the AI
+runs per tick.
+
+Breaking on the registrar and reading `$ra` and `$a0` splits one struggle
+exactly, and the totals reconcile with the counters:
+
+| fighter | site | path | hits |
+|---|---|---|---|
+| CPU | `001F49C4` | the rotation condition | **36** |
+| CPU | `001F49E8` | every 4 ticks | 10 |
+| CPU | `001F4A1C` | every 15 ticks | 6 |
+| CPU | `001F4AE4` | the finishing hit | 1 |
+| player | `001F49E8` | every 4 ticks | 20 |
+| player | `001F4A1C` | every 15 ticks | 6 |
+
+### Measured, same save state, same input
+
+With no input at all, so this is purely the CPU's automatic accrual:
+
+| arm | struggle | CPU hits | per tick | **per vsync** |
+|---|---|---|---|---|
+| 30fps stock | 88 ticks / **177 vsyncs (2.95s)** | +50 | 0.568 | **0.2825** |
+| 60fps, battle group only | 88 ticks / **88 vsyncs (1.47s)** | +50 | 0.568 | 0.568 |
+| 60fps, full patch | 98 ticks / **98 vsyncs (1.63s)** | +51 | 0.520 | **0.5204** |
+
+**The struggle is exactly 88 ticks in every arm.** Identical in tick space,
+half the real time at 60fps, and `[60FPS - animation clock]` does not stretch it.
+
+Driving the stick in a circle on the wall clock, identically in both arms:
+
+| arm | player | CPU | contest |
+|---|---|---|---|
+| 30fps | 22.5 hits/s | 21.6 hits/s | **even** |
+| 60fps | 32.4 hits/s | 35.3 hits/s | CPU ahead |
+
+The player's figure at 60fps is **inflated** by the instrument: the debug link
+caps the pad at ~43 updates a second, which the 30Hz arm cannot out-sample but
+the 60Hz arm can, so a real hand on a real stick does worse than this shows. The
+CPU's rise is clean at 1.6-1.9x, and it is purely a function of tick rate.
+
+### Why the obvious fixes do not work
+
+- **Halving the hit cadences** (doubling all five literals) cuts the player's
+  automatic hits from 26 to 13 but the CPU's only from 53 to 43, because the
+  CPU's dominant stream is the rotation path, not the cadences.
+- **Gating the rotation path to even ticks** works - a trampoline at `000F1500`
+  redirecting the condition call at `001F4938` and honouring it only when
+  `[fighter+0x964]` is even took the CPU from 0.5204 to 0.2449 hits per vsync,
+  against the 30fps target of 0.2825. But **the player's hits come through the
+  same call**, so it halves both sides and leaves the ratio - and therefore who
+  wins - exactly where it was.
+- **Doubling the struggle's duration** is what would actually give the player
+  back their time, and the per-tick `[obj+0x94] += 0.5` at `001F4C34` is not it:
+  halving that constant to 0.25 was verified in RAM and moved the duration not
+  at all. The 88 ticks come from somewhere else - the outcome is signalled by
+  animation event flags 0xBF and 0xC0 (`FUN_001DAAF0` registers them on entry,
+  `FUN_001DAC78` tests them), so the next place to look is what drives that
+  timeline, since it is demonstrably not the animation clock this patch halves.
+
+### What a correct fix needs
+
+Two things, and the second is not yet found:
+
+1. **Halve the CPU's stream without halving the player's.** They share
+   `001F49C4`, so this needs a per-fighter AI discriminator. `+0x04`, `+0x08`,
+   `+0x0C`, `+0x940` and `+0x944` are all just the fighter index or shared
+   constants; diffing a COM-on-Stand state against a COM-on-Level-5 state was
+   swamped by ordinary fight divergence. Not found yet.
+2. **Restore the 88-tick duration to its real time**, so the player gets the
+   2.95s of rotating the fight was authored around instead of 1.63s.
+
+Recorded unfixed rather than shipped half-done: a change that halves both sides
+equally would move the numbers on screen without changing who wins, which is
+precisely the complaint.
+
+**Reproduce it with `roo.loadstate(3)` on the dev rig** - the transplanted state
+is native now, and both fighters enter state 250 within a second of loading.
