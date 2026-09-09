@@ -43,9 +43,15 @@ KNOWN_BROKEN: list[str] = [
     "left is the flight, and it is neither an integer tick counter nor a "
     "per-tick float step - every one of those in the game has been gated or "
     "halved and none of them moves it",
-    "a transformation runs a few hundred milliseconds LONG - the opposite sign, "
-    "so a different cause",
-    "in the pre-fight intro the characters' mouths do not move at all",
+    "Frieza's summoned rocks now travel at the right speed, but the summon "
+    "animation before the launch - which is most of that move - still runs "
+    "about five frames fast. The same short pre-launch overshoot is on Buu's "
+    "charged blast",
+    "some pre-fight intro animations are paced wrong against the camera. The "
+    "mouths in that scene are fixed; this is the other half of the same report",
+    "death by a body-erasing attack: the camera around the victim was reported "
+    "too fast and cutting oddly, and has never been re-checked since the camera "
+    "work landed. It may have gone with the other camera fixes, or it may not",
 ]
 
 
