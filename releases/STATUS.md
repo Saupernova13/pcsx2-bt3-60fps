@@ -217,3 +217,36 @@ mashed rush. No airborne state was ever tested, and the trap is airborne.
 
 That is a strong circumstantial case, not a proof. It was never reproduced under
 controlled conditions.
+
+## v19 - screen fade
+
+Adds `[60FPS - screen fade]`, two words. `FUN_00172810` is the game's fullscreen
+fade service - a colour, a fade-in, a hold and a fade-out - and its init at
+`FUN_00172718` takes durations in **seconds** and multiplies by a hard-coded
+30.0. The same defect as the tween constructor at `00267AC8`, in a second
+general-purpose service. One word makes it 60.0, which doubles all three phase
+counts and their divisors together, so the blend curve is unchanged and only its
+rate halves. The 180-tick hold cap at `001728C8` is a separate literal.
+
+That the callers speak seconds is read straight out of the ELF: the static
+descriptors at `002ECCC0` and `002ECCF0` hold 0.5 / 1.0 / 0.5 and 1.0 / 0 / 1.0
+seconds. So this fixes every fade in the game at once, not one move's flash.
+
+Verified as shipped from the pnach on Vegeta (Scouter)'s Final Galick Cannon,
+save state 3, filmed per vsync on mean luma:
+
+| arm | full white | lifts at | scene behind it |
+|---|---|---|---|
+| 30fps oracle | v446..v495 | v508 | mean 170 |
+| 60fps before | v437..v460 | v476 | **mean 90 - the animation, exposed** |
+| 60fps after | v443..v491 | v504 | mean 168 |
+
+The fall is value-for-value the 30fps curve over the same 28 vsyncs. On the node
+itself the durations go 15/30 frames to 30/60 and the blend step 1/15 to 1/30.
+
+No regression: the ultimate's eleven state transitions land on identical vsyncs
+with the group on and off, so the fade moves no beat. Frieza's rocks and Buu's
+charged blast construct no fade node at all, so it cannot touch them.
+
+**Starred pending the user's own play-test.** **Inherits v12's input-timing
+flag.**
