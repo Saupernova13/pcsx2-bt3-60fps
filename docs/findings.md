@@ -5846,3 +5846,54 @@ precisely the complaint.
 
 **Reproduce it with `roo.loadstate(3)` on the dev rig** - the transplanted state
 is native now, and both fighters enter state 250 within a second of loading.
+
+### 2026-09-10, continued - what the second pass ruled out, and a reframing
+
+**The outcome decision, found.** `001D945C`/`001D9460` loads both fighters'
+`+0xE50` and compares them with `slt` both ways. The winner of a rush struggle
+is simply whoever has more hits, so the whole fix reduces to making each side's
+hits-per-real-second match the 30fps arm.
+
+**`fighter+0xD48`, found and set aside.** The handler writes it with 5, 11, 17
+or **30** by character attribute (`001F4AC0`), and `001E1E2C` counts it down one
+per tick. A 30Hz literal, but it is reloaded every tick by the handler, so it is
+a latch - "was there a hit recently" - not the struggle's length.
+
+**Ruled out as the duration clock:**
+
+| candidate | how it was ruled out |
+|---|---|
+| `[obj+0x94] += 0.5` at `001F4C34` | halved to 0.25, write verified in RAM, duration moved 0 ticks |
+| the model's animation clock, `model+0x138` | reads 0.0 for the whole struggle in both arms - this clip is not on it |
+| `fighter+0x964` | the generic per-state tick counter (`001E23A8` increments, `001E2484` zeroes); 65 readers, none comparing it to a struggle length |
+| `fighter+0x15E0/+0x15E4` | advance +1 a tick but are only read by HUD code at `00204D20` / `00211EC4` |
+
+`FUN_001C47A8` shows the shape of the real answer: it compares an animation
+object's `+0x138` against `+0x13C` with **`c.eq.s`** - current time against end
+time, exact equality - and reports finished. So the struggle's length is a clip
+length divided by a per-tick advance, on an animation object that is **not** the
+model this project already patches. Finding that object is the open task.
+
+**The AI discriminator, and why it may not be needed after all.**
+`FUN_001D4658` steps byte-identically for both fighters over 220 instructions,
+and the input-source copier at `001D45D0` is the same code for both, so the AI
+writes further upstream than either. Flipping COM Settings from Level 5 to Stand
+with the game paused - the clean way to diff - changed **zero** words in either
+fighter struct, so the AI level is not a fighter field.
+
+But the instrument, not the game, may be what made a discriminator look
+necessary. The debug link caps the pad at ~43 updates a second: the 30Hz arm
+cannot out-sample that, the 60Hz arm can, so the player's measured hits per tick
+fall from 0.750 to 0.541 across the arms while the CPU's barely move. **A real
+stick sweeps continuously**, so a real player's hits per tick should be the same
+in both arms - and if that holds, the only defect is that the struggle gets half
+its real time, and
+
+    double the duration  +  halve every hit cadence
+
+restores the counts *and* the fairness with no per-fighter discrimination at
+all. Both sides then score what they scored at 30fps, over the real time the
+fight was authored around.
+
+That hinges on one number nobody has measured: **a human's hits per tick at
+60fps.** One played struggle with the final two counts would settle it.
