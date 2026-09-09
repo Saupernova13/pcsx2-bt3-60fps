@@ -5335,3 +5335,78 @@ control behind every fast projectile:
 
 So there are at least three separate projectile movers in this game. Two are now
 paced correctly; Buu's beam is the third and remains open.
+
+## The third mover: beams are a sibling of the rock mover
+
+Buu's charged blast is **not** on the rock class - `FUN_0015BFB8` never runs for
+it, and the beam is byte-identical with and without `[60FPS - blast object
+travel]`. It is on a sibling class whose update is `FUN_00155C5C`:
+
+| | rocks (`FUN_0015BFB8`) | beams (`FUN_00155C5C`) |
+|---|---|---|
+| position | `+0x30` | `+0x60` |
+| per-tick delta | `+0x50` | `+0x80` |
+| step scalar | `+0x58C` | `+0x04` |
+| the `jal Vec3Add` | `0015C28C` | `00156004` |
+
+Both have the same two-path shape - one branch recomputes the delta from the
+step, the other reuses it - and both converge on a single `Vec3Add`.
+
+The delta measures **37.037**, the same speed constant as the rocks, is written
+once at launch and never rewritten, and reads identical in both arms.
+
+### What made this one slow to find
+
+The beam is a **particle pool**. Slots are recycled, so the net-displacement
+detector that found the rocks reported an address "moving 656 units" when it was
+really different particles occupying the same slot in turn. Requiring the step
+vector to stay **constant across three consecutive vsyncs** filtered the pool
+out and left the real objects.
+
+Everything else found by watchpoint was a copy, including a bulk `ld`/`sd`
+struct copy at `001555C4..00155608` that moves `[$s3+0x50..0x88]` into a render
+node. That copy is what finally named the source: the delta it reads is
+`[$s3+0x80]`.
+
+The decisive step was a **data** experiment, not a code one. Poking the constant
+delta to half mid-flight dropped the advance from 37.037 to 18.519 per tick and
+moved the hit v59 -> v71, which proved the mechanism before a single instruction
+was patched.
+
+Note `00155FE4` was in the enumerated Scale-then-Add family the whole time. It
+never fires for the beam because the branch at `00155FB4` skips that block -
+exactly the trap that made `0015C248` look innocent for the rocks. An
+enumerated site is not a tested site.
+
+### Result
+
+| gap | 30fps | 60fps without | 60fps with |
+|-----|-------|---------------|------------|
+|  86 |  50   |  44           |  45        |
+| 657 |  81   |  59           |  76        |
+
+The travel component paces **18.42 units/vsync in both arms** - taking the slope
+between the two ranges, an exact match. The residual ~5 vsyncs is the pre-launch
+animation, the same separate defect the rocks show (124 against 128 there).
+
+Inert at idle, for plain ki blasts, and for Frieza's rocks, so it cannot
+double-compensate with either shipped projectile group. Frieza re-measures at
+v124, unchanged.
+
+**Correction:** commit afb8fc4's message names the function `FUN_00155EE8`. The
+containing function actually starts at `00155C5C`; the hooked instruction is
+`00156004`, which is correct there and in the pnach.
+
+### Where this leaves projectile pacing
+
+Three movers, three classes, all the same defect and all now paced:
+
+- `00176A2C` - plain ki blasts (`[60FPS - projectile travel]`, v16)
+- `0015C28C` - spawned projectiles, Frieza's rocks (`[60FPS - blast object travel]`, v17)
+- `00156004` - travelling beams, Buu's charged blast (`[60FPS - beam object travel]`, v18)
+
+The shared shape is worth stating plainly: a projectile keeps a per-tick delta
+vector, and doubling the tick rate doubles the distance covered per second. The
+fix is always to halve the advance at the one `Vec3Add` the update converges on,
+never to touch the stored delta - that field is read by other things and, on the
+rock class, recomputed from a step scalar.
