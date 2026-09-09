@@ -5897,3 +5897,65 @@ fight was authored around.
 
 That hinges on one number nobody has measured: **a human's hits per tick at
 60fps.** One played struggle with the final two counts would settle it.
+
+### 2026-09-10 - FIXED: the AI rotates twice as fast, and the fix is one flag
+
+The instrument was the thing standing in the way, and the user named it: drive
+**both** sticks, and drive them from **elapsed game time** rather than the wall
+clock. Frame stepping with the angle computed as `vsync / 59.94 * rot_per_sec`
+simulates a real hand exactly - one real second of rotation is one real second
+in either arm - and removes the ~43-updates-a-second ceiling the socket imposed.
+
+Measured that way, at a true 5 rotations a second on both sticks:
+
+| arm | struggle | player | CPU | winner |
+|---|---|---|---|---|
+| 30fps oracle | 88 ticks / 2.95s | 66 | 59 | **player** |
+| 60fps, before | 98 ticks / 1.63s | 47 | 53 | **CPU** |
+
+**The outcome flips.** Not a cosmetic doubling - the fight is decided the other
+way round.
+
+### The discriminator, found
+
+Tracing both fighters through `FUN_001D4370` - the input *source* function, not
+the mask builder that had been traced before - the paths diverge at `001D43B0`:
+
+    001D439C  lw   $v1, 0x1278($s1)
+    001D43B0  beqz $v1, 0x1D4470      ; 0 -> read the pad
+    001D43B8  ...                     ; nonzero -> synthetic input at
+                                      ;   +0x127C buttons, +0x1280/+0x1284 stick
+
+**`fighter+0x1278` is the game's own human/AI flag** - 0 on the pad-driven
+fighter, 1 on the CPU. Confirmed live on both fighters.
+
+And the CPU's stick is visibly synthetic: sampled through a struggle, the
+player's `+0x93E/+0x93F` hold continuous analog values while the CPU's only ever
+read `0x00`, `0x7f` or `0xff` - it snaps through cardinal directions, one step
+per tick. That is why the CPU gains with tick rate and the player does not.
+
+### The fix
+
+`[60FPS - rush struggle]`: route the rotation query at `001F4938` through a
+trampoline at `000F1500` that honours it only on even ticks of the state's own
+counter, **and only when `fighter+0x1278` says the fighter is AI-driven**. The
+player's input path is not touched at all.
+
+Swept across hand speeds, as shipped from the pnach:
+
+| rot/s | 30fps oracle | 60fps before | 60fps fixed |
+|---|---|---|---|
+| 2.0 | CPU 52-39 | CPU 53-33 | **CPU 37-33** |
+| 3.5 | CPU 57-55 | CPU 53-40 | P1 41-37 |
+| 5.0 | **P1 66-59** | CPU 53-47 | **P1 48-37** |
+| 8.0 | **P1 82-60** | CPU 59-57 | **P1 58-37** |
+
+The winner matches the oracle at 2, 5 and 8 rotations a second. 3.5 is a coin
+flip in the oracle itself (55-57) and the fix lands on the other side of it.
+
+**What is still not right:** the counts are low, because the struggle still runs
+in 1.63s instead of 2.95s. The 88-tick duration is a clip length compared to a
+clip end with `c.eq.s` in `FUN_001C47A8`, on an animation object that is not the
+model this patch halves, and that object is still unfound. Doubling the duration
+would restore the counts; it would not change the ratio, so it is a separate and
+much less urgent defect than the one now fixed.

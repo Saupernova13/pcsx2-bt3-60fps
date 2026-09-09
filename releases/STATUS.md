@@ -1,7 +1,7 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v20**.
+Newest at the top. `releases/latest/` currently holds **v21**.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
@@ -28,6 +28,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
 | `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
 | `v19-screen-fade` | 24 | **CONFIRMED IN PLAY** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
 | `v18-beam-object-travel` | 23 | **CONFIRMED IN PLAY** | correct | Adds `beam object travel` - Buu's charged blast and its class crossed the gap at 2x |
@@ -326,3 +327,27 @@ pacing, and the never-re-checked camera on a body-erasing death.
 
 Cut as its own version rather than rewriting v19 in place - a release is a
 record, and v19's file stays as it shipped.
+
+## v21 - the rush struggle
+
+Two rush attacks collide, both fighters enter state 250, the game counts hits
+into `fighter+0xE50` and at `001D945C` picks whoever has more. All of it is
+authored in ticks. A player's hands do not speed up with the tick rate; the
+AI's do - `FUN_001D4370` branches on **`fighter+0x1278`**, the game's own
+human/AI flag, and feeds an AI fighter synthetic input whose stick snaps
+through cardinal directions once per tick.
+
+Driving both sticks at a true 5 rotations a second, per vsync so the hand speed
+is identical in both arms: **30fps ends 66-59 to the player, unpatched 60fps
+ends 53-47 to the CPU.** The outcome flips - this is the first defect found in
+this project that decides who wins a fight.
+
+The fix gates only the AI's rotation, on even ticks, using that flag. Swept
+across hand speeds the winner matches the 30fps oracle at 2, 5 and 8 rotations
+a second; 3.5 is a coin flip in the oracle itself (55-57).
+
+The struggle still runs in 1.63s rather than 2.95s, so the counts read low - the
+88-tick duration is a separate defect and does not affect who wins.
+
+**Starred pending the user's own play-test.** **Inherits v12's input-timing
+flag.**
