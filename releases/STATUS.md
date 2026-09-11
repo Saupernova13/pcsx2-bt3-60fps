@@ -1,12 +1,12 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v21**.
+Newest at the top. `releases/latest/` currently holds **v22**.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
 > in play by the user**. A star is provisional: nothing is settled here until it
-> has been played. **Only v17 is still starred.**
+> has been played. **v17, v21 and v22 are starred.**
 
 **v16, v18 and v19 are confirmed in play by the user, 2026-09-09.** Ki blast
 travel, Buu's charged blast *and his breath*, and the screen fade - the user
@@ -28,6 +28,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v22-beam-clash` | 26 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
 | `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
 | `v19-screen-fade` | 24 | **CONFIRMED IN PLAY** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
@@ -351,3 +352,34 @@ The struggle still runs in 1.63s rather than 2.95s, so the counts read low - the
 
 **Starred pending the user's own play-test.** **Inherits v12's input-timing
 flag.**
+
+## v22 - the beam clash
+
+Two beams collide and both players rotate their sticks. There is no counter on
+screen, so this was measured against the game's own internals: rotations land in
+`fighter+0xE4C`, and an event manager, `FUN_001D8E50`, runs the contest one call
+per tick - 30 ticks of each fighter's introduction, 46 in which a tug moves one
+step per tick toward whoever leads, 16 to show the result, then a few to drive
+it out. The sign of the tug picks the winner.
+
+Every part of that is authored in ticks, so at 60fps the clash played in **half
+its real time** while a human's hands did not speed up and the CPU's synthetic
+stick did. From the user's own save state, both sticks turned at a true 5
+rotations a second: **30fps ends 91-88 to the player, 60fps ended 61-62 to the
+CPU.** The outcome flipped.
+
+The fix doubles every phase length so each phase lasts its 30fps real time,
+halves the clash point constant so the point lands exactly where 30fps puts it
+(and now moves smoothly every frame rather than in 30Hz steps), and gates the
+AI's rotation to every other tick through the game's own human/AI flag. The
+player's input is untouched.
+
+Verified against the 30fps oracle with the 60fps base patch alone, where the AI
+behaves tick for tick as it does at 30fps: **72-72 idle, 91-86 at 5 rotations a
+second, over the same 4.3 seconds.**
+
+**Known gap:** with every group enabled the CPU ends 10-18% below the 30fps
+game, because the correct beam travel speed changes where the clash forms and
+the AI reacts to that. At 3.5 rotations a second - a near-tie the 30fps game
+gives the CPU 73-75 - this build gives it to the player 73-69. Every other speed
+tested picks the 30fps winner.

@@ -6078,10 +6078,33 @@ flips the result. The cause is upstream of this fix: the CPU's clash stepping is
 alone**, so the gate halves an already-slowed AI.
 
 That is not a random-stream side effect. Dropping any single group from the full
-preset leaves it at *exactly* 0.377 and +42 - sixteen of them tested one at a
-time, all bit-identical - so no one group owns it and the AI's decisions are not
-sensitive to those groups at all. Only `animation clock` moves it, and barely
-(0.385). The additive direction is the next test.
+preset leaves it at *exactly* 0.377 and +42 - **all 24 tested one at a time, bit
+identical** - so no one group owns it, and the AI's decisions are not sensitive
+to those groups at all. Only `animation clock` moves it, and barely (0.385).
+
+Building up instead of tearing down found it, and it is not an AI defect at all:
+
+| arm | CPU stepping |
+|---|---|
+| 30fps, and 60fps with the base patch alone | 0.492 a tick |
+| + `beam object travel` | 0.385 |
+| + `animation clock` on top | 0.377 (the full preset) |
+
+Adding any of the other 22 groups changes nothing at all. So what slows the CPU
+is **the beams travelling at their correct speed**, which changes where and when
+the two of them meet and therefore the geometry the AI is reacting to, plus a
+little from the animation clock. The AI itself is per-tick and deterministic -
+the same decisions in 24 different patch sets - and the gate is exact where the
+approach is directly comparable. What is left is that the CPU enters the tug
+phase from a slightly different situation than at 30fps, and this fix does not
+reach that.
+
+One arm of that sweep is worth keeping for its own sake: **with `beam object
+travel` removed, the clash never happens at all** - 0 ticks in state 304 from a
+save state that is 13 vsyncs away from it. Unpatched, the beams cross at double
+speed and miss each other. A group that paces a projectile decides whether two
+of them ever meet, which is also why subset bisects of this measurement kept
+finding nothing to measure.
 
 ### A lead for the rush struggle
 
