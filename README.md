@@ -16,7 +16,7 @@ Running analysis log: **[docs/findings.md](docs/findings.md)** - start at "STATE
 
 ## What the patch covers
 
-24 groups, each compensating one system that the 60Hz loop drives twice as often.
+26 groups, each compensating one system that the 60Hz loop drives twice as often.
 Movement, gravity and knockback; the animation clock; menu and combat input windows; the
 ki aura, particles, effect rotation and the hovering idle; the tween system; blast hit
 cadence and blast effect duration; the integer clock behind scripted-sequence waits; the
