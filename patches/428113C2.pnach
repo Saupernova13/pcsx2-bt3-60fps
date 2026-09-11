@@ -1062,3 +1062,54 @@ patch=1,EE,000F1520,word,00000000 // nop
 patch=1,EE,000F1524,word,03E00008 // jr $ra
 patch=1,EE,000F1528,word,0000102D // move $v0, $zero        (delay slot)
 patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
+
+// The beam clash, found 2026-09-12. Two beams collide, both fighters enter
+// state 304 (FUN_001FB660) and rotate their sticks. Rotations are counted into
+// fighter+0xE4C - seeded on entry from the move's power and the character's
+// attributes, so it does not start at zero - and the contest itself is run by
+// an event manager, FUN_001D8E50, dispatched once per tick from FUN_001D9900
+// for modes 1..5. That manager is authored entirely in ticks: 30 ticks of one
+// fighter's introduction, 30 of the other's, then 46 ticks in which a tug at
+// [m+8] moves one step per tick toward whoever leads on +0xE4C, 16 ticks to
+// show the result and a few more to drive the tug out to 71, where the sign of
+// the tug names the winner and sets the outcome flags 0xC1/0xC3 and 0xC2.
+// So at 60fps the whole clash plays in half its real time - 2.17s against
+// 4.34s - while a human's hands do not speed up, and the CPU's do: it steps a
+// synthetic stick through cardinal directions once per tick. Measured from the
+// user's own save state with both sticks turned at a true 5 rotations a second,
+// 30fps ends 91-88 to the player and 60fps ends 61-62 to the CPU. The outcome
+// flips.
+// This halves the manager's clock by doubling every phase length, which puts
+// each phase back on its 30fps real-time duration. The tug still moves one step
+// per tick, so over a window of twice as many ticks it reaches twice the
+// magnitude - which is why the clash point constant halves too, leaving the
+// point exactly where 30fps puts it while updating smoothly every frame rather
+// than in 30Hz steps. The AI's rotation is gated to every other tick using the
+// game's own human/AI flag, as the rush struggle does; the player's input is
+// untouched. Against the 30fps game with the 60fps base patch alone, where the
+// AI draws the same random stream, this reproduces it exactly: 72-72 idle and
+// 91-86 at 5 rotations a second, over the same 4.3 seconds.
+[60FPS - beam clash]
+description=Pace the beam clash in real time at 60fps - every phase of its event manager, the clash point, and the CPU's stick rotation - so the clash lasts as long as it does at 30fps and is decided the same way.
+patch=1,EE,000F1540,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
+patch=1,EE,000F1544,word,10600005 // beqz $v1, 0x000F155C   human: unchanged
+patch=1,EE,000F1548,word,00000000 // nop
+patch=1,EE,000F154C,word,8C830964 // lw $v1, 0x964($a0)     the state's tick counter
+patch=1,EE,000F1550,word,30630001 // andi $v1, $v1, 1
+patch=1,EE,000F1554,word,14600003 // bnez $v1, 0x000F1564   odd tick: not rotating
+patch=1,EE,000F1558,word,00000000 // nop
+patch=1,EE,000F155C,word,080753CC // j 0x1d4f30             even tick: the real query
+patch=1,EE,000F1560,word,00000000 // nop
+patch=1,EE,000F1564,word,03E00008 // jr $ra
+patch=1,EE,000F1568,word,0000102D // move $v0, $zero        (delay slot)
+patch=1,EE,001FB9BC,word,0C03C550 // jal QueryCondition -> jal 000F1540
+patch=1,EE,001FB9A8,word,28420020 // slti $v0, $v0, 0x20    rotations count from tick 32
+patch=1,EE,001D8EF8,word,2402003C // addiu $v0, $zero, 0x3c the second cue at tick 60
+patch=1,EE,001D8F0C,word,2402003C // addiu $v0, $zero, 0x3c
+patch=1,EE,001D8F14,word,2862003C // slti $v0, $v1, 0x3c    first introduction: 60 ticks
+patch=1,EE,001D8F28,word,2862003C // slti $v0, $v1, 0x3c
+patch=1,EE,001D8F30,word,28620078 // slti $v0, $v1, 0x78    second introduction ends at 120
+patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs to 212
+patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
+patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
+patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
