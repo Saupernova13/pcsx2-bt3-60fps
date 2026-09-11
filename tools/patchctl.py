@@ -172,11 +172,20 @@ SCREENFADE = ["60FPS - screen fade"]
 # at a true 5 rotations a second, the winner flips. This gates only the AI side.
 STRUGGLE = ["60FPS - rush struggle"]
 
+# The beam clash, found 2026-09-12. Two beams collide, both fighters enter state
+# 304 and rotate; rotations count into fighter+0xE4C and an event manager,
+# FUN_001D8E50, runs the contest on a tick clock - introductions, a per-tick tug
+# toward whoever leads, then the result. At 60fps that whole clash plays in half
+# its real time while a human's hands do not speed up, and the CPU's synthetic
+# stick does. This puts the manager's phases back on real time, keeps the clash
+# point where 30fps puts it, and gates only the AI's rotation.
+BEAMCLASH = ["60FPS - beam clash"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + SPARES)
+                  + STRUGGLE + BEAMCLASH + SPARES)
 
 PRESETS = {
     "off": [],
@@ -230,7 +239,8 @@ PRESETS = {
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH),
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE),
+             + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+             + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
