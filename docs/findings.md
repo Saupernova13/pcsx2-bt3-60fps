@@ -5959,3 +5959,134 @@ clip end with `c.eq.s` in `FUN_001C47A8`, on an animation object that is not the
 model this patch halves, and that object is still unfound. Doubling the duration
 would restore the counts; it would not change the ratio, so it is a separate and
 much less urgent defect than the one now fixed.
+
+## 2026-09-12 - the beam clash: the whole contest is on a tick clock
+
+The user hit a beam clash - both fighters fire a beam, the beams collide, and
+both players rotate their sticks - and asked for the 30fps and 60fps screens to
+be compared and the difference fixed. There is no hit counter on screen for this
+one, so the comparison has to be made against the game's own internals.
+
+### Getting the state onto the dev rig
+
+Their save state was made **on the pause menu**: every fighter field is frozen,
+`+0x964` included, and 600 vsyncs of film showed nothing moving at all. Twenty
+screenshots of "1P PAUSE" is what that looks like. `tools/transplant.py` carried
+the RAM across as before; Start then closes the menu, and the un-paused scene is
+re-saved natively as dev slot 5. **The button press stays outside the measured
+window** - it lands two ticks after a load, and a press is asymmetric in ticks
+against vsyncs.
+
+### The clash, located
+
+| what | where |
+|---|---|
+| fighter state | **304**, handler `FUN_001FB660` |
+| rotations counted into | **`fighter+0xE4C`** - and it does **not** start at zero |
+| the rotation query | condition **0x33** at `001FB9BC`, the same condition the rush struggle uses, gated on `+0x964 >= 16` |
+| the contest itself | **`FUN_001D8E50`**, an event manager dispatched once per tick from `FUN_001D9900` for modes 1..5 |
+| the clash point | `pt = tug/(|tug|+20)`, written at `001D92BC`; `[m+0x10]` is its world position, lerped between the two fighters' bone 0x11 |
+
+`+0xE4C` is seeded on entry from the move's power over 20, then +10/6/3 or
+-10/6/3 by character attribute (`001FB6FC..001FB7D8`) - a head start that does
+not scale with time, so halving the clash's duration doubles its weight.
+
+The manager's phases, all counted in ticks:
+
+| phase | what | length |
+|---|---|---|
+| 2 | fighter 0's introduction, then fighter 1's, then the tug: **+-1 per tick** toward whoever leads on cumulative `+0xE4C` | 30 + 30 + 46 |
+| 3 | show the result | 16 |
+| 4 | drive the tug out by 4 a tick until \|tug\| >= 71 | ~7 |
+| 5 | resolve: winner gets flags 0xC1/0xC3, loser 0xC2 and state 260 | 1 |
+
+The +-0.64 thresholds on `pt` only pick a camera mode; they do not end anything.
+
+### Measured, same save state, both sticks at a true 5 rotations a second
+
+| arm | clash | player | CPU | tug | winner |
+|---|---|---|---|---|---|
+| 30fps oracle | 130 ticks / **4.34s** | 91 | 88 | +45 | **player** |
+| 60fps, before | 130 ticks / **2.17s** | 61 | 62 | -45 | **CPU** |
+
+**The outcome flips**, and for two reasons at once: the whole cinematic plays in
+half its real time, and a human's hands do not speed up while the CPU's
+synthetic stick steps once per tick, exactly as in the rush struggle.
+
+### What was tried and rejected: gating the manager itself
+
+Running the manager only on even global ticks restores the duration exactly -
+260 vsyncs, and the player's count lands on the oracle's 91 - but it **strobes**.
+Six consecutive vsyncs photographed mid-tug alternate between two camera views,
+because `FUN_001D8980` and `FUN_001D8B88` issue a camera request through
+`FUN_001C6E78` every tick and a skipped tick leaves the previous frame's camera
+standing. It also leaves the clash point stepping at 30Hz. A per-tick call that
+looks like bookkeeping can be a render request.
+
+### The fix
+
+Keep the manager running every tick and halve its **clock** instead:
+
+- double every phase length - 30 -> 60, 60 -> 120, 106 -> 212, and 16 -> 32 in
+  phase 3 - so each phase lasts its 30fps real time;
+- leave the tug at +-1 a tick. Over twice as many ticks it reaches twice the
+  magnitude, so **halve the clash point constant** at `gp-0x6F40` from 0.05 to
+  0.025. `pt` then lands exactly where 30fps puts it and updates smoothly every
+  frame rather than in 30Hz steps. That constant has exactly one reader,
+  `001D8E10`; nothing else in either segment addresses it;
+- phase 4's limit 71 -> 142, its +-4 step unchanged, which is the same real-time
+  speed in doubled units;
+- gate the AI's rotation query to every other tick through the game's own
+  human/AI flag, `fighter+0x1278`, exactly as `[60FPS - rush struggle]` does -
+  its own trampoline at `000F1540`, because the validator refuses the same
+  address in two groups;
+- double state 304's rotation start, 16 -> 32 ticks.
+
+### Verified
+
+The AI gate is **exact**, and there is a clean way to prove it: with the 60fps
+base patch alone the AI draws the same random stream as the 30fps game, and its
+stepping is identical tick for tick (0.492 a tick, +54, in both).
+
+| arm | idle | 5 rot/s |
+|---|---|---|
+| 30fps oracle | CPU 31-72, 4.34s | P1 91-88, 4.34s |
+| 60fps base + this fix | CPU 31-**72**, 4.30s | P1 **91**-86, 4.34s |
+
+Shipped (every group enabled), against the oracle:
+
+| rot/s | 30fps oracle | 60fps fixed |
+|---|---|---|
+| 0 | CPU 31-72, 4.34s | CPU 31-59, 4.30s |
+| 2 | CPU 55-72 | CPU 55-60 |
+| 3.5 | **CPU 73-75** | **P1 73-69** |
+| 5 | **P1 91-88** | **P1 91-74** |
+| 8 | **P1 119-88** | **P1 128-74** |
+
+The player's count matches the oracle exactly at 2, 3.5 and 5, and the duration
+matches within two vsyncs. At 8 rotations a second the player scores *more* than
+at 30fps - 128 against 119 - and that is not a defect in the fix: a hand turning
+8 times a second crosses 32 quadrants a second, and the 30fps game only samples
+the stick 30 times. The 60fps game sees crossings the 30fps game aliases away.
+
+### Still not right: the CPU ends low in the full build
+
+With every group enabled the CPU ends 10-18% below the oracle, and at 3.5
+rotations a second - a near-tie the 30fps game gives to the CPU, 73-75 - that
+flips the result. The cause is upstream of this fix: the CPU's clash stepping is
+**0.377 a tick with the full preset against 0.492 with the 60fps base patch
+alone**, so the gate halves an already-slowed AI.
+
+That is not a random-stream side effect. Dropping any single group from the full
+preset leaves it at *exactly* 0.377 and +42 - sixteen of them tested one at a
+time, all bit-identical - so no one group owns it and the AI's decisions are not
+sensitive to those groups at all. Only `animation clock` moves it, and barely
+(0.385). The additive direction is the next test.
+
+### A lead for the rush struggle
+
+The same dispatcher runs the rush struggle: modes 6-8 go to `FUN_001D9330`,
+which contains `001D945C`, the winner decision found on 2026-09-10. **The rush
+struggle's 88-tick duration is almost certainly that manager's own clock**, not
+the animation clip that was hunted and never found. The technique above - double
+the phase lengths, leave the per-tick work alone - should apply to it directly.
