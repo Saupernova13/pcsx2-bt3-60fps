@@ -1,8 +1,8 @@
 # Spec: making pcsx2-bt3-60fps publishable
 
-Status: approved design, not yet executed.
+Status: Stage 1 executed 2026-09-12; Stages 2 and 3 pending.
 Written 2026-09-12. Decisions in this document were made interactively; the
-sections below are the record. Nothing here has been executed yet.
+sections below are the record.
 
 ## 0. Goal and scope
 
@@ -312,3 +312,30 @@ Stage 3 — docs and tools index:
    the session.
 5. filter-repo preserves authorship; a purged path that was a commit's only
    content may drop that commit — acceptable, noted in G2.
+
+## 9. Stage 1 execution log (2026-09-12)
+
+Gates passed:
+
+- G1: bundle at `../pcsx2-bt3-60fps-pre-purge.bundle` (22 refs, verified).
+- G2: five paths gone from all history and objects; 151 commits remain (one
+  purge-only commit dropped, expected); all branches and 18 tags rewritten.
+- G3: tree matches section 2; gitignore additions committed; the video draft
+  was restored to disk as an ignored file.
+- G4: release dirs sort v02…v22 with v06b in place.
+- G5: `patch/428113C2.pnach` byte-identical to the pre-work v22 reference.
+- G6: all 49 tools `--help` clean.
+- G7: fresh `--no-local` clone shows exactly the intended tree, clean history
+  and status; 3 branches + 18 tags.
+
+Deviations and findings:
+
+- filter-repo required `--force` in place (repo not a fresh clone; local-only,
+  bundle backup verified — safe).
+- One commit was purge-only and dropped (expected, spec 8.5).
+- Tag hygiene deferred to the owner: tags v2–v9 still use old names while the
+  dirs are now v02–v09; no v17–v22 tags exist; a `v1-60fps-input-fixed` tag
+  exists with no v1 release dir; the history table in `releases/README.md`
+  only lists v1–v3.
+- A fresh clone's default branch resolves to the branch checked out at clone
+  time; set `main` as default when creating the GitHub repo.
