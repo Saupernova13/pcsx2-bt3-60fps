@@ -4,6 +4,14 @@ Running record of everything established about Dragon Ball Z: Budokai Tenkaichi 
 (SLUS-21678, CRC 428113C2). Shared memory between the Analyst and Interpreter roles.
 Newest sections at the bottom.
 
+> **Note (2026-09-12):** the repo was restructured for publication. The generic
+> ps2ee library and 13 tools moved to the sibling pcsxroo checkout
+> (`tools/pcsxroo/`); this game's knowledge now lives in `bt3/`. Tool names in
+> this log are unchanged and still resolve - the current index is
+> [`docs/tools.md`](tools.md). `patches/428113C2.pnach` is now
+> `dev/pnach/working.pnach`, and the install file is `patch/428113C2.pnach`.
+> Sections below keep the paths they were written with.
+
 ## STATE OF PLAY - read this first
 
 Last revised 2026-09-08. **20 groups ship**, in `patches/428113C2.pnach` and
