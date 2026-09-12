@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw
 import _bootstrap  # noqa: F401
 import patchctl
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.roo import Roo
 
 

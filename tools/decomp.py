@@ -16,7 +16,7 @@ import sys
 
 import _bootstrap  # noqa: F401
 
-from ps2ee import config
+from bt3 import config
 
 
 
@@ -28,7 +28,7 @@ def ghidra_home():
     explicit = os.environ.get("GHIDRA_HOME")
     if explicit:
         return Path(explicit)
-    from ps2ee.config import _setting
+    from bt3.config import _setting
 
     configured = _setting("GHIDRA_HOME")
     if configured:

@@ -30,7 +30,7 @@ from pathlib import Path
 import _bootstrap  # noqa: F401
 import patchctl
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.pnach import Pnach
 
 # Present in the repo pnach, never in a shared copy. One list, in config, because

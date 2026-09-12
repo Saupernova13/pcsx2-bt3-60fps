@@ -9,7 +9,7 @@ import argparse
 
 import _bootstrap  # noqa: F401
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.savestate import EE_MEMORY, IOP_MEMORY, SCREENSHOT, SaveState
 
 WANTED = [EE_MEMORY, IOP_MEMORY, SCREENSHOT]

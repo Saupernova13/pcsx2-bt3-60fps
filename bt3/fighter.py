@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .pine import Pine
+from ps2ee.pine import Pine
 
 # $gp - 0x575c. Set once at boot; holds the battle manager, or 0 outside a fight.
 MANAGER_PTR = 0x002FEB14

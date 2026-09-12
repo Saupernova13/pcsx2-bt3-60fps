@@ -30,9 +30,9 @@ import _bootstrap  # noqa: F401
 import patchctl
 import realclock
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.roo import Roo
-from ps2ee import battle as B
+from bt3 import battle as B
 
 STATE = 0x948
 

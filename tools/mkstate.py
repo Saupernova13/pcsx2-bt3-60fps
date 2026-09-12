@@ -21,8 +21,8 @@ import time
 import _bootstrap  # noqa: F401
 import patchctl
 
-from ps2ee import config
-from ps2ee.battle import POS, resolve, vec
+from bt3 import config
+from bt3.battle import POS, resolve, vec
 from ps2ee.roo import Roo
 
 GROUND_SLOT = 1

@@ -21,7 +21,7 @@ import argparse
 
 import _bootstrap  # noqa: F401
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.roo import Roo
 
 SCRATCH = 0x000F7000        # far end of the safe zone, nothing else uses it

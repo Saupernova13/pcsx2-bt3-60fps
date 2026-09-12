@@ -7,7 +7,7 @@ import argparse
 
 import _bootstrap  # noqa: F401
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.ciso import DiscImage, find, read_root
 
 
