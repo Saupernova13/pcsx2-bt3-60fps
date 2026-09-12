@@ -49,9 +49,12 @@ drift apart. Tag the same commit, so a release directory and a tag always agree.
 
 | version | tag | what it added |
 |---|---|---|
-| v3 | `v3-blast-hit-cadence` | multi-hit attacks paced by real time: ki blasts land their hits at the right rate and last as long as they should. 14 groups. |
-| v2 | `v2-airborne-and-hover` | airborne motion, vertical, residual and gravity; the tween system; aura and trail particles; the hovering idle bob. 13 groups. |
+| v3 | `v03-blast-hit-cadence` | multi-hit attacks paced by real time: ki blasts land their hits at the right rate and last as long as they should. 14 groups. |
+| v2 | `v02-airborne-and-hover` | airborne motion, vertical, residual and gravity; the tween system; aura and trail particles; the hovering idle bob. 13 groups. |
 | v1 | `v1-60fps-input-fixed` | the battle loop at 60fps with animation, input timing and the ki aura correct. |
+
+There is no `v1-*` release directory - v1 exists only as the
+`v1-60fps-input-fixed` tag; directories start at v2.
 
 Earlier milestones are tagged `milestone-anim-rate` and `milestone-input-timing`.
 Every build from v4 onward is catalogued with its confidence in
