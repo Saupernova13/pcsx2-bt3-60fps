@@ -99,6 +99,8 @@ is gated is an effect that does not get built.**
 | Death by a body-erasing attack: camera too fast, cuts weirdly (item 2) | **ASSUMED solved\*** - not checked by anyone. The user expects it to have gone with items 3 and 5. Asterisked deliberately: nothing has verified it |
 | ~~The Galick Cannon fade to white ends early (item 7b)~~ | **FIXED** by `screen fade`, v19, **confirmed in play 2026-09-09**. Not a sequence beat at all: `FUN_00172810` is the game's fullscreen fade SERVICE and its init converts seconds to frames with a hard-coded 30.0 |
 | ~~**Real-time blast travel speed** (item 1)~~ | **FIXED** across three movers. `projectile travel` (v16, ki blasts) and `beam object travel` (v18, Buu's charged blast **and his breath**) are **confirmed in play 2026-09-09**. `blast object travel` (v17, Frieza's rocks) is measured at 1.77x and halved, but the user **feels no change** - correctly, because at play range the rocks are 94% summon animation; see the 2026-09-09 play-test entry. **Explosive waves** are confirmed fixed in play, by which group nobody knows |
+| ~~A beam clash runs in half its real time, and the CPU wins it~~ | **FIXED** by `beam clash`, v22. The contest is an event manager counted in ticks; doubling its phase lengths restores 4.3s and the player's count matches the 30fps game exactly. **Duration confirmed in play 2026-09-12**; the outcome is not yet reported |
+| A beam clash: the CPU ends 10-18% low in the full build | **Not the gate** - with the 60fps base patch alone it reproduces the 30fps game outright, 72-72 idle and 91-86 at 5 rotations a second. It is `beam object travel`: beams at their correct speed change where and when the clash forms, and the AI reacts to that geometry. At ~3.5 rotations a second - a near-tie the 30fps game gives the CPU 73-75 - this build gives it to the player 73-69 |
 | Frieza's rocks: the ~5-vsync fast **summon** phase | The travel is fixed; the 103-vsync pre-launch animation that dominates the move is not. 98.3 vsyncs at 60fps against 103.2 at 30. This is the part of that move a player can actually see. **The most legible thing still wrong** |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
@@ -6105,6 +6107,41 @@ save state that is 13 vsyncs away from it. Unpatched, the beams cross at double
 speed and miss each other. A group that paces a projectile decides whether two
 of them ever meet, which is also why subset bisects of this measurement kept
 finding nothing to measure.
+
+### Confirmed in play, 2026-09-12
+
+The user played the clash from their own save state with v22 installed: **"it
+indeed was fixed in terms of duration."** That is the half of this that is
+visible without a counter on screen. Who wins when they rotate hard is not yet
+reported, so the star stays.
+
+### The player's input is still read every tick, and that is deliberate
+
+Their next question was whether the *read rate* was fixed too. It is not. The
+gate tests `fighter+0x1278` and only halves the **CPU's** query, so a human's
+stick is still sampled once per tick - 60 times a second against the original's
+30.
+
+That sounds like a defect and is not, because the clash counts one rotation per
+quadrant crossing with no debounce: the sampling rate only matters once the hand
+out-runs it.
+
+| hand speed | quadrant crossings/s | 30fps | 60fps with v22 |
+|---|---|---|---|
+| 2 rot/s | 8 | 55 | **55** |
+| 3.5 rot/s | 14 | 73 | **73** |
+| 5 rot/s | 20 | 91 | **91** |
+| 8 rot/s | 32 | 119 | **128** |
+
+Below about 7.5 rotations a second - 30 crossings, the 30fps sampling rate -
+both arms see every crossing and the counts are identical. Above it the *30fps
+game* is the one that is wrong: it samples 30 times a second while the hand
+crosses 32 quadrants, and silently drops rotations the player actually made.
+
+Gating the player's side as well would be one word - the same trampoline without
+the `+0x1278` test - and would reproduce the original's blind spot exactly. It is
+deliberately not done: it would make the game eat input a player can feel
+themselves giving it. Recorded here so the choice is visible rather than assumed.
 
 ### A lead for the rush struggle
 

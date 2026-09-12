@@ -26,7 +26,11 @@ move lengths are both counted in ticks; the three movers that carry projectiles 
 the ground - ki blasts, spawned objects like Frieza's rocks, and travelling beams like
 Buu's charged blast and his breath; and the fullscreen fade service, which took its phase
 durations in seconds and converted them at 30Hz, so every fade in the game ran in half
-its real time.
+its real time. And the two contests that are decided by how fast a player turns the
+sticks - the rush struggle and the beam clash - both of which were counted in ticks
+throughout, so at 60fps they ran in half their real time while the CPU, whose stick is
+synthetic and steps once per tick, rotated twice as fast in real time as it should. Both
+gate only the AI side; a human's input is untouched.
 
 Every group is verified against the unpatched 30fps game as its own oracle: same save
 state, same input, same number of vsyncs. The ones a player can see are confirmed in play
@@ -35,8 +39,10 @@ with the game running free, not by frame stepping.
 Known not fixed, and stated in the released file's header: an ultimate's beam lands its
 first hit about half a second early; the summon animation before Frieza's rocks - most of
 that move - still runs about five frames fast, as does the wind-up on Buu's charged blast;
-some pre-fight intro animations are paced wrong against the camera; and the camera on a
-body-erasing death has never been re-checked since the camera work landed.
+some pre-fight intro animations are paced wrong against the camera; the camera on a
+body-erasing death has never been re-checked since the camera work landed; and in a beam
+clash the CPU ends a little weaker than it is at 30fps, so a near-tie can fall the
+player's way.
 
 Build-by-build confidence, and what has been confirmed in play rather than only measured,
 is in **[releases/STATUS.md](releases/STATUS.md)**.

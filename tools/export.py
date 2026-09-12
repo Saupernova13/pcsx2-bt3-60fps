@@ -49,6 +49,11 @@ KNOWN_BROKEN: list[str] = [
     "charged blast",
     "some pre-fight intro animations are paced wrong against the camera. The "
     "mouths in that scene are fixed; this is the other half of the same report",
+    "in a beam clash the CPU ends a little weaker than it is at 30fps when both "
+    "sides rotate at a middling speed. The clash's pacing and the player's own "
+    "count are exact, but the beams now travelling at their correct speed change "
+    "where the clash forms and the AI reacts to that, so a near-tie the 30fps "
+    "game gives the CPU can fall the player's way",
     "death by a body-erasing attack: the camera around the victim was reported "
     "too fast and cutting oddly, and has never been re-checked since the camera "
     "work landed. It may have gone with the other camera fixes, or it may not",
