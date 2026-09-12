@@ -1,7 +1,7 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `releases/latest/` currently holds **v22**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v22**.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
@@ -20,7 +20,7 @@ pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
 mouths, in the cut-in AND in the pre-fight intro. v14's star is cleared.
 None of it touches v12's input-timing flag, which still stands.
 
-> **Deploy `releases/latest/`, never `patches/428113C2.pnach`.** The working
+> **Deploy `patch/428113C2.pnach`, never `dev/pnach/working.pnach`.** The working
 > pnach carries five groups that must never be enabled, and `deploy.py` used to
 > turn on every group in whatever file it was given. The user's EmuDeck install
 > had been running all 24 of them - quarter-speed animation, no beams, broken

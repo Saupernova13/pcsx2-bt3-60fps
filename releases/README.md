@@ -54,4 +54,6 @@ drift apart. Tag the same commit, so a release directory and a tag always agree.
 | v1 | `v1-60fps-input-fixed` | the battle loop at 60fps with animation, input timing and the ki aura correct. |
 
 Earlier milestones are tagged `milestone-anim-rate` and `milestone-input-timing`.
-The full derivation of every group is in [`docs/findings.md`](../docs/findings.md).
+Every build from v4 onward is catalogued with its confidence in
+[`STATUS.md`](STATUS.md). The full derivation of every group is in
+[`docs/findings.md`](../docs/findings.md).
