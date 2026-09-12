@@ -1,18 +1,18 @@
 # Releases
 
-**The latest stable patch is [`latest/428113C2.pnach`](latest/428113C2.pnach).**
+**The latest stable patch is [`patch/428113C2.pnach`](../patch/428113C2.pnach).**
 
 That is the file to install, and the file to hand to anyone else. Everything else
 in this repository is working material.
 
-    releases/latest/428113C2.pnach              always the newest stable patch
-    releases/v2-airborne-and-hover/...          the same file, kept under its version
-    patches/428113C2.pnach                      the working pnach - NOT for sharing
+    patch/428113C2.pnach                        always the newest stable patch
+    releases/v02-airborne-and-hover/...         the same file, kept under its version
+    dev/pnach/working.pnach                     the working pnach - NOT for sharing
 
 The filename has to stay `428113C2.pnach`. PCSX2 finds a pnach by the game's CRC
 and ignores any other name, so rename the directory, never the file.
 
-## Why not just share `patches/428113C2.pnach`
+## Why not just share `dev/pnach/working.pnach`
 
 The working pnach carries two groups that must never be enabled:
 
@@ -28,7 +28,7 @@ header of the released file.
 
 ## Installing
 
-    python tools/deploy.py patches/428113C2.pnach   # writes the cheat file and
+    python tools/deploy.py patch/428113C2.pnach   # writes the cheat file and
                                                     # the enabled list, then say
                                                     # which groups with --only
 
@@ -42,7 +42,7 @@ a reset or a save-state load is not enough, quit and relaunch.
     python tools/export.py --release v3-something
     git tag v3-something
 
-`--release` writes both the versioned directory and `latest/`, so they cannot
+`--release` writes the versioned directory and refreshes `patch/`, so they cannot
 drift apart. Tag the same commit, so a release directory and a tag always agree.
 
 ## History
