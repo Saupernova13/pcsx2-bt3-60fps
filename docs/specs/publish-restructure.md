@@ -378,3 +378,19 @@ Deviations and findings:
 - pcsxroo merge is the owner's call: `feat/ps2ee-migration` is ready to merge
   into `fix/frame-advance-input`; until it is, that branch must stay checked
   out there for the tools here to resolve `ps2ee`.
+
+## 11. Remaining-calls resolution (2026-09-12)
+
+- pcsxroo: `feat/ps2ee-migration` fast-forwarded into
+  `fix/frame-advance-input` (nothing else had moved), branch deleted, the
+  temporary extract remote removed. `fix/frame-advance-input` stays checked
+  out, so the tools here resolve `ps2ee`. Both suites re-verified: 13 movers
+  and 35 stayers `--help` clean. One swept-in screenshot (`bin/charged-full.png`,
+  caught by an unscoped `git add -A`) was unstaged again; it remains in one
+  commit of pcsxroo's local history.
+- Tag hygiene: v2-v9 renamed to v02-v09 and v6-withdraw to v06b at their
+  original targets; v17-v22 created at each release's cut commit (verified:
+  tag == commit that added the release directory, the convention the existing
+  tags follow). v1 stays tag-only, now stated in `releases/README.md`.
+  Pre-existing deviation left untouched: the `v13-pursuit-stomp` tag sits on a
+  later docs commit, not its cut commit - the owner's call whether to repoint.
