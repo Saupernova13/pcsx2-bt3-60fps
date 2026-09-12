@@ -6,7 +6,8 @@ Newest at the top. `releases/latest/` currently holds **v22**.
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
 > in play by the user**. A star is provisional: nothing is settled here until it
-> has been played. **v17, v21 and v22 are starred.**
+> has been played. **v17, v21 and v22 are starred** - v22 half-cleared: the user
+> confirmed its duration in play on 2026-09-12, but not yet who wins a clash.
 
 **v16, v18 and v19 are confirmed in play by the user, 2026-09-09.** Ki blast
 travel, Buu's charged blast *and his breath*, and the screen fade - the user
@@ -28,7 +29,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
-| `v22-beam-clash` | 26 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
+| `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
 | `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
 | `v19-screen-fade` | 24 | **CONFIRMED IN PLAY** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
@@ -383,3 +384,14 @@ game, because the correct beam travel speed changes where the clash forms and
 the AI reacts to that. At 3.5 rotations a second - a near-tie the 30fps game
 gives the CPU 73-75 - this build gives it to the player 73-69. Every other speed
 tested picks the 30fps winner.
+
+**Play-test, 2026-09-12:** the user played a beam clash from their own save with
+v22 installed and confirmed the duration - "it indeed was fixed in terms of
+duration". The outcome is still unreported, so the star stands.
+
+**The player's input rate is deliberately untouched.** The gate is AI-only, so a
+human's stick is still read every tick, 60 times a second. Below about 7.5
+rotations a second that is indistinguishable from 30fps - the counts are
+identical, 55/55, 73/73, 91/91 - and above it the 60fps build counts crossings
+the 30fps game aliases away. Matching the original exactly would mean throwing
+away input the player can feel themselves giving. See docs/findings.md.
