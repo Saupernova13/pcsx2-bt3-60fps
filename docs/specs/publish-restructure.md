@@ -1,6 +1,7 @@
 # Spec: making pcsx2-bt3-60fps publishable
 
-Status: Stage 1 executed 2026-09-12; Stages 2 and 3 pending.
+Status: Stages 1-3 executed 2026-09-12; publishing and the pcsxroo merge are
+the owner's remaining calls.
 Written 2026-09-12. Decisions in this document were made interactively; the
 sections below are the record.
 
@@ -339,3 +340,41 @@ Deviations and findings:
   only lists v1–v3.
 - A fresh clone's default branch resolves to the branch checked out at clone
   time; set `main` as default when creating the GitHub repo.
+
+## 10. Stage 2 and 3 execution log (2026-09-12)
+
+Stage 2 gates passed:
+
+- G8: history-preserving graft merged into pcsxroo on `feat/ps2ee-migration`
+  (off `fix/frame-advance-input`, which carries the agent tooling; `master`
+  there is upstream-parity). 22 commits of ps2ee/tools history preserved,
+  merge commit `a8d24e33e`.
+- G9: 13 movers `--help` clean from pcsxroo.
+- G10: all 35 stayers `--help` clean via the new seam (`bt3/` + sibling
+  pcsxroo checkout).
+- G11: export gate re-run, byte-identical.
+
+Stage 3 gates passed:
+
+- G12: `docs/tools.md` indexes all 48 tools with transport requirements.
+- G13: README rewritten; the stranger-read caught `setup-pcsx2.py`'s new home.
+- G14: no dead local references; `docs/findings.md` covered by its header note.
+
+Deviations and findings:
+
+- Allocation correction: `oscscan.py`, `writers.py` and `realclock.py` import
+  `patchctl` (this project's group presets) and moved BACK to this repo.
+  Movers are 13 (was 17); stayers are 35 (was 32).
+- `savestate.py` moved with the library (`ramdiff` depends on it), as planned.
+- The GameIdentity seam carries the layout constants (text/data bounds, gp,
+  safe zone) alongside serial/CRC/ELF - the moving modules need them (disasm
+  defaults, pnach validation, diff regions). Values stay in `bt3/game.py`.
+- Generic config takes its identity from a `"GAME"` block in `local.json` or
+  `config.bind()`; `bt3/config.py` binds programmatically and repoints
+  `LOCAL_JSON` at this repo. `ee_ram_size` stayed a universal constant (32 MB
+  is the PS2 spec, not per-game).
+- pcsxroo's commit convention honoured: all pcsxroo commits carry
+  `(AI-assisted)`.
+- pcsxroo merge is the owner's call: `feat/ps2ee-migration` is ready to merge
+  into `fix/frame-advance-input`; until it is, that branch must stay checked
+  out there for the tools here to resolve `ps2ee`.
