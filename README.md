@@ -88,7 +88,10 @@ decompilation:
 
     pip install capstone keystone-engine zstandard numpy
 
-    python tools/setup-pcsx2.py --enable-pine    # PINE on for the live tools
+Enable PINE from the pcsxroo checkout (the generic tools live there):
+
+    python tools/pcsxroo/setup-pcsx2.py --enable-pine
+
     python tools/extract-elf.py                  # pull SLUS_216.78 out of the disc
 
 The generic half of the tooling lives in the sibling **pcsxroo** repo (a local
