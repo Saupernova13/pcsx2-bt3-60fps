@@ -17,3 +17,14 @@ ghidra/project/
 __pycache__/
 *.pyc
 .venv/
+
+# Machine-local overrides
+local.json
+
+# Third-party tooling checked out for use, not part of this repo
+ps2_patch_agent_tools/
+
+# Private drafts and throwaway work
+docs/video-essay-draft.md
+scratch/
+*.png
