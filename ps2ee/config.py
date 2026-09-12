@@ -18,7 +18,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 WORK = REPO / "work"
-PATCHES = REPO / "patches"
+PATCHES = REPO / "patch"
+DEV_PNACH = REPO / "dev" / "pnach"
 
 # --- target game -----------------------------------------------------------
 

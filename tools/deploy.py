@@ -1,7 +1,7 @@
 """Install a pnach into PCSX2 and enable it, so the user only has to launch.
 
-    python tools/deploy.py patches/428113C2.pnach
-    python tools/deploy.py patches/exp/003-halve-anim.pnach --only 60FPS
+    python tools/deploy.py patch/428113C2.pnach
+    python tools/deploy.py dev/pnach/experiments/003-halve-anim.pnach --only 60FPS
     python tools/deploy.py --off                 # disable every cheat
     python tools/deploy.py --status
 """
@@ -82,7 +82,7 @@ def main() -> int:
     # 157 trap, an experiment that breaks ground movement, and `animation rate`,
     # which together with `animation clock` gives quarter-speed animation. That
     # is how an install ends up "broken beyond belief", and it is silent -
-    # everything looks deployed. Deploy releases/latest/ instead.
+    # everything looks deployed. Deploy patch/428113C2.pnach instead.
     poison = [n for n in groups if n in config.NEVER_SHIP]
     if poison and not args.force_development:
         print(f"{args.pnach}")
@@ -93,7 +93,7 @@ def main() -> int:
         print("")
         print("  This looks like the working pnach. Deploy the export instead:")
         print("     python tools/export.py --release <name>")
-        print("     python tools/deploy.py releases/latest/428113C2.pnach")
+        print("     python tools/deploy.py patch/428113C2.pnach")
         print("")
         print("  --only NAME deploys a chosen subset; --force-development")
         print("  overrides this, and is only right for a deliberate experiment.")

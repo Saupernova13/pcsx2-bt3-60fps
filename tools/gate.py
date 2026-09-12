@@ -9,19 +9,19 @@ gated is render submission, one that *slows down* is simulation.
 Each gate is a 9-word trampoline in the safe zone. The call sites must not have
 their return value consumed - tools/bisect.call_sites already filters those.
 
-    python work/gate.py --list
-    python work/gate.py 0 1 3 4          # gate these, by index
-    python work/gate.py --off            # restore everything
+    python tools/gate.py --list
+    python tools/gate.py 0 1 3 4          # gate these, by index
+    python tools/gate.py --off            # restore everything
 """
 import argparse
 import importlib.util
 import json
-import pathlib
 import sys
 
 sys.path.insert(0, "tools")
 import _bootstrap  # noqa: F401
 
+from ps2ee import config
 from ps2ee.pine import Pine, PineNotRunning
 
 spec = importlib.util.spec_from_file_location("bm", "tools/bisect.py")
@@ -31,7 +31,7 @@ spec.loader.exec_module(bm)
 ROOT = 0x0012B6E0
 ZONE = 0x000F0400          # clear of everything the shipped patch uses
 STRIDE = 0x28
-STATE = pathlib.Path("work/gate-state.json")
+STATE = config.WORK / "gate-state.json"
 FRAME_COUNTER = 0x00331D64
 
 

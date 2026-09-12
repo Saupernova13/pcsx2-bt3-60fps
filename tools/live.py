@@ -5,7 +5,7 @@ Needs EnablePINE = true in PCSX2.ini and a booted game.
     python tools/live.py status
     python tools/live.py read 264DBC 1DCB40
     python tools/live.py watch 00331D64 --seconds 5
-    python tools/live.py apply patches/exp/003-halve-anim.pnach
+    python tools/live.py apply dev/pnach/experiments/003-halve-anim.pnach
     python tools/live.py fps
 """
 
