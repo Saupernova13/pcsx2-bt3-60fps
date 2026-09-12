@@ -10,13 +10,14 @@ comment with it, and puts the list of what to enable at the top.
 The name matters: PCSX2 finds a pnach by the game's CRC, so the file has to be
 called 428113C2.pnach wherever it ends up.
 
-    python tools/export.py --release v2-airborne-and-hover
+    python tools/export.py --release v02-airborne-and-hover
     python tools/export.py --to build/
 
-With --release it writes two copies: releases/<name>/ for the record, and
-releases/latest/ which is always the newest stable patch. Both are named
-428113C2.pnach, because PCSX2 finds a pnach by CRC and will ignore any other
-name. Tag the commit to match, so a release directory and a tag always agree.
+With --release it writes releases/<name>/ for the record and refreshes patch/
+at the repo top level, which is always the newest stable patch and the file to
+install. Both are named 428113C2.pnach, because PCSX2 finds a pnach by CRC and
+will ignore any other name. Tag the commit to match, so a release directory and
+a tag always agree.
 """
 
 from __future__ import annotations
@@ -109,11 +110,11 @@ def banner(names: list[str]) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--source", default="patches/428113C2.pnach")
+    parser.add_argument("--source", default="dev/pnach/working.pnach")
     parser.add_argument("--to", default=None,
                         help="directory to write into (default: the desktop)")
     parser.add_argument("--release", default=None, metavar="NAME",
-                        help="write releases/NAME/ and refresh releases/latest/")
+                        help="write releases/NAME/ and refresh patch/")
     args = parser.parse_args()
 
     source = Path(args.source)
@@ -132,8 +133,8 @@ def main() -> int:
     text = "\n".join(lines).rstrip() + "\n"
 
     if args.release:
-        root = Path(__file__).resolve().parent.parent / "releases"
-        targets = [root / args.release, root / "latest"]
+        repo = Path(__file__).resolve().parent.parent
+        targets = [repo / "releases" / args.release, repo / "patch"]
     elif args.to:
         targets = [Path(args.to)]
     else:
