@@ -22,7 +22,7 @@ import numpy as np
 
 import _bootstrap  # noqa: F401
 
-from ps2ee import fighter as fx
+from bt3 import fighter as fx
 from ps2ee.pine import Pine, PineNotRunning
 
 MODEL_TABLE = 0x0031C640

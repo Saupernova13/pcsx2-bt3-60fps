@@ -16,7 +16,7 @@ import struct
 import _bootstrap  # noqa: F401
 import patchctl
 
-from ps2ee.battle import POS, norm, resolve
+from bt3.battle import POS, norm, resolve
 from ps2ee.roo import Roo
 
 

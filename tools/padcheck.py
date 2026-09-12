@@ -15,7 +15,7 @@ import argparse
 
 import _bootstrap  # noqa: F401
 
-from ps2ee.battle import PAD_INDEX, resolve
+from bt3.battle import PAD_INDEX, resolve
 from ps2ee.roo import Roo
 
 RAW_PAD = 0x0033381C        # libpad's own word for pad 0, active low

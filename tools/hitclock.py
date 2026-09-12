@@ -36,7 +36,7 @@ import time
 import _bootstrap  # noqa: F401
 import patchctl
 
-from ps2ee import config
+from bt3 import config
 from ps2ee.roo import Roo
 
 DAMAGE = 0x0033371C          # the combo readout, exact integers

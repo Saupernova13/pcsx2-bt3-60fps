@@ -1,6 +1,6 @@
 """The live battle, resolved over PCSXROO: fighters, models, and their fields.
 
-``ps2ee.fighter`` does the same job over PINE and is kept for the scripts that
+``bt3.fighter`` does the same job over PINE and is kept for the scripts that
 already use it. This one exists because the debugger client can also stop the
 CPU, so everything built on top of it - watchpoints, frame-precise capture -
 needs the same resolution without a second dependency.
@@ -14,7 +14,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 
-from .roo import Roo
+from ps2ee.roo import Roo
 
 MANAGER = 0x002FEB14        # $gp-0x575c, null outside a fight
 MODEL_TABLE = 0x0031C640
