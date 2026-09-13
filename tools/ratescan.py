@@ -29,7 +29,7 @@ import struct
 import _bootstrap  # noqa: F401
 import patchctl
 
-from bt3.battle import FRAME_COUNTER, POS, resolve, vec
+from game.battle import FRAME_COUNTER, POS, resolve, vec
 from ps2ee.roo import Roo
 
 SETUPS = {

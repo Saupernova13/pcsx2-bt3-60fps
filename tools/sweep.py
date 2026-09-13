@@ -33,7 +33,7 @@ from pathlib import Path
 import _bootstrap  # noqa: F401
 import patchctl
 
-from bt3 import config
+from game import config
 from ps2ee.roo import Roo
 
 OPPONENT_HP = 0x018726A4

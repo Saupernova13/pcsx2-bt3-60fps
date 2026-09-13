@@ -9,7 +9,7 @@ without restarting.
 """
 import argparse
 import _bootstrap  # noqa: F401
-from bt3 import config
+from game import config
 from ps2ee import Pine, PineNotRunning
 from ps2ee.pnach import Pnach
 

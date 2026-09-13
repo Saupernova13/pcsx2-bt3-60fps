@@ -19,7 +19,7 @@ import time
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config, fighter as fx
+from game import config, fighter as fx
 from ps2ee.pine import Pine, PineNotRunning
 
 SNAPS = config.WORK / "fighter-snaps"

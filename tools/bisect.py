@@ -18,7 +18,7 @@ import time
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 from ps2ee.disasm import decode, jump_target
 from ps2ee.eemem import EEMemory, ElfImage
 from ps2ee.pine import Pine, PineNotRunning

@@ -18,7 +18,7 @@ import sys
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 from ps2ee.eemem import ElfImage
 
 FRAME_COUNTER = 0x00331D64
