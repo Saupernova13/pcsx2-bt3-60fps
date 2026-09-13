@@ -10,14 +10,14 @@ comment with it, and puts the list of what to enable at the top.
 The name matters: PCSX2 finds a pnach by the game's CRC, so the file has to be
 called 428113C2.pnach wherever it ends up.
 
-    python tools/export.py --release v02-airborne-and-hover
+    python tools/export.py --release v23-something
     python tools/export.py --to build/
 
-With --release it writes releases/<name>/ for the record and refreshes patch/
-at the repo top level, which is always the newest stable patch and the file to
-install. Both are named 428113C2.pnach, because PCSX2 finds a pnach by CRC and
-will ignore any other name. Tag the commit to match, so a release directory and
-a tag always agree.
+With --release it refreshes patch/ at the repo top level, which is always the
+newest stable patch and the file to install. Named 428113C2.pnach, because
+PCSX2 finds a pnach by CRC and will ignore any other name. The version history
+is the git tags: tag the commit to match the release name, so a tag and what
+patch/ held at that commit always agree.
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ def main() -> int:
     parser.add_argument("--to", default=None,
                         help="directory to write into (default: the desktop)")
     parser.add_argument("--release", default=None, metavar="NAME",
-                        help="write releases/NAME/ and refresh patch/")
+                        help="refresh patch/; NAME is the git tag for the record")
     args = parser.parse_args()
 
     source = Path(args.source)
@@ -134,7 +134,7 @@ def main() -> int:
 
     if args.release:
         repo = Path(__file__).resolve().parent.parent
-        targets = [repo / "releases" / args.release, repo / "patch"]
+        targets = [repo / "patch"]
     elif args.to:
         targets = [Path(args.to)]
     else:
@@ -154,6 +154,8 @@ def main() -> int:
               f"{sum(len(g.lines) for g in written.groups)} patch lines, validated")
     for name in dropped:
         print(f"  dropped (development only)  {name}")
+    if args.release:
+        print(f"tag this commit:  git tag {args.release}")
     return 0
 
 
