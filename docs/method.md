@@ -44,5 +44,5 @@ is the source. The companion toolset lives at
 
 ## What shipped
 
-Per-build confidence: [`releases/STATUS.md`](../releases/STATUS.md).
+Per-build confidence: [`status.md`](status.md).
 The full derivation of every group: [`docs/findings.md`](findings.md).

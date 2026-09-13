@@ -5,15 +5,15 @@ docstring - `python <tool> --help` is the reference.
 
 - **This repo, `tools/`** - the 35 tools that know this game: they read BT3's
   structs, drive its pnach groups, or walk its save-state conventions. They
-  import game knowledge from `bt3/` and the generic library from the sibling
-  pcsxroo checkout.
+  import game knowledge from `tools/game/` and the generic library from the
+  sibling pcsxroo checkout.
 - **pcsxroo, `tools/pcsxroo/`** - the generic `ps2ee/` library and 13 EE
   analysis tools that would work on any game.
 
 Transport column: **PCSXROO** = needs the PCSXROO debug server (port 28110),
 **PINE** = works against stock PCSX2 with PINE enabled, **offline** = needs no
 emulator at all. Tools that need a game identity take it from `local.json`
-(this repo) or `tools/pcsxroo/local.json` (pcsxroo), or from `bt3.config`
+(this repo) or `tools/pcsxroo/local.json` (pcsxroo), or from `game.config`
 automatically in this repo.
 
 ## In this repo (35)
