@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, "tools")
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 from ps2ee.pine import Pine, PineNotRunning
 
 spec = importlib.util.spec_from_file_location("bm", "tools/bisect.py")

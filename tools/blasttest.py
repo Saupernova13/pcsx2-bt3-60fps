@@ -35,7 +35,7 @@ from PIL import Image
 import _bootstrap  # noqa: F401
 import patchctl
 
-from bt3 import config
+from game import config
 from ps2ee.roo import Roo
 
 DAMAGE = 0x0033371C          # the combo readout, rises as the blast connects

@@ -1,8 +1,8 @@
-"""BT3-specific config: repo paths, patch policy, and the bound game identity.
+"""This game's config: repo paths, patch policy, and the bound identity.
 
 Imports the generic discovery config from the sibling pcsxroo checkout's
 ps2ee, binds this game's identity, then re-exports the generic functions so
-tools keep reading ``from bt3 import config`` the way they read the old
+tools keep reading ``from game import config`` the way they read the old
 ``from ps2ee import config``.
 """
 
@@ -13,9 +13,9 @@ from pathlib import Path
 
 from ps2ee import config as _generic
 
-from bt3 import game
+from game import identity
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 WORK = REPO / "work"
 PATCHES = REPO / "patch"
 DEV_PNACH = REPO / "dev" / "pnach"
@@ -23,23 +23,23 @@ DEV_PNACH = REPO / "dev" / "pnach"
 # This repo's overrides come from ITS local.json, not pcsxroo's.
 _generic.LOCAL_JSON = REPO / "local.json"
 
-_generic.bind(game.IDENTITY)
+_generic.bind(identity.IDENTITY)
 
 # Game constants as module-level names, so the tools stay unchanged.
-SERIAL = game.SERIAL
-CRC = game.CRC
-ELF_NAME = game.ELF_NAME
-GAME = game.GAME
-TEXT_BASE = game.TEXT_BASE
-TEXT_END = game.TEXT_END
-DATA_BASE = game.DATA_BASE
-BSS_END = game.BSS_END
-GP_BASE = game.GP_BASE
-SAFE_ZONE = game.SAFE_ZONE
-SAFE_ZONE_SIZE = game.SAFE_ZONE_SIZE
+SERIAL = identity.SERIAL
+CRC = identity.CRC
+ELF_NAME = identity.ELF_NAME
+GAME = identity.GAME
+TEXT_BASE = identity.TEXT_BASE
+TEXT_END = identity.TEXT_END
+DATA_BASE = identity.DATA_BASE
+BSS_END = identity.BSS_END
+GP_BASE = identity.GP_BASE
+SAFE_ZONE = identity.SAFE_ZONE
+SAFE_ZONE_SIZE = identity.SAFE_ZONE_SIZE
 EE_RAM_SIZE = _generic.EE_RAM_SIZE
-NEVER_SHIP = game.NEVER_SHIP
-OPTIONAL = game.OPTIONAL
+NEVER_SHIP = identity.NEVER_SHIP
+OPTIONAL = identity.OPTIONAL
 
 # Re-export the generic discovery, identity-driven helpers.
 from ps2ee.config import (  # noqa: E402, F401

@@ -14,7 +14,7 @@ import time
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 from ps2ee.disasm import decode
 from ps2ee.pine import Pine, PineNotRunning
 from ps2ee.pnach import Pnach

@@ -28,7 +28,7 @@ import numpy as np
 
 import _bootstrap  # noqa: F401
 
-from bt3 import fighter as fx
+from game import fighter as fx
 from ps2ee.pine import Pine, PineNotRunning
 
 # FUN_00264D98 copies its vblank-count argument into $s1 here. Overwriting the

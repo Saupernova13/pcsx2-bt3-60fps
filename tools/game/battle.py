@@ -1,6 +1,6 @@
 """The live battle, resolved over PCSXROO: fighters, models, and their fields.
 
-``bt3.fighter`` does the same job over PINE and is kept for the scripts that
+``game.fighter`` does the same job over PINE and is kept for the scripts that
 already use it. This one exists because the debugger client can also stop the
 CPU, so everything built on top of it - watchpoints, frame-precise capture -
 needs the same resolution without a second dependency.

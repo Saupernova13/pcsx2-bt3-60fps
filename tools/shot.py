@@ -18,8 +18,8 @@ import time
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
-from bt3.battle import POS, resolve, vec
+from game import config
+from game.battle import POS, resolve, vec
 from ps2ee.roo import Roo
 
 

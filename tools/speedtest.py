@@ -20,7 +20,7 @@ import argparse
 import _bootstrap  # noqa: F401
 import patchctl
 
-from bt3.battle import POS, norm, delta, resolve, vec
+from game.battle import POS, norm, delta, resolve, vec
 from ps2ee.roo import Roo
 
 # (slot, who, buttons, stick, vsyncs). "who" is which fighter to measure.

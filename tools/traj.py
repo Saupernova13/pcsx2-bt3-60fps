@@ -38,8 +38,8 @@ import struct
 import _bootstrap  # noqa: F401
 import patchctl
 
-from bt3 import config
-from bt3.battle import (ANCHOR, FRAME_COUNTER, POS, ROOT_NOW, ROOT_PREV, VEL,
+from game import config
+from game.battle import (ANCHOR, FRAME_COUNTER, POS, ROOT_NOW, ROOT_PREV, VEL,
                           delta, norm, resolve)
 from ps2ee.roo import Roo
 

@@ -25,7 +25,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 from ps2ee.eemem import ElfImage
 from ps2ee.pnach import Pnach
 from ps2ee.roo import Roo

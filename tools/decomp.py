@@ -16,7 +16,7 @@ import sys
 
 import _bootstrap  # noqa: F401
 
-from bt3 import config
+from game import config
 
 
 
@@ -28,7 +28,7 @@ def ghidra_home():
     explicit = os.environ.get("GHIDRA_HOME")
     if explicit:
         return Path(explicit)
-    from bt3.config import _setting
+    from game.config import _setting
 
     configured = _setting("GHIDRA_HOME")
     if configured:
