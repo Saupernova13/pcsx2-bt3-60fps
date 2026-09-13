@@ -18,7 +18,7 @@ from game import identity
 REPO = Path(__file__).resolve().parent.parent.parent
 WORK = REPO / "work"
 PATCHES = REPO / "patch"
-DEV_PNACH = REPO / "dev" / "pnach"
+WIP = REPO / "wip"
 
 # This repo's overrides come from ITS local.json, not pcsxroo's.
 _generic.LOCAL_JSON = REPO / "local.json"

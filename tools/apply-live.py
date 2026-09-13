@@ -4,7 +4,7 @@ Loading a save state restores EE RAM wholesale and wipes any live writes, and
 a freshly deployed cheat file is only read at boot. This puts the patch back
 without restarting.
 
-    python tools/apply-live.py                    # apply dev/pnach/working.pnach
+    python tools/apply-live.py                    # apply wip/working.pnach
     python tools/apply-live.py --check            # report only
 """
 import argparse
@@ -21,7 +21,7 @@ def in_safe_zone(addr: int) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("pnach", nargs="?", default=str(config.DEV_PNACH / "working.pnach"))
+    ap.add_argument("pnach", nargs="?", default=str(config.WIP / "working.pnach"))
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
 

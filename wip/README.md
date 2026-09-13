@@ -1,7 +1,7 @@
-# dev/pnach/
+# wip/
 
 **Looking for the patch to install or share? It is not here.**
-It is [`patch/428113C2.pnach`](../../patch/428113C2.pnach).
+It is [`patch/428113C2.pnach`](../patch/428113C2.pnach).
 
     working.pnach   the working pnach: every group, including two that must
                     never be enabled. The tools read this file; people do not.
@@ -13,4 +13,4 @@ It carries `60FPS - animation rate` (superseded by `60FPS - animation clock`) an
 Both are off, and `tools/export.py` strips them when cutting a release.
 
 To cut one: `python tools/export.py --release vN-name`, then tag the commit.
-See [`releases/README.md`](../../releases/README.md).
+See [`docs/releases.md`](../docs/releases.md).

@@ -110,7 +110,7 @@ def banner(names: list[str]) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--source", default="dev/pnach/working.pnach")
+    parser.add_argument("--source", default="wip/working.pnach")
     parser.add_argument("--to", default=None,
                         help="directory to write into (default: the desktop)")
     parser.add_argument("--release", default=None, metavar="NAME",

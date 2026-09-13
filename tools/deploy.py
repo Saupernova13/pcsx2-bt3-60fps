@@ -1,7 +1,7 @@
 """Install a pnach into PCSX2 and enable it, so the user only has to launch.
 
     python tools/deploy.py patch/428113C2.pnach
-    python tools/deploy.py dev/pnach/experiments/003-halve-anim.pnach --only 60FPS
+    python tools/deploy.py wip/experiments/003-halve-anim.pnach --only 60FPS
     python tools/deploy.py --off                 # disable every cheat
     python tools/deploy.py --status
 """
