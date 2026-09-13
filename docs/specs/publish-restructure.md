@@ -394,3 +394,35 @@ Deviations and findings:
   tags follow). v1 stays tag-only, now stated in `releases/README.md`.
   Pre-existing deviation left untouched: the `v13-pursuit-stomp` tag sits on a
   later docs commit, not its cut commit - the owner's call whether to repoint.
+
+## 12. Layout revision (2026-09-13, owner-directed)
+
+The owner reviewed the Stage 1-3 tree and rejected three of its shapes. This
+section records the revision; sections 2 and 5 above keep the decisions they
+were written with.
+
+| Before | After | Why |
+|---|---|---|
+| `bt3/` (game library) | `tools/game/` | A top-level `bt3/` in a repo already named after BT3 explained nothing; all Python now lives under `tools/`, with the domain package beside the scripts that use it. `game.py` became `identity.py` so the package reads `from game import identity`. |
+| `dev/pnach/` | `wip/` | `dev/` collided with the ignored `work/` (save states, dumps). `wip/working.pnach` + `wip/experiments/` say what they are and are clearly not installable. |
+| `releases/v02-…/…/428113C2.pnach` | deleted | Twenty-one directories each holding the same file, duplicating the git tags. The tags `v02-…v22` are now the versioned record; `patch/428113C2.pnach` remains the one installable file. |
+| `releases/README.md`, `releases/STATUS.md` | `docs/releases.md`, `docs/status.md` | Kept as separate docs (release workflow/history and the per-build confidence ladder), not folded into the README. |
+
+Consequential changes:
+
+- `tools/_bootstrap.py` now inserts `tools/` itself on `sys.path` (not the repo
+  root); the sibling pcsxroo insertion is unchanged.
+- `tools/export.py --release NAME` writes only `patch/` and prints the
+  `git tag NAME` reminder; `--to` and the desktop default are unchanged.
+- All 36 tools import `from game import …`; the old `from bt3 import …` seam is
+  gone. The pcsxroo side (ps2ee, 13 movers) is untouched.
+- Tag convention restated: a tag marks the commit whose `patch/` held that
+  release. Existing tags were not repointed - they still mark the commits that
+  added the now-deleted release directories (still valid history).
+- `docs/findings.md` body prose is still frozen; its header note was updated
+  (2026-09-13) with the new paths.
+
+Verification re-run after the revision: all 36 tools `--help` clean, the
+export gate regenerates `patch/` content-identical to the committed v22, and
+no `bt3/`, `dev/pnach/` or `releases/latest` reference remains outside the
+frozen findings body and this spec.

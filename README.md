@@ -17,7 +17,7 @@ reset or save-state load is not enough.
 
 The file's header also lists what is still not fixed. Per-build confidence, and
 what has been confirmed in play rather than only measured, is in
-**[`releases/STATUS.md`](releases/STATUS.md)**.
+**[`docs/status.md`](docs/status.md)**.
 
 ## What the patch covers
 
@@ -72,12 +72,13 @@ full table is in [`docs/findings.md`](docs/findings.md).
 ## Repository layout
 
     patch/            the patch to install: 428113C2.pnach
-    releases/         one directory per tagged build, plus STATUS.md
-    docs/             method, tool index, and the findings log
-    bt3/              this game's knowledge: fighter/battle layout, config
-    tools/            the BT3-specific command line tools
-    dev/pnach/        the working pnach and isolation experiments - NOT for install
+    wip/              the working pnach and isolation experiments - NOT for install
+    tools/            the command line tools, with the game knowledge in tools/game/
+    docs/             method, tool index, release history, and the findings log
     ghidra/scripts/   the headless decompiler script
+
+Every released version is a git tag (`v02-...` through `v22-...`) - the tag
+holds the patch as it shipped. See [`docs/releases.md`](docs/releases.md).
 
 `work/` (extracted ELF, RAM dumps, caches) is gitignored.
 
@@ -195,6 +196,7 @@ Four rules, each learned by getting it wrong:
 When a change is ready to hand over:
 
     python tools/export.py --release vNN-name
+    git tag vNN-name
 
 ## Notes
 
@@ -215,5 +217,5 @@ Ghidra Emotion Engine support: chaoticgd and beardypig.
 
 ## Licence
 
-Code (`tools/`, `bt3/`, `ghidra/scripts/`): **MIT**, see [`LICENSE`](LICENSE).
+Code (`tools/`, `ghidra/scripts/`): **MIT**, see [`LICENSE`](LICENSE).
 Docs, findings and the patch itself: **CC BY 4.0**, see [`LICENSE-docs`](LICENSE-docs).
