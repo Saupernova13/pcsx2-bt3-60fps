@@ -1,18 +1,18 @@
 # Releases
 
-**The latest stable patch is [`patch/428113C2.pnach`](../patch/428113C2.pnach).**
+**The latest stable patch is [`patch/428113C2.pnach`](patch/428113C2.pnach).**
 
 That is the file to install, and the file to hand to anyone else. Everything else
 in this repository is working material.
 
     patch/428113C2.pnach                        always the newest stable patch
-    releases/v02-airborne-and-hover/...         the same file, kept under its version
-    dev/pnach/working.pnach                     the working pnach - NOT for sharing
+    git tags v02-... through v22-...            every version, kept under its tag
+    wip/working.pnach                           the working pnach - NOT for sharing
 
 The filename has to stay `428113C2.pnach`. PCSX2 finds a pnach by the game's CRC
 and ignores any other name, so rename the directory, never the file.
 
-## Why not just share `dev/pnach/working.pnach`
+## Why not just share `wip/working.pnach`
 
 The working pnach carries two groups that must never be enabled:
 
@@ -39,11 +39,11 @@ a reset or a save-state load is not enough, quit and relaunch.
 
 ## Cutting a new one
 
-    python tools/export.py --release v3-something
-    git tag v3-something
+    python tools/export.py --release v23-something
+    git tag v23-something
 
-`--release` writes the versioned directory and refreshes `patch/`, so they cannot
-drift apart. Tag the same commit, so a release directory and a tag always agree.
+`--release` refreshes `patch/`; the git tag is the versioned record, so a tag
+always agrees with what `patch/` held at that commit.
 
 ## History
 
@@ -53,10 +53,10 @@ drift apart. Tag the same commit, so a release directory and a tag always agree.
 | v2 | `v02-airborne-and-hover` | airborne motion, vertical, residual and gravity; the tween system; aura and trail particles; the hovering idle bob. 13 groups. |
 | v1 | `v1-60fps-input-fixed` | the battle loop at 60fps with animation, input timing and the ki aura correct. |
 
-There is no `v1-*` release directory - v1 exists only as the
-`v1-60fps-input-fixed` tag; directories start at v2.
+v1 exists only as the `v1-60fps-input-fixed` tag - there is no v1 build to
+point at; every version from v2 onward is a tag (`v02-...` through `v22-...`).
 
 Earlier milestones are tagged `milestone-anim-rate` and `milestone-input-timing`.
 Every build from v4 onward is catalogued with its confidence in
-[`STATUS.md`](STATUS.md). The full derivation of every group is in
-[`docs/findings.md`](../docs/findings.md).
+[`status.md`](status.md) - the per-build detail lives there. The full derivation
+of every group is in [`findings.md`](findings.md).

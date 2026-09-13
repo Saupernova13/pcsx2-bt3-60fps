@@ -20,7 +20,7 @@ pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
 mouths, in the cut-in AND in the pre-fight intro. v14's star is cleared.
 None of it touches v12's input-timing flag, which still stands.
 
-> **Deploy `patch/428113C2.pnach`, never `dev/pnach/working.pnach`.** The working
+> **Deploy `patch/428113C2.pnach`, never `wip/working.pnach`.** The working
 > pnach carries five groups that must never be enabled, and `deploy.py` used to
 > turn on every group in whatever file it was given. The user's EmuDeck install
 > had been running all 24 of them - quarter-speed animation, no beams, broken
@@ -316,7 +316,7 @@ a transformation ever runs long again, this is the note to come back to.
 
 ## v20 - the shipped header caught up
 
-**No patch change.** `releases/v20-known-issues-refresh/428113C2.pnach` has the
+**No patch change.** The patch at the `v20-known-issues-refresh` tag has the
 same 25 groups and the same 279 patch lines as v19, verified line for line.
 
 What changed is the `KNOWN NOT FIXED` block the shared file carries at the top,
