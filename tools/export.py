@@ -18,6 +18,10 @@ newest stable patch and the file to install. Named 428113C2.pnach, because
 PCSX2 finds a pnach by CRC and will ignore any other name. The version history
 is the git tags: tag the commit to match the release name, so a tag and what
 patch/ held at that commit always agree.
+
+Every release also carries a version note, docs/versions/NAME.md, saying what
+the version changes over the one before it and what was discovered on the way.
+--release refuses to run without it, so the history cannot quietly lapse.
 """
 
 from __future__ import annotations
@@ -117,6 +121,14 @@ def main() -> int:
                         help="refresh patch/; NAME is the git tag for the record")
     args = parser.parse_args()
 
+    if args.release:
+        note = Path(__file__).resolve().parent.parent / "docs" / "versions" / f"{args.release}.md"
+        if not note.exists():
+            raise SystemExit(
+                f"no version note for {args.release}: write docs/versions/{args.release}.md "
+                "first - what this version changes over the last one, and what was "
+                "discovered. Every release carries one; see docs/releases.md.")
+
     source = Path(args.source)
     header, blocks = split_groups(source.read_text(encoding="utf-8"))
     kept = [(n, b) for n, b in blocks if n not in DEVELOPMENT_ONLY]
@@ -155,7 +167,7 @@ def main() -> int:
     for name in dropped:
         print(f"  dropped (development only)  {name}")
     if args.release:
-        print(f"tag this commit:  git tag {args.release}")
+        print(f"tag this commit:  git tag -a {args.release} -m \"{args.release}: <one line from its note>\"")
     return 0
 
 
