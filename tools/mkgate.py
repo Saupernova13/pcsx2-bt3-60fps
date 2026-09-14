@@ -8,7 +8,7 @@ the next branch, and returns to that branch. Nothing else about the site
 changes: the store in the branch's delay slot still runs every tick.
 
     python tools/mkgate.py 001F7A00,001F6778 --base F1000
-    python tools/pcsxroo/phasetimer.py --sites-only | python tools/mkgate.py --stdin --base F1000
+    python ../pcsxroo/pcsxroo/tools/phasetimer.py --sites-only | python tools/mkgate.py --stdin --base F1000
 """
 
 from __future__ import annotations

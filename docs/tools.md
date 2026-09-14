@@ -1,25 +1,23 @@
 # Tools index
 
-> **Reference only, for now.** These tools import a generic library that lives
-> in pcsxroo, a PCSX2 fork that is not yet public, so none of them run from a
-> fresh clone of this repository. They are published so the method behind the
-> patch can be read and checked.
-
 All 48 command-line tools, split across two repos. Every one has a real module
-docstring - `python <tool> --help` is the reference.
+docstring - `python <tool> --help` is the reference. Setting them up is in the
+README's [Getting started](../README.md#getting-started).
 
 - **This repo, `tools/`** - the 35 tools that know this game: they read BT3's
   structs, drive its pnach groups, or walk its save-state conventions. They
-  import game knowledge from `tools/game/` and the generic library from the
-  sibling pcsxroo checkout.
-- **pcsxroo, `tools/pcsxroo/`** - the generic `ps2ee/` library and 13 EE
-  analysis tools that would work on any game.
+  import game knowledge from `tools/game/` and the generic library from a
+  [PCSXROO](https://github.com/Saupernova13/pcsxroo) checkout - a sibling
+  `pcsxroo` folder, or wherever `PCSXROO_REPO` points.
+- **PCSXROO, `pcsxroo/ps2ee/` and `pcsxroo/tools/`** - the generic library and
+  13 EE analysis tools that would work on any game. Run them as
+  `python ../pcsxroo/pcsxroo/tools/<tool>.py`.
 
 Transport column: **PCSXROO** = needs the PCSXROO debug server (port 28110),
 **PINE** = works against stock PCSX2 with PINE enabled, **offline** = needs no
-emulator at all. Tools that need a game identity take it from `local.json`
-(this repo) or `tools/pcsxroo/local.json` (pcsxroo), or from `game.config`
-automatically in this repo.
+emulator at all. The tools here take the game identity from `game.config`
+automatically; PCSXROO's take it from `pcsxroo/local.json` in that checkout
+(copy its `local.json.example`, which is this game).
 
 ## In this repo (35)
 
