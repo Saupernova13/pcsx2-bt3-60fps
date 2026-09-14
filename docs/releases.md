@@ -6,7 +6,8 @@ That is the file to install, and the file to hand to anyone else. Everything els
 in this repository is working material.
 
     patch/428113C2.pnach                        always the newest stable patch
-    git tags v02-... through v22-...            every version, kept under its tag
+    git tags v01-... through v22-...            every version, kept under its tag
+    docs/versions/                              what every version changed and discovered
     wip/working.pnach                           the working pnach - NOT for sharing
 
 The filename has to stay `428113C2.pnach`. PCSX2 finds a pnach by the game's CRC
@@ -39,24 +40,18 @@ a reset or a save-state load is not enough, quit and relaunch.
 
 ## Cutting a new one
 
-    python tools/export.py --release v23-something
-    git tag v23-something
+1. Write `docs/versions/v23-something.md`: what this version changes over the last
+   one, and what was discovered on the way. Add its row to
+   [`versions/README.md`](versions/README.md).
+2. Export and tag:
 
-`--release` refreshes `patch/`; the git tag is the versioned record, so a tag
-always agrees with what `patch/` held at that commit.
+       python tools/export.py --release v23-something
+       git tag -a v23-something -m "v23-something: <one line from the note>"
+
+`--release` refuses to run without the note, and refreshes `patch/`. The tag is the
+versioned record, so a tag always agrees with what `patch/` held at that commit.
 
 ## History
 
-| version | tag | what it added |
-|---|---|---|
-| v3 | `v03-blast-hit-cadence` | multi-hit attacks paced by real time: ki blasts land their hits at the right rate and last as long as they should. 14 groups. |
-| v2 | `v02-airborne-and-hover` | airborne motion, vertical, residual and gravity; the tween system; aura and trail particles; the hovering idle bob. 13 groups. |
-| v1 | `v1-60fps-input-fixed` | the battle loop at 60fps with animation, input timing and the ki aura correct. |
-
-v1 exists only as the `v1-60fps-input-fixed` tag - there is no v1 build to
-point at; every version from v2 onward is a tag (`v02-...` through `v22-...`).
-
-Earlier milestones are tagged `milestone-anim-rate` and `milestone-input-timing`.
-Every build from v4 onward is catalogued with its confidence in
-[`status.md`](status.md) - the per-build detail lives there. The full derivation
-of every group is in [`findings.md`](findings.md).
+Every version, what it changed and what it discovered, is in
+**[`versions/`](versions/README.md)** - one note per version, v01 through v22.

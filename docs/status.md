@@ -3,6 +3,9 @@
 Which build to trust, and why. Set by testing **in play**, not by measurement.
 Newest at the top. `patch/428113C2.pnach` currently holds **v22**.
 
+What every version changed and discovered, v01 through v22, is in
+[`versions/`](versions/README.md). This page is only about which build to trust.
+
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
 > in play by the user**. A star is provisional: nothing is settled here until it
@@ -42,10 +45,10 @@ None of it touches v12's input-timing flag, which still stands.
 | `v12-restore-sequence-wait` | 16 | **FINE, FLAGGED** | correct | Carries the input-timing flag below |
 | `v11-back-to-v8-set` | 15 | **DEFINITELY FINE** | **ends early** | The known-good baseline. Fall back here |
 | `v10-withdraw-phase-timers` | 16 | superseded | correct | Identical group list to v12 |
-| `v9-scripted-clocks` | 17 | **DO NOT USE** | correct | State 157 trap |
-| `v8-blast-duration-only` | 15 | fine | ends early | Same group list as v11 |
-| `v7-blasts-fixed` | 16 | superseded | - | Contained the withdrawn sequence-rate gate |
-| `v5`, `v4` | 16, 15 | **DO NOT USE** | - | Withdrawn: gating deleted the beam |
+| `v09-scripted-clocks` | 17 | **DO NOT USE** | correct | State 157 trap |
+| `v08-blast-duration-only` | 15 | fine | ends early | Same group list as v11 |
+| `v07-blasts-fixed` | 16 | superseded | - | Contained the withdrawn sequence-rate gate |
+| `v05`, `v04` | 16, 15 | **DO NOT USE** | - | Withdrawn: gating deleted the beam |
 
 ## v11 - DEFINITELY FINE
 
