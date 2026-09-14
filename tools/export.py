@@ -155,7 +155,9 @@ def main() -> int:
     for out_dir in targets:
         out_dir.mkdir(parents=True, exist_ok=True)
         dest = out_dir / f"{config.CRC}.pnach"
-        dest.write_text(text, encoding="utf-8", newline="\r\n")
+        # LF, as .gitattributes stores every pnach. CRLF made a release export of an
+        # unchanged patch show patch/ as modified on Windows. PCSX2 reads either.
+        dest.write_text(text, encoding="utf-8", newline="\n")
         problems = Pnach.load(dest).validate()
         if problems:
             raise SystemExit("the exported pnach did not validate:\n  "
