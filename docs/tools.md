@@ -1,5 +1,10 @@
 # Tools index
 
+> **Reference only, for now.** These tools import a generic library that lives
+> in pcsxroo, a PCSX2 fork that is not yet public, so none of them run from a
+> fresh clone of this repository. They are published so the method behind the
+> patch can be read and checked.
+
 All 48 command-line tools, split across two repos. Every one has a real module
 docstring - `python <tool> --help` is the reference.
 

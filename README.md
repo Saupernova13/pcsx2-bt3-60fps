@@ -3,6 +3,11 @@
 A 60fps patch for **Dragon Ball Z: Budokai Tenkaichi 3** (SLUS-21678, CRC
 428113C2) on PCSX2, and the tooling that built it.
 
+> **The tooling is published for reference only, for now.** The patch installs
+> and works on its own. The Python tools do not run from a fresh clone: their
+> generic half lives in pcsxroo, a PCSX2 fork that is not yet public. Read them
+> for how the patch was found and verified; do not expect to run them.
+
 ## Install
 
 **[`patch/428113C2.pnach`](patch/428113C2.pnach) is the patch.** Drop it in
@@ -84,6 +89,10 @@ holds the patch as it shipped. See [`docs/releases.md`](docs/releases.md).
 
 ## Setup
 
+> **Reference only, for now.** Everything below documents how this project is
+> run on the author's machine. It needs a checkout of pcsxroo, which is not yet
+> public, so a fresh clone of this repository cannot follow it.
+
 Needs Python 3.11+, and Ghidra with the Emotion Engine extension for
 decompilation:
 
@@ -122,13 +131,13 @@ Ghidra project (once, several minutes):
 
 ## Tools
 
-All 49 tools are indexed in **[docs/tools.md](docs/tools.md)** with what each
+All 48 tools are indexed in **[docs/tools.md](docs/tools.md)** with what each
 needs (PCSXROO, PINE, or offline). Two homes:
 
 - **`tools/` here** - the 35 that know this game: they read its structs, drive
   its pnach groups, or walk its save-state conventions. `deploy.py`,
   `patchctl.py` and `export.py` are the ones you will use the most.
-- **pcsxroo's `tools/pcsxroo/`** - the generic ps2ee library and 14 EE analysis
+- **pcsxroo's `tools/pcsxroo/`** - the generic ps2ee library and 13 EE analysis
   tools that would work on any game: disassembly, xrefs, RAM diffing, tick
   counting.
 
