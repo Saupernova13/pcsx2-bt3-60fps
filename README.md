@@ -24,6 +24,9 @@ The file's header also lists what is still not fixed. Per-build confidence, and
 what has been confirmed in play rather than only measured, is in
 **[`docs/status.md`](docs/status.md)**.
 
+**Every version of the patch, v01 through v22, with what each one changed and what
+was discovered on the way, is in [`docs/versions/`](docs/versions/README.md).**
+
 ## What the patch covers
 
 26 groups, each compensating one system the 60 Hz loop drives twice as often.
