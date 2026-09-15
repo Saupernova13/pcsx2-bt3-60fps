@@ -1,15 +1,15 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v22**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v23**.
 
-What every version changed and discovered, v01 through v22, is in
+What every version changed and discovered, v01 through v23, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
 > same save state, same input, same number of vsyncs - but **not yet confirmed
 > in play by the user**. A star is provisional: nothing is settled here until it
-> has been played. **v17, v21 and v22 are starred** - v22 half-cleared: the user
+> has been played. **v17, v21, v22 and v23 are starred** (v23 is v22's patch) - v22 half-cleared: the user
 > confirmed its duration in play on 2026-09-12, but not yet who wins a clash.
 
 **v16, v18 and v19 are confirmed in play by the user, 2026-09-09.** Ki blast
@@ -32,6 +32,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate's blast | Notes |
 |---|---|---|---|---|
+| `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a beam clash - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
 | `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
@@ -398,3 +399,14 @@ rotations a second that is indistinguishable from 30fps - the counts are
 identical, 55/55, 73/73, 91/91 - and above it the 60fps build counts crossings
 the 30fps game aliases away. Matching the original exactly would mean throwing
 away input the player can feel themselves giving. See docs/findings.md.
+
+## v23 - the shipped header caught up with the beam clash
+
+**No patch change.** The patch at the `v23-known-issues-refresh` tag has the
+same 27 groups and the same 313 patch lines as v22; only comments differ.
+
+v22 was tagged before its known gap - the CPU ending 10-18% low in a beam clash -
+was written into the `KNOWN NOT FIXED` block, so the file people installed never
+mentioned it. v23 is that file. Its confidence is v22's, star and all.
+
+It is the first version published as a GitHub Release, with the patch attached.
