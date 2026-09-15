@@ -4,7 +4,9 @@ Every version of the patch: what it changed over the one before it, and what was
 discovered on the way. Each note is written from the release file at its tag, the
 commits that produced it, and the findings log of the time.
 
-**The patch to install is always [`patch/428113C2.pnach`](../../patch/428113C2.pnach).**
+**The patch to install is always [`patch/428113C2.pnach`](../../patch/428113C2.pnach)**,
+also the download on the
+[latest release](https://github.com/Saupernova13/pcsx2-bt3-60fps/releases/latest).
 Every version below is also a git tag, and each note ends with the command that
 recovers that version's file.
 
@@ -33,6 +35,7 @@ recovers that version's file.
 | [`v20`](v20-known-issues-refresh.md) | 2026-09-09 | 25 | no patch change - the shipped known-issues header refreshed | confirmed in play |
 | [`v21`](v21-rush-struggle.md) | 2026-09-10 | 26 | the CPU can no longer out-rotate the player in a rush struggle | not yet played\* |
 | [`v22`](v22-beam-clash.md) | 2026-09-12 | 27 | the beam clash paced in real time, and the CPU's rotation gated | duration confirmed\* |
+| [`v23`](v23-known-issues-refresh.md) | 2026-09-15 | 27 | no patch change - the beam clash caveat added to the shipped header; the first GitHub Release | duration confirmed\* |
 
 Group counts are the groups in each release file. From v16 on, one of them is the
 optional 19.5:9 widescreen group, which ships switched off.
@@ -46,7 +49,8 @@ The list is not a straight line, and the notes say why:
 - **v07 builds on v06**, not v06b.
 - **v08 and v11 have identical group lists**, as do **v10 and v12** - v09 to v12 is a
   rollback and roll-forward to isolate the state 157 trap.
-- **v20's patch is byte-identical to v19's**; only the shipped header changed.
+- **v20's patch is byte-identical to v19's**, and **v23's patch lines are v22's**;
+  in both only the shipped header changed.
 
 A \* marks a build measured correct against the 30fps game but not yet confirmed in
 play. Per-build confidence is kept current in [`status.md`](../status.md), and the
@@ -56,4 +60,5 @@ full derivation of every group is in [`findings.md`](../findings.md).
 
 `tools/export.py --release NAME` refuses to run until `docs/versions/NAME.md` exists.
 Write the note first - what the version changes over the last one, and what was
-discovered - then cut the release and tag it. See [`releases.md`](../releases.md).
+discovered - then cut the release, tag it, and push the tag to publish it as a
+GitHub Release. See [`releases.md`](../releases.md).
