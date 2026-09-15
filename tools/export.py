@@ -170,6 +170,7 @@ def main() -> int:
         print(f"  dropped (development only)  {name}")
     if args.release:
         print(f"tag this commit:  git tag -a {args.release} -m \"{args.release}: <one line from its note>\"")
+        print(f"then, on main:    git push origin {args.release}   (publishes the GitHub Release)")
     return 0
 
 

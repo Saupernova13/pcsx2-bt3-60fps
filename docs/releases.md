@@ -1,12 +1,15 @@
 # Releases
 
-**The latest stable patch is [`patch/428113C2.pnach`](patch/428113C2.pnach).**
+**The latest stable patch is `428113C2.pnach` on the
+[latest release](https://github.com/Saupernova13/pcsx2-bt3-60fps/releases/latest)**,
+and the same file is [`patch/428113C2.pnach`](../patch/428113C2.pnach) here.
 
 That is the file to install, and the file to hand to anyone else. Everything else
 in this repository is working material.
 
+    GitHub Releases                             the newest version, with the patch attached
     patch/428113C2.pnach                        always the newest stable patch
-    git tags v01-... through v22-...            every version, kept under its tag
+    git tags v01-... through v23-...            every version, kept under its tag
     docs/versions/                              what every version changed and discovered
     wip/working.pnach                           the working pnach - NOT for sharing
 
@@ -43,15 +46,27 @@ a reset or a save-state load is not enough, quit and relaunch.
 1. Write `docs/versions/v23-something.md`: what this version changes over the last
    one, and what was discovered on the way. Add its row to
    [`versions/README.md`](versions/README.md).
-2. Export and tag:
+2. Export, commit, and tag:
 
-       python tools/export.py --release v23-something
-       git tag -a v23-something -m "v23-something: <one line from the note>"
+       python tools/export.py --release v24-something
+       git tag -a v24-something -m "v24-something: <one line from the note>"
+
+3. Once that commit is on `main`, push the tag:
+
+       git push origin v24-something
 
 `--release` refuses to run without the note, and refreshes `patch/`. The tag is the
 versioned record, so a tag always agrees with what `patch/` held at that commit.
 
+Pushing the tag runs `.github/workflows/release.yml`, which publishes a GitHub
+Release named for the tag: `428113C2.pnach` attached as the download, install steps
+and the version note as its text. It marks the new release Latest; older versions
+stay tags, never downloads, so no one picks up a build the notes say not to use. A
+tag without `patch/428113C2.pnach` or its note fails the run instead of publishing.
+If a run fails, fix the cause and run the workflow by hand from the Actions tab,
+giving it the tag name.
+
 ## History
 
 Every version, what it changed and what it discovered, is in
-**[`versions/`](versions/README.md)** - one note per version, v01 through v22.
+**[`versions/`](versions/README.md)** - one note per version, v01 through v23.

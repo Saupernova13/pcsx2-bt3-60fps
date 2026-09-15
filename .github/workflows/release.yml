@@ -1,0 +1,81 @@
+# Publishes a version tag as a GitHub Release with the patch attached, so the
+# Releases page is where people download it. See docs/releases.md.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to publish, e.g. v23-known-issues-refresh"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    env:
+      # Passed through env, never expanded into a script, so a tag name is only data.
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Write the release notes
+        run: |
+          set -euo pipefail
+          pnach=patch/428113C2.pnach
+          note="docs/versions/${TAG}.md"
+          if [ ! -f "$pnach" ]; then
+            echo "::error::${TAG} has no ${pnach}; cut it with tools/export.py --release ${TAG}"
+            exit 1
+          fi
+          if [ ! -f "$note" ]; then
+            echo "::error::${TAG} has no ${note}; every release carries a version note"
+            exit 1
+          fi
+
+          head -n 1 "$note" | sed 's/^# *//' > title.txt
+
+          # Relative links in the note point into the repo; a release page needs them absolute.
+          base="https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/versions/"
+          {
+            cat <<'EOF'
+          ## Install
+
+          **Download `428113C2.pnach` below.** The "Source code" archives are the
+          development repository, not the patch.
+
+          1. Keep the name `428113C2.pnach`. PCSX2 finds a patch by the game's CRC and
+             ignores any other name.
+          2. Put it in PCSX2's `cheats` folder.
+          3. Enable cheats for Budokai Tenkaichi 3 (SLUS-21678) and tick every group
+             listed at the top of the file, in the game's Settings -> Cheats.
+          4. Quit and relaunch PCSX2. A reset or a save-state load is not enough.
+
+          The top of the file also lists what is still not fixed.
+
+          EOF
+            # The note without its title (the release has one) or its git recipe (this page replaces it).
+            awk 'NR == 1 { next } /^## Get this version/ { skip = 1; next } /^## / { skip = 0 } !skip' "$note" |
+              sed -E "s|\]\(([^)#:][^):]*)\)|](${base}\1)|g"
+          } > notes.md
+
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" patch/428113C2.pnach \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$(cat title.txt)" \
+            --notes-file notes.md \
+            --verify-tag

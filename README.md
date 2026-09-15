@@ -8,9 +8,12 @@ it, see [Getting started](#getting-started).
 
 ## Install
 
-**[`patch/428113C2.pnach`](patch/428113C2.pnach) is the patch.** Drop it in
-PCSX2's `cheats/`, set `EnableCheats = true`, and enable every group listed in
-the file's own header - or let the tooling do it:
+**Download `428113C2.pnach` from the
+[latest release](https://github.com/Saupernova13/pcsx2-bt3-60fps/releases/latest).**
+Drop it in PCSX2's `cheats/`, set `EnableCheats = true`, and enable every group
+listed in the file's own header. The same file is
+[`patch/428113C2.pnach`](patch/428113C2.pnach) here, and from a clone the
+tooling can install it for you:
 
     python tools/deploy.py patch/428113C2.pnach
 
@@ -22,7 +25,7 @@ The file's header also lists what is still not fixed. Per-build confidence, and
 what has been confirmed in play rather than only measured, is in
 **[`docs/status.md`](docs/status.md)**.
 
-**Every version of the patch, v01 through v22, with what each one changed and what
+**Every version of the patch, v01 through v23, with what each one changed and what
 was discovered on the way, is in [`docs/versions/`](docs/versions/README.md).**
 
 ## What the patch covers
@@ -83,8 +86,9 @@ full table is in [`docs/findings.md`](docs/findings.md).
     docs/             method, tool index, release history, and the findings log
     ghidra/scripts/   the headless decompiler script
 
-Every released version is a git tag (`v02-...` through `v22-...`) - the tag
-holds the patch as it shipped. See [`docs/releases.md`](docs/releases.md).
+Every released version is a git tag (`v02-...` through `v23-...`) - the tag
+holds the patch as it shipped - and pushing a tag publishes it as a GitHub
+Release with the patch attached. See [`docs/releases.md`](docs/releases.md).
 
 `work/` (extracted ELF, RAM dumps, caches) is gitignored.
 
@@ -170,7 +174,7 @@ acceptance tests are `speedtest.py`, `stomptest.py`, `blasttest.py` and
 
 **8. Read what is already known** before changing anything:
 [`docs/status.md`](docs/status.md) for the state of every group,
-[`docs/versions/`](docs/versions/README.md) for what each of v01 to v22 changed
+[`docs/versions/`](docs/versions/README.md) for what each of v01 to v23 changed
 and discovered, [`docs/findings.md`](docs/findings.md) for the full log, and
 [`docs/tools.md`](docs/tools.md) for every tool.
 
@@ -259,7 +263,8 @@ Four rules, each learned by getting it wrong:
 When a change is ready to hand over:
 
     python tools/export.py --release vNN-name
-    git tag vNN-name
+    git tag -a vNN-name -m "vNN-name: <one line from its note>"
+    git push origin vNN-name        # once the commit is on main: publishes the release
 
 ## Notes
 
