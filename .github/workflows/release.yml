@@ -23,7 +23,7 @@ jobs:
       # Passed through env, never expanded into a script, so a tag name is only data.
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: refs/tags/${{ env.TAG }}
 
