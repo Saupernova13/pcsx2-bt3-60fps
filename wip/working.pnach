@@ -1113,3 +1113,46 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// Blast 1 buff durations, found 2026-09-16 for issue #20. SuperCombo publishes
+// these in SECONDS, so this one needs no 30fps arm to say what is right - and
+// the 30fps game matches the published number exactly, which is the check that
+// the oracle is the right one.
+//
+// FUN_00200408 applies a Blast 1's effects. It is a 54-case jump table on the
+// effect type (table at 002F0FD0), and one register carries the duration
+// through every case:
+//
+//   00200558  jal  002123B0             the move's duration, in frames
+//   0020055C  move $s6, $v0             <- the ONE place $s6 is set
+//   00200620  sw   $s6, 0xE08($s1)
+//   00200688  blez $s6, 002006C0
+//   00200690  div  $zero, $s5, $s6      a per-tick amount = total / duration
+//   002006A4  sw   $v0, 0xE10($s1)
+//   00200754  sw   $s6, 0xE14($s1)
+//   00200778  sw   $s6, 0xE18($s1)
+//   00200860  move $t1, $s6             -> FUN_001C3410, the four stat slots
+//   00200A08  sw   $s6, 0xE1C($s1)
+//   00200A1C  sw   $s6, 0xE24($s1)
+//
+// Every one of those is a duration, and nothing else reads $s6, so doubling it
+// where it is set doubles every buff timer at once. The division makes that
+// self-consistent: a drain-over-time effect gets half the per-tick amount for
+// twice as long, so its total is unchanged.
+//
+// `move $s6, $v0` is `addu`, and `sll $s6, $v0, 1` is the same one word with
+// the shift folded in - no trampoline, no scratch space.
+//
+// Measured on Vegeta (Scouter)'s Saiyan Soul, published at 20 seconds. Two
+// timers at fighter+0xE14/+0xE1C and four stat slots at +0xF64 + i*0x18 all
+// arm together and count down once a tick:
+//
+//   30fps        armed 599   1200 vsyncs /  600 ticks = 20.00s
+//   60fps        armed 599    600 vsyncs /  600 ticks = 10.00s
+//   with this   armed 1199   1200 vsyncs / 1200 ticks = 20.00s
+//
+// Explosive Wave, the same character's other Blast 1, arms no duration and is
+// unchanged by this group: state 253 for 70 vsyncs either way.
+[60FPS - buff duration]
+description=Double the Blast 1 buff durations, so a 20-second stat boost lasts 20 seconds at 60fps instead of 10.
+patch=1,EE,0020055C,word,0002B040 // move $s6, $v0 -> sll $s6, $v0, 1   double every buff duration
