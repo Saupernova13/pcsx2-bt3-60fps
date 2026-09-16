@@ -6253,12 +6253,34 @@ to two decimal places is what makes the other two rows readable at all.
 explicitly: the `full` arm above carries it and still ends at 10 seconds. Buff
 durations are not counted on `fighter+0x132C`.
 
+### Confirmed on a second character, with two more published numbers
+
+Hercule was located the same day (see the roster note in [`rig.md`](rig.md)), and
+both of his Blast 1s carry a published duration. He is `work/state-backups/rocky-hercule-vs-standing-gohan.p2s`,
+also save slot 5.
+
+His timers are at **different offsets** from Saiyan Soul's - `+0x0E18` and the
+`+0x0F60 + i*0x18` slots rather than `+0x0E14` and `+0x0F64`. That is the inner
+loop at `001C32C8`, which walks two entries per slot; a buff takes whichever
+entry suits its effect. Same array, same decrement, same `$s6`.
+
+| move | published | 30fps | 60fps | 60fps + this group |
+|---|---|---|---|---|
+| False Courage | 7.5s | 7.67s | 4.00s | 7.67s |
+| Champion Style?! | 15s | **15.00s** | 7.67s | **15.00s** |
+| Saiyan Soul (Vegeta Scouter) | 20s | **20.00s** | 10.00s | **20.00s** |
+
+The armed values double exactly - False Courage 224 -> 449, Champion Style 449
+-> 898 - and the two `7.67s` rows are the same number, not a near miss: the
+sampling loop steps 20 vsyncs at a time, so a 450-vsync span reads 460 in both
+arms. Champion Style and Saiyan Soul are long enough to land on the step
+boundary and both read their published seconds exactly.
+
+**Three moves, two characters, three different published durations, one word.**
+
 ### What this does not cover
 
-- **Hercule's False Courage (7.5s) and Champion Style?! (15s)** are the same
-  mechanism by inspection, but Hercule has not been located in character select
-  - see #5 and #8 - so neither is measured.
-- **After Image Strike (15s)** likewise.
+- **After Image Strike (15s)** is on characters not yet loaded.
 - **Teen Gohan SSJ2's Unforgivable** lasts until the Max Power gauge drains
   rather than a fixed time, so it is a different question.
 - Explosive Wave, the other Blast 1 on the same character, arms no duration at
