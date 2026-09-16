@@ -1145,11 +1145,27 @@ patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug 
 // Flight time is exact and the landing point is within 3%. Speed goes 10.91 ->
 // 20.59 -> 11.19 units per vsync against a 30fps 10.91.
 //
-// Gravity is a `lui $at, 0x3F00` immediate in the constructor at 0017873C, with
-// one reader, so that half is one word. The displacement is a bare Vec3Add with
-// no scalar to halve, so it needs the trampoline: scale the velocity into a
-// fixed scratch vector and add that instead. Nothing runs between the scale and
-// the add, so a fixed buffer needs no re-entrancy.
+// BOTH HALVES ARE DONE AT THE MOVER, NOT AT THE CONSTRUCTOR. Gravity is a `lui
+// $at, 0x3F00` immediate in Hercule's constructor at 0017873C, and halving it
+// there is one word and measures the same - but it fixes one move. Nine
+// different constructors write +0xF0 on this object layout, with four
+// different values:
+//
+//   00177770 in FUN_00177548   lui $at, 0x3F00   0.5
+//   001787AC in FUN_00178704   lui $at, 0x3F00   0.5     Hercule
+//   0018A4E0 in FUN_0018A1D8   lui $at, 0x3F80   1.0
+//   001A4D7C in FUN_001A4C98   lui $at, 0x3F80   1.0
+//   0017A434, 00183CF4, 0018DD1C, 00191CE8, 00231010   computed at runtime
+//
+// Five of those are not constants at all, so no data patch could reach them.
+// The mover reads +0xF0 once per tick for every object it advances, so halving
+// it there covers all nine and anything added later. The trampoline therefore
+// swallows the whole gravity block and returns past it, to 00178DA8.
+//
+// The displacement is a bare Vec3Add with no scalar to halve, so it needs the
+// trampoline anyway: scale the velocity into a fixed scratch vector and add
+// that instead. Nothing runs between the scale and the add, so a fixed buffer
+// needs no re-entrancy.
 //
 // FUN_00178D18 saves $ra at 00178D30, so the trampoline's own calls are safe to
 // make even though it is entered with `j` rather than `jal`.
@@ -1166,7 +1182,13 @@ patch=1,EE,000F161C,word,0220282D // daddu $a1, $s1, $zero   a   = position
 patch=1,EE,000F1620,word,3C06000F // lui $a2, 0x000F
 patch=1,EE,000F1624,word,0C0487B0 // jal 0x00121EC0          Vec3Add
 patch=1,EE,000F1628,word,34C61660 // ori $a2, $a2, 0x1660    (delay) b = scratch vector
-patch=1,EE,000F162C,word,0805E366 // j 0x00178D98
-patch=1,EE,000F1630,word,00000000 // nop
+patch=1,EE,000F162C,word,C6000084 // replay 00178D98         lwc1 $f0, 0x84($s0)  vel.y
+patch=1,EE,000F1630,word,C60100F0 // replay 00178D9C         lwc1 $f1, 0xF0($s0)  gravity
+patch=1,EE,000F1634,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F1638,word,44811000 // mtc1 $at, $f2           0.5f
+patch=1,EE,000F163C,word,46020842 // mul.s $f1, $f1, $f2     THIS object's gravity, halved
+patch=1,EE,000F1640,word,46010000 // replay 00178DA0         add.s $f0, $f0, $f1
+patch=1,EE,000F1644,word,E6000084 // replay 00178DA4         swc1 $f0, 0x84($s0)
+patch=1,EE,000F1648,word,0805E36A // j 0x00178DA8            past the gravity block
+patch=1,EE,000F164C,word,00000000 // nop
 patch=1,EE,00178D90,word,0803C580 // jal Vec3Add -> j 000F1600
-patch=1,EE,0017873C,word,3C013E80 // lui $at, 0x3F00 -> 0x3E80   thrown gravity 0.5 -> 0.25

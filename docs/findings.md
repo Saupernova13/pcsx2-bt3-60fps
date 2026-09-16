@@ -6233,26 +6233,64 @@ With both halved, the flight time is exact and the landing point is within 3%.
 The residual is a launch-phase offset: the throw animation ends on a different
 vsync in the two arms, so the object spawns a vsync or two apart.
 
-### The two changes
+### The one-word gravity fix was a trap
 
-**Gravity is one word.** `0017873C` is `lui $at, 0x3F00` - 0.5f as an immediate,
-loaded into `$f22` and stored to `+0xF0` in the constructor, with no other
-reader. `0x3E80` is 0.25f.
+Gravity looked like this project's favourite shape. `0017873C` is
+`lui $at, 0x3F00` - 0.5f as an immediate, loaded into `$f22` and stored to
+`+0xF0` in Hercule's constructor. `0x3E80` is 0.25f. One word, and it measures
+exactly as well as what shipped.
 
-**The displacement needs a trampoline.** Unlike every other travel site in this
-patch, `00178D90` is a bare `Vec3Add` with no scalar anywhere to halve. The
+It fixes one character.
+
+The object layout is recognisable - a float store to `+0xF0` in a function that
+also writes `+0xDC`, `+0xE0` and `+0xE4`. **Nine constructors match, with four
+different gravities:**
+
+| site | function | gravity |
+|---|---|---|
+| `00177770` | `FUN_00177548` | `lui $at, 0x3F00` = 0.5 |
+| `001787AC` | `FUN_00178704` | `lui $at, 0x3F00` = 0.5 (Hercule) |
+| `0018A4E0` | `FUN_0018A1D8` | `lui $at, 0x3F80` = 1.0 |
+| `001A4D7C` | `FUN_001A4C98` | `lui $at, 0x3F80` = 1.0 |
+| `0017A434`, `00183CF4`, `0018DD1C`, `00191CE8`, `00231010` | five more | **computed at runtime** |
+
+Five of them are not constants at all, so no data patch could ever reach them.
+Patching the one that Hercule happens to use would have closed the issue, passed
+its own A/B, and left eight other thrown attacks at double gravity.
+
+**The mover is the global site.** `FUN_00178D18` reads `+0xF0` once per tick for
+every object it advances, whatever built it, so halving it there covers all nine
+and anything added later. The trampoline swallows the whole gravity block and
+returns past it, to `00178DA8`. The measured result is identical - 34 vsyncs,
+landing at (-108.3, -2.8, 210.4) - and the coverage is not.
+
+The general rule, which this project keeps re-learning: **a constant with one
+reader is a one-word fix; a constant with one reader per instance is not.** The
+one-reader test asks how many sites read the value, and the answer here is one -
+but it is one site reading nine different values. Halve it where it is *used*,
+not where it is *set*, unless the setter is unique too.
+
+### The displacement half
+
+Unlike every other travel site in this patch, `00178D90` is a bare `Vec3Add`
+with no scalar anywhere to halve, so it needed the trampoline regardless. The
 trampoline scales the velocity into a fixed scratch vector at `000F1660` and
-adds that instead - the same shape as `[60FPS - airborne residual]`, and for
-the same reason: nothing runs between the scale and the add, so a fixed buffer
-needs no re-entrancy and the stack is left alone.
+adds that instead - the same shape as `[60FPS - airborne residual]`, and for the
+same reason: nothing runs between the scale and the add, so a fixed buffer needs
+no re-entrancy and the stack is left alone.
 
 `FUN_00178D18` saves `$ra` at `00178D30`, so the trampoline's own `jal`s are
 safe to make even though it is entered with `j`.
 
 ### Not established
 
-- **Which other attacks are thrown objects.** `FUN_00178704` is a constructor
-  with no direct `jal` callers, so it is reached through a pointer and the
-  roster of moves that use it is unknown. Nothing else was observed changing.
+- **Which other attacks are thrown objects.** The nine constructors above are
+  the static evidence that there are several; which moves they belong to was not
+  traced. `FUN_00178704` has no direct `jal` callers, so it is reached through a
+  pointer. Only Hercule's throw was measured.
+- **Whether the mover handles objects that should NOT be halved.** Everything it
+  advances now moves at half the per-tick rate. That is right for anything
+  paced in game ticks, which is everything this game does, but it has been
+  checked on one move.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
