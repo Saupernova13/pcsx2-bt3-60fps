@@ -6159,3 +6159,98 @@ which contains `001D945C`, the winner decision found on 2026-09-10. **The rush
 struggle's 88-tick duration is almost certainly that manager's own clock**, not
 the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.
+
+
+## 2026-09-16 - issue #23, widescreen: the model generalises, so put it in a tool
+
+The 19.5:9 group was worked out by hand on 2026-09-08 and its derivation sat in
+a findings section. Issue #23 asked for 21:9 and 16:10, which is the same
+arithmetic twice more, so the arithmetic moved into `tools/widescreen.py` and
+the next aspect costs one command.
+
+Nothing about the model changed. The three words are:
+
+| address | what it is | value |
+|---|---|---|
+| `002FE4CC` | projection scale, 7/6 at 4:3 | `(7/6) * aspect / (4/3)` |
+| `002FE594` | the same constant x256 | the above x256 |
+| `00130BF0` | `lui $at, imm` - an instruction | top 16 bits of `float32(1/aspect)` |
+
+### The tool is checked against words nobody in this project chose
+
+`--selftest` runs the model against BT3's stock 4:3 and PCSX2's own shipped
+`[Widescreen 16:9]` from `resources/patches.zip`:
+
+```
+ok   stock 4:3
+       scale  ours 3F955555 1.1666667   theirs 3F955555 1.1666666   0.0000%
+       lui    ours 0x3F40    theirs 0x3F40    exact
+ok   PCSX2's shipped [Widescreen 16:9]
+       scale  ours 3FC71C72 1.5555556   theirs 3FC70FB6 1.5551670   0.0250%
+       lui    ours 0x3F10    theirs 0x3F10    exact
+```
+
+The `lui` immediate - the part that actually carries the aspect - matches both
+bit for bit. The 16:9 scale is 0.025% off, and the arithmetic says exactly why:
+`7/6 * 1.333` is `1.5551667`, so the official patch typed the widen factor as
+`1.333` rather than `4/3`. That is a field of view 0.025% narrow, about half a
+pixel across 1920. Fed 19.5:9 the tool reproduces the group already in the file,
+all three words.
+
+### 16:10 and 21:9 both land exactly
+
+| aspect | `002FE4CC` | `002FE594` | `00130BF0` | `lui` error |
+|---|---|---|---|---|
+| 19.5:9 (2.166667) | `3FF2AAAB` | `43F2AAAB` | `3C013EEC` | 0.13% |
+| 16:10 (1.600000) | `3FB33333` | `43B33333` | `3C013F20` | **exact** |
+| 21:9 as 64:27 (2.370370) | `4004BDA1` | `4404BDA1` | `3C013ED8` | **exact** |
+| 43:18 (3440x1440) | `4005C71C` | `4405C71C` | `3C013ED6` | 0.15% |
+
+`lui` sets only the top 16 bits, so 1/aspect is rounded to what fits there.
+`1/1.6` is 0.625 and `27/64` is 0.421875; both are exact in a handful of
+mantissa bits, so the two new groups have nothing to round away. 19.5:9 does not
+have that luck, which is where its 0.13% comes from.
+
+### "21:9" is a marketing name, not a ratio
+
+No panel is 21/9 = 2.333333. 2560x1080 and 3840x1620 are **64:27** (2.370370),
+which is the aspect the standard defines; 3440x1440 is **43:18** (2.388889).
+The group carries 64:27. Rendering it into a 3440x1440 window stretches the
+picture 0.8% horizontally, which is not visible, and anyone who wants their
+panel exact can run `python tools/widescreen.py 3440x1440`.
+
+### Overlapping groups, and what it cost to allow them
+
+Every display aspect writes the same three addresses, and `Pnach.validate()`
+has always reported two groups writing one address as an overwrite - correctly,
+because the cheat engine's last write wins and a fix can be silently undone by
+an unrelated one. With one aspect in the file that never fired. With three it
+fired six times, and the only options were to ship a single aspect or to stop
+checking overlaps.
+
+`validate(exclusive=[[...]])` in PCSXROO (`Saupernova13/pcsxroo#4`) takes sets of
+group names that are alternatives of one another. Overlap inside a set is
+expected; overlap with anything outside it is still a problem, and a name in a
+set that matches no group is reported too, so renaming a group cannot quietly
+drop its exemption. `config.EXCLUSIVE` names the three aspects and both
+`export.py` and `deploy.py` pass it.
+
+**This repo's tools therefore need that PCSXROO change.** On an older `ps2ee`,
+`export.py` raises `TypeError: validate() got an unexpected keyword argument`.
+
+### Not verified
+
+The same gap the 19.5:9 group has, for the same reason. The arithmetic is
+verified - breakpoint after the `mul.s` two instructions past `00130BF0` and
+read `$f20`, group off versus on, against the predicted ratio - but **no render
+test in this project has ever distinguished one aspect from another on screen**,
+including PCSX2's official 16:9 values against stock. These constants are
+consumed at scene entry, so every quick path shows the projection the save state
+was captured with. Seeing it needs a battle entered fresh after boot.
+
+Both groups are in `config.OPTIONAL`: installed, listed, switched off. A display
+preference is not a fix. They also conflict with the stock `[Widescreen 16:9]`,
+which must be turned off in the per-game ini's `[Patches]` section, and PCSX2
+offers no 21:9 or 16:10 display aspect - `AspectRatioType` is Stretch, Auto
+4:3/3:2, 4:3, 16:9, 10:7 - so both need **Aspect Ratio = Stretch** against a
+window of the matching shape.
