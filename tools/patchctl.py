@@ -181,11 +181,17 @@ STRUGGLE = ["60FPS - rush struggle"]
 # point where 30fps puts it, and gates only the AI's rotation.
 BEAMCLASH = ["60FPS - beam clash"]
 
+# The smash charge, found 2026-09-16 chasing the "frame perfect attack" report.
+# FUN_001E33E0 adds gp-0x6D80 (0.0444444) to the charge every tick, for all
+# eleven charge states, so at 60fps a smash charges in half the real time - and
+# with it the Perfect Smash release window, which is one tick of timing.
+SMASH = ["60FPS - smash charge"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SPARES)
+                  + STRUGGLE + BEAMCLASH + SMASH + SPARES)
 
 PRESETS = {
     "off": [],
@@ -240,7 +246,13 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH),
+             + BEAMCLASH + SMASH),
+    # The set without the smash charge, kept so the new group has a named
+    # baseline to be diffed against without editing a preset.
+    "nosmash": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

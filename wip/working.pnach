@@ -1113,3 +1113,33 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// The smash charge. SuperCombo's BT3 wiki names the mechanic: a Smash Attack
+// is Square held with a direction, level 3 is "indicated by your character
+// flashing white", and a Perfect Smash is "releasing the attack button at the
+// exact moment your character reaches level three of charge". The same page
+// states BT3's frame as a 30th of a second, which is this whole project in one
+// line.
+//
+// FUN_001E33E0 is the charge step: it reads gp-0x6D80 (002FD4F0, 0.0444444 =
+// 1/22.5), scales it, adds it to the raw charge at fighter+0xD7C and stores the
+// normalised 0..1 copy at fighter+0xD78. The constant has exactly one reader,
+// so it is halved in data the way the gravity group's acceleration is, and one
+// word covers all eleven charge states: 71-76, the six Smash directions
+// (FUN_001E4330), and 83-87 (FUN_001E4D80) both call it.
+//
+// The charge then takes 44 vsyncs to fill instead of 22, which is the same real
+// time as 30fps and the same sequence sample for sample: 0.04 0.09 0.13 ...
+// 0.98 1.00.
+//
+// It also restores the Perfect Smash window, which is the part of the report
+// that matters in play. fighter+0xD84 counts TICKS since the charge hit
+// maximum and 001E4804 grants the Perfect Smash on a single tick's worth of
+// release timing. Releasing on each vsync in turn and breakpointing the grant
+// at 001E4810: 30fps accepts 2 vsyncs, the patch alone accepts 1, and this puts
+// it back to 2. Widening the 001E4804 test to accept 1 OR 2 was built and
+// measured as well and is NOT here - it makes the window 3 vsyncs, wider than
+// the real game.
+[60FPS - smash charge]
+description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
+patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick
