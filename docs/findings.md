@@ -6173,7 +6173,7 @@ gives four systems, and two of the four already had a group written for them.
 | 12 | fighters taunt almost at once | fighter state phase timers |
 | 5 | Hercule's ki blasts too fast | spawned projectile travel |
 | 8, 13 | speed lines, Special Beam Cannon twirl | effect animation |
-| 9, 11 | blimp, helicopter, wind | stage ambient animation |
+| 9, 11 | blimp, helicopter, wind | stage ambient animation - suspected, NOT confirmed |
 | 7, 10 | Cell's and Vegeta's transformations break | scripted sequence - REGRESSIONS |
 
 Items 7 and 10 are the only two where the patch makes the game *worse* than the
@@ -6300,29 +6300,51 @@ either way - so dropping that site cost the fix nothing.
 not. The case that this site is its cause is a reading of the code, a strong
 one, but a play test is what would close it.
 
-### Issues #9 and #11, the stage: measured, not yet fixed
+### Issues #9 and #11, the stage: a claim made and withdrawn the same day
 
-`ratediff` over all of RAM, same save state, the same 180 vsyncs of real time,
-no input:
+**This section originally reported that Rocky Area carries ~1200 uncompensated
+animated fields and that this was the stage's ambient animation - the system
+behind the wind and the World Tournament aerials. That was wrong, and the error
+is worth keeping rather than deleting.**
+
+What happened: `tools/export.py` was never involved, but the save state was. The
+scan attributed to "Rocky Area" was run against a slot that did **not** hold the
+Rocky Area scene. `savestate --slot 10` exits 1 - slots are 0-9 - and the helper
+that cut the state captured the CLI's output without checking its return code,
+so it reported success. `sstates/` already held a `.10.p2s` from an older
+session, and that file, a Goku vs Teen Gohan fight on the grassy stage with both
+auras lit, is what got copied into the slot and measured.
+
+Re-run against the genuine Rocky Area scene, cut and confirmed by screenshot:
 
 | scene | steady movers | still 2x |
 |---|---|---|
-| grassy stage at night (slot 1) | 45 | 25 |
-| **Rocky Area - Evening** | **1453** | **1257** |
+| grassy stage at night (slot 1), Buu vs Vegeta | 45 | 25 |
+| **Rocky Area - Evening, Cell vs Gohan** | **32** | **27** |
+| the mis-attributed scene: grassy, Goku vs Gohan, both auras lit | 1453 | 1257 |
 
-The Rocky Area candidates are not in the fighters (`018706C0`, `01871CC0`) or
-their models (`008C02F0`, `008C1970`). They are ~1200 words in `006Bxxxx`
-through `007Exxxx`, arranged as an array of identical objects each carrying the
-same three animated fields, and every one of them covers twice the ground per
-second that the 30fps game gives it.
+Rocky Area is ordinary. There is **no evidence of a stage ambient animation
+system running at double speed**, and #9 and #11 are no better understood than
+before. The candidates on Rocky Area are the same two families seen everywhere:
+the fighter and manager block around `01870000`, and tween counters - both of
+which read 2x by design, for the reason in the next section.
 
-That is the stage's own ambient animation, and nothing in the patch touches it.
-It is the system behind #11 and, almost certainly, behind #9 - a blimp and a
-helicopter are the same kind of object on a different map. Locating the step
-site is the next job. A write watchpoint on one field lands in a constructor
-(`00121394`, called from `00123650`, which allocates 0xE0 bytes and initialises
-three sub-objects), which is the allocation rather than the per-tick update -
-and memchecks do not observe every write path, so that silence is not proof.
+What the mis-attributed scene does say, now that it is labelled correctly, is
+that **an effects-heavy scene carries ~1200 uncompensated animated fields** in
+`006Bxxxx`-`007Exxxx`, outside the fighters (`018706C0`, `01871CC0`) and their
+models (`008C02F0`, `008C1970`), arranged as an array of identical objects with
+three animated fields each. Two lit auras is the difference between that scene
+and the quiet ones. That makes it a lead for the **effect** cluster - #8's speed
+lines and #13's Special Beam Cannon twirl - not for the stage. It is not yet
+attributed to anything: a write watchpoint on one field lands in a constructor
+(`00121394`, from `00123650`, which allocates 0xE0 bytes and initialises three
+sub-objects), which is the allocation rather than the per-tick update, and
+memchecks do not observe every write path, so that silence is not proof.
+
+The lesson is cheap and general: **a save state is an input to the measurement,
+and an unverified input makes a confident wrong answer.** Check the return code,
+then load the state and look at it. One screenshot would have caught this before
+the analysis ran. It is written up in [`rig.md`](rig.md) as trap 3.
 
 ### A caution about reading a rate scan
 
