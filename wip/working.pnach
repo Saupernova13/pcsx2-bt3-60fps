@@ -1113,3 +1113,32 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// The stage's own animation. Separate from everything else in this patch: the
+// fighters, their effects and the camera all live in the battle code, but a
+// stage's moving scenery - the World Tournament blimp, its banners, whatever
+// else a map animates - is a scene graph with keyframe tracks, walked once a
+// tick by FUN_00115478 and evaluated by FUN_00123890:
+//
+//   fVar5 = (time - t0) / (t1 - t0);           // where we are between two keys
+//   param_2[4] = (*pfVar3     - fVar4)     * fVar5 + fVar4;      // position
+//   param_2[8] = (pfVar3[4]   - pfVar3[-4])* fVar5 + pfVar3[-4]; // rotation
+//
+// `time` is object+0x1C, and the step that advances it is a bare immediate:
+//
+//   001153C8  lui  $at, 0x4000      # 2.0f
+//   001153CC  mtc1 $at, f20
+//   00115410  add.s f00, f00, f20   # time += 2.0, once a tick
+//   00115418  swc1  f00, 0x1C(s0)
+//
+// Two units of track a tick is 60 a second at 30Hz and 120 at 60Hz, so every
+// animated prop on the map runs at exactly double speed. Halving the immediate
+// is the whole fix. Measured on World Tournament Stage - Noon, over 80 vsyncs:
+// 30fps +78, the patch +158, this +79.
+//
+// Not every stage uses it. The evaluator never runs at all on Rocky Area, which
+// is why a rate scan of that map found nothing to explain issue #9 - the desert
+// wind is a different system, still unfound.
+[60FPS - stage animation]
+description=Animate a stage's own scenery at its real-time speed at 60fps, so the World Tournament blimp and banners move as they do on a PS2.
+patch=1,EE,001153C8,word,3C013F80 // lui $at, 0x3F80   stage keyframe step 2.0 -> 1.0

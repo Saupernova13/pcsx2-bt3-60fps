@@ -6159,3 +6159,185 @@ which contains `001D945C`, the winner decision found on 2026-09-10. **The rush
 struggle's 88-tick duration is almost certainly that manager's own clock**, not
 the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.
+
+## 2026-09-16 - issue #10, the Great Ape: the animation is NOT skipped
+
+The report: *"Vegeta scouter hand crush animation when turn to great ape is not
+there/skipped"*. Triaged as a regression, then as "the same class as #7". Both
+labels are wrong, and this one can be settled with a number instead of a
+picture.
+
+### The scene
+
+Built from the menus for the first time rather than from an existing save:
+character select -> Vegeta (Scouter) -> Normal loadout -> Rocky Area - Evening,
+then `COM Settings -> Stand`, cut with every group off and confirmed by
+screenshot. `work/state-backups/rocky-vegeta-scouter-standing.p2s`, slot 3.
+`R3` transforms; Great Ape costs 3 Blast Stocks and he starts with exactly 3.
+
+### The instrument that settled it
+
+`FUN_001C4638` is a leaf: `lw v0, 0x974(a0)`. **`fighter+0x974` is the current
+animation id**, and `FUN_001FE620` - state 238, the transformation - advances by
+asking whether that animation has *finished*, not by counting ticks:
+
+```c
+lVar2 = FUN_001c4638(param_1);
+if (lVar2 == 0x177) {                       /* the scouter-crush animation */
+    if (FUN_001c47a8(param_1,0) != 0 && ...) FUN_001c41a0(0,param_1,0x179);
+} else if (lVar2 == 0x179) { ... }
+```
+
+So the beats *are* the animation ids, and tracing `+0x974` per vsync says
+exactly where the arms part. `scratchpad/iss/animtrace.py`.
+
+| arm | anim 0x177 from | switches to 0x179 | leaves state 238 |
+|---|---|---|---|
+| unpatched 30fps | v11 | **v401** | v477 |
+| `60FPS - battle` alone | v10 | v206 | v244 |
+| `60FPS - battle` + `animation clock` | v10 | **v401** | **v477** |
+| the 27 shipped groups | v10 | **v401** | **v477** |
+
+**The hand-crush animation already plays for exactly its 30fps length**, 390
+vsyncs, and `60FPS - animation clock` - which shipped long ago - is what does
+it. `sequence wait` does nothing here. Whatever the user is seeing, it is not
+the animation being cut short.
+
+### What IS wrong
+
+The pictures still differ. Mean absolute pixel difference against the 30fps arm
+at six fixed vsyncs, the same probe used for #7:
+
+| group set | drift |
+|---|---|
+| unpatched 30fps against itself | 0.00 |
+| `60FPS - battle` alone | 54.21 |
+| `+ animation clock` | 34.86 |
+| `shipped` | 34.87 |
+| `full` (27 groups) | 34.78 |
+
+Between the animation clock and everything else the project has built, the
+residual moves by **0.08**. Frame by frame it is the *camera and the poses
+inside the animation* that run early - at v14 the patched arm has already cut to
+the close-up the 30fps arm reaches at v28, and by v98 it has pulled back to the
+wide shot the 30fps arm holds until v182 - and then it waits, because the
+animation's own completion timer is correct.
+
+That is the shape of the user's report: the crush is rushed through and the
+camera has left before it reads.
+
+### What was ruled out
+
+- **A rate scan finds nothing new.** `ratediff` over the first 100 vsyncs flags
+  36 float and 44 integer words still at 2x, and every one is a known
+  read-2x-by-design family: the fighter block at `01870000`, the global frame
+  counter `00331D64`, tween counters.
+- Two candidates outside those families, `01A9AEE0` and `01FFE530`, were chased
+  with write watchpoints. Both land in **generic setters** - a 48-byte copy and a
+  VU matrix multiply at `00121980`/`00121C58`, and a position setter at
+  `001A77C8` - which is the same dead end `findings.md` already records for this
+  class. They are followers, not causes.
+- `camera pacing` does not touch this camera: `shipped` (no camera pacing) and
+  `nomouth` (with it) differ by 0.09.
+
+### Next
+
+The target is now specific: **a second animation clock**. One drives the logical
+completion timer (`FUN_001C47A8` reads a remaining/step pair at `+0x144`/`+0x148`
+off the model) and is correct; another drives the skeleton pose and the cinematic
+camera, and is not. Finding it would close #7 and #10 together, since Cell's
+transformation shows the same 22-35 point residual after the same groups.
+
+## 2026-09-16 - issue #11, the stage: a scene graph with its own clock
+
+The report: *"Background Helicopter in world tournament stage moves at double
+speed"*. Two earlier attempts at the stage family failed, and both failures are
+worth keeping because neither was a measurement error this time.
+
+### Why the earlier attempts found nothing
+
+The 2026-09-16 morning attempt measured **Rocky Area**, and reported ~1200
+uncompensated fields before that was withdrawn as the wrong save state. The
+corrected re-run found 32 movers on Rocky Area, 27 at 2x, all of them known
+read-2x-by-design families.
+
+That answer was right, and the reason is now clear: **Rocky Area has no animated
+scenery at all.** A breakpoint on the stage evaluator's own instruction never
+fires on that map, in any arm. There was nothing there to find.
+
+`#11` names the World Tournament stage specifically. Built from the menus -
+Vegeta (Scouter), `COM Settings -> Stand`, World Tournament Stage - Noon, cut
+with every group off and confirmed by screenshot
+(`work/state-backups/world-tournament-noon-vegeta.p2s`, slot 4) - the same scan
+reads very differently:
+
+| scene | steady movers | still 2x | biggest pages |
+|---|---|---|---|
+| Rocky Area - Evening | 32 | 27 | the fighter block |
+| **World Tournament - Noon** | **1672** | **1254** | `006Dxxxx` 468, `007Dxxxx` 468, `006Cxxxx` 105 |
+
+The fighter block contributes 25 of the 1254.
+
+### Following it to the cause, past two dead ends
+
+A write watchpoint on the biggest family lands in `00121388`/`00121394` - a
+`sqc2 vf24-27` block, a bare 64-byte matrix store. The fields are **world
+matrices**, the output of the transform pass, exactly the follower-not-cause
+trap this log already records for `00121394`.
+
+Breaking on the store and tallying `ra` instead of the address is what got past
+it: **`00111610`, 48 hits of 55**, inside `FUN_00111358`, the scene-graph walker.
+Still downstream, but it named the system.
+
+The smaller clusters the scan flagged were the way in. `016F1F74` and friends -
+nine words, value 0.92, climbing 0.0316 per 50 ticks - watchpoint into
+`00123A9C`:
+
+```
+00123A88  lwc1  f01, 0x14(s1)     # b
+00123A8C  lwc1  f00, 0x14(s0)     # a
+00123A90  sub.s f00, f00, f01     # a - b
+00123A94  mul.s f00, f00, f02     # * t
+00123A98  add.s f00, f00, f01     # + b
+00123A9C  swc1  f00, 0x24(s2)
+```
+
+That is a keyframe lerp, and `FUN_00123890` around it is the evaluator: given a
+time it finds the two keys straddling it and interpolates position and rotation.
+
+### The cause, and the fix
+
+`FUN_00123890` has exactly one caller, `FUN_00115478`, which reads the time from
+`node+0x1C` at `00115648` and advances it a few instructions earlier:
+
+```
+001153C8  lui   $at, 0x4000       # 2.0f
+001153CC  mtc1  $at, f20
+00115410  add.s f00, f00, f20     # time += 2.0, once a tick
+00115418  swc1  f00, 0x1C(s0)
+00115434  c.lt.s f00, f01         # past the end of the track?
+0011543C  sw    zero, 0x1C(s0)    # wrap
+```
+
+**Two units of track per tick.** Sixty a second at 30Hz, a hundred and twenty at
+60Hz. Every animated prop on a map that has them runs at exactly double speed,
+and the immediate is the whole of it.
+
+| arm | stage time over 80 vsyncs |
+|---|---|
+| unpatched 30fps | 94 -> 172, **+78** |
+| the 27 groups | 122 -> 280, +158 |
+| **+ `lui $at, 0x3F80`** | 92 -> 171, **+79** |
+
+A cropped sky-band picture score moves 6.98 -> 5.69 over the same window; the
+whole-frame score barely moves, because two fighters and a stadium crowd
+dominate the frame and a blimp does not. The memory figure is the one that
+settles it.
+
+### What this does not fix
+
+**Issue #9, the desert wind, is not this system.** The evaluator never runs on
+Rocky Area - Evening, in any arm, from either of the two states cut on that map.
+Whatever animates the wind, it is not the stage scene graph, and the rate scans
+of that map were telling the truth. If "desert sequence" means a story-mode
+cutscene rather than the battle stage, that has not been looked at at all.
