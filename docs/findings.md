@@ -6248,7 +6248,7 @@ off the model) and is correct; another drives the skeleton pose and the cinemati
 camera, and is not. Finding it would close #7 and #10 together, since Cell's
 transformation shows the same 22-35 point residual after the same groups.
 
-## 2026-09-16 - issue #11, the stage: a scene graph with its own clock
+## 2026-09-16 - issue #9, the stage: a scene graph with its own clock
 
 The report: *"Background Helicopter in world tournament stage moves at double
 speed"*. Two earlier attempts at the stage family failed, and both failures are
@@ -6265,7 +6265,7 @@ That answer was right, and the reason is now clear: **Rocky Area has no animated
 scenery at all.** A breakpoint on the stage evaluator's own instruction never
 fires on that map, in any arm. There was nothing there to find.
 
-`#11` names the World Tournament stage specifically. Built from the menus -
+`#9` names the World Tournament stage specifically. Built from the menus -
 Vegeta (Scouter), `COM Settings -> Stand`, World Tournament Stage - Noon, cut
 with every group off and confirmed by screenshot
 (`work/state-backups/world-tournament-noon-vegeta.p2s`, slot 4) - the same scan
@@ -6336,8 +6336,14 @@ settles it.
 
 ### What this does not fix
 
-**Issue #9, the desert wind, is not this system.** The evaluator never runs on
+**Issue #11, the Rocky Area wind, is not this system.** The evaluator never runs on
 Rocky Area - Evening, in any arm, from either of the two states cut on that map.
 Whatever animates the wind, it is not the stage scene graph, and the rate scans
-of that map were telling the truth. If "desert sequence" means a story-mode
-cutscene rather than the battle stage, that has not been looked at at all.
+of that map were telling the truth.
+
+**A note on which issue is which**, because this session got it backwards once
+and wrote it into a PR: **#9 is the World Tournament aerials** - "the Blimp and
+Helicopter move faster than in the vanilla game" - and **#11 is the Rocky Area
+wind**. The user's original list said "the animation of the wind is sped up in
+desert sequence", and the desert sequence is Rocky Area, so #11 needs no
+clarifying question. Read the issue, not the memory of it.

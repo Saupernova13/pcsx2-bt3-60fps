@@ -1137,8 +1137,8 @@ patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug 
 // 30fps +78, the patch +158, this +79.
 //
 // Not every stage uses it. The evaluator never runs at all on Rocky Area, which
-// is why a rate scan of that map found nothing to explain issue #9 - the desert
-// wind is a different system, still unfound.
+// is why a rate scan of that map found nothing to explain issue #11 - the
+// Rocky Area wind is a different system, still unfound.
 [60FPS - stage animation]
 description=Animate a stage's own scenery at its real-time speed at 60fps, so the World Tournament blimp and banners move as they do on a PS2.
 patch=1,EE,001153C8,word,3C013F80 // lui $at, 0x3F80   stage keyframe step 2.0 -> 1.0

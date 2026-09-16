@@ -320,7 +320,7 @@ a transformation ever runs long again, this is the note to come back to.
 
 ## v24 (proposed) - the stage's own animation
 
-Adds `[60FPS - stage animation]`, one data word. Closes issue #11: the World
+Adds `[60FPS - stage animation]`, one data word. Closes issue #9: the World
 Tournament stage's moving scenery runs at double speed.
 
 A stage's animated props are a scene graph with keyframe tracks, walked by
@@ -335,7 +335,7 @@ lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
 | **v23 + this group** | 92 -> 171, **+79** |
 
 **Not confirmed in play.** Measured on one map. The evaluator does not run at
-all on Rocky Area, so **issue #9's desert wind is a different system** and is
+all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
 untouched by this.
 
 ## v20 - the shipped header caught up
