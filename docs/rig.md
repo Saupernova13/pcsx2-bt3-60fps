@@ -114,7 +114,16 @@ The battle manager pointer (`game.battle.MANAGER`, `0x002FEB14`) is null outside
 a fight. Polling it until it is non-null catches the **first frame the battle
 exists**, which is what makes the opening seconds of a match testable:
 
-    work/state-backups/rocky-cell-match-start.p2s     Cell 1st Form, Rocky Area - Evening, frame 0
+The scenes that exist, all in `work/state-backups/` and all cut with every
+group off:
+
+| file | scene | good for |
+|---|---|---|
+| `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
+| `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
+| `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+
+Copy one over a slot before using it, and back up whatever that slot held.
 
 Save with every group **off** so the snapshot carries the game's original words
 and each arm can apply its own.
