@@ -181,11 +181,20 @@ STRUGGLE = ["60FPS - rush struggle"]
 # point where 30fps puts it, and gates only the AI's rotation.
 BEAMCLASH = ["60FPS - beam clash"]
 
+# The fighter meter economy, found 2026-09-16 chasing the "ki charges and drains
+# faster" report. FUN_001E16C0 is one tick of one fighter's whole economy - ki
+# income by two paths, three more gauges, a -400 drain, and a 0..29 counter that
+# fires the once-per-second blocks when it wraps. Every constant in it is per
+# 30Hz frame and that counter IS the game's second, so at 60fps a fighter earns,
+# spends and reaches every per-second milestone twice as fast. It has exactly one
+# caller, so one gate fixes the system rather than a dozen constants.
+ECONOMY = ["60FPS - meter economy"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SPARES)
+                  + STRUGGLE + BEAMCLASH + ECONOMY + SPARES)
 
 PRESETS = {
     "off": [],
@@ -240,7 +249,13 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH),
+             + BEAMCLASH + ECONOMY),
+    # The set without the meter economy, kept so the new group has a named
+    # baseline to be diffed against without editing a preset.
+    "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

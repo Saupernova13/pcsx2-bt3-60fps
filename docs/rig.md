@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Six traps, each of which cost an hour or more
+## Seven traps, each of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -63,7 +63,23 @@ back over a slot. Back up the slot you are about to overwrite first.
 was already down when control is handed over does nothing. An action test needs a
 state cut *after* the banner, not at the match start.
 
-**6. Screenshots need the VM running, and an armed breakpoint counts as
+**6. `launch` attaches to an emulator that is ALREADY running, and a second
+one can be left behind.** A new group name only reaches the cheat engine when
+the emulator re-reads its per-game ini at start-up, so adding one means a real
+restart. `launch` does not give you that if a process is already holding port
+28110 - it reports `emulator ready on port 28110 (pid NNNNN)` for a *different*
+pid and attaches to the old one, whose ini is the one from before the edit. The
+symptom is a group that `patchctl --status` calls `[ON]`, that raises no
+warning, and whose words are simply never in memory.
+
+    Get-Process -Name pcsxroo* | Select Id,ProcessName      # expect exactly one
+
+Kill every one of them, then `launch`, then read the hook word back after a
+`frame_advance` before trusting any measurement - the cheat engine writes its
+words at a frame boundary, so a read taken immediately after `patchctl.apply`
+shows zeros whether the group applied or not.
+
+**7. Screenshots need the VM running, and an armed breakpoint counts as
 paused.** This one is in PCSXROO's own agent guide and is still worth repeating,
 because a stray breakpoint makes every capture silently vanish.
 

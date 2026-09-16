@@ -1113,3 +1113,36 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// The fighter's meter economy - ki, the three gauges beside it, and every
+// milestone the game reaches "after a second". FUN_001E16C0 is one tick of it
+// for one fighter, and it has exactly one caller, 001E2584, at the tail of the
+// per-fighter update. Everything inside is authored per 30Hz frame: ki comes in
+// at a flat 3333 a tick while charging plus a computed trickle, the second and
+// third gauges fill by their own constants, fighter+0xD80 runs down by 400 a
+// tick, and - the part that makes this a system rather than a list of constants
+// - fighter+0x132C counts 0..29 and fires the once-a-second blocks when it
+// wraps. That counter IS the game's second. At 60fps it wraps twice as often,
+// so a "per second" bonus arrives every half second, on top of every rate being
+// doubled. FUN_0020EF20 even divides by a literal 30 to get its per-frame
+// share, which is as close to a framerate constant as BT3 has.
+//
+// Gating the single call puts the whole economy back on real time at once -
+// income, drain, and the second itself - instead of halving a dozen constants
+// and still getting the second wrong. Measured from the Rocky Area state, the
+// gated arm lands on the 30fps arm's exact values: after 46 vsyncs ki 259962
+// against 259962, both other gauges equal, and the second-counter at 14 against
+// 14, where the ungated arm reads 340761 and 7. Spending ki on a move is not
+// affected - that happens on the move's own code path, not per tick.
+[60FPS - meter economy]
+description=Run the fighter's ki and gauge economy every other frame so ki fills and drains at its real-time speed and the game's one-second milestones still take a second.
+patch=1,EE,000F1580,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1584,word,8D081D64 // lw $t0, 0x1D64($t0)    frame counter
+patch=1,EE,000F1588,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F158C,word,15000003 // bnez $t0, 0x000F159C   odd tick: skip the tick
+patch=1,EE,000F1590,word,00000000 // nop
+patch=1,EE,000F1594,word,080785B0 // j 0x001E16C0           even tick: tail jump, ra kept
+patch=1,EE,000F1598,word,00000000 // nop
+patch=1,EE,000F159C,word,03E00008 // jr $ra
+patch=1,EE,000F15A0,word,00000000 // nop
+patch=1,EE,001E2584,word,0C03C560 // jal 001E16C0 -> jal 000F1580
