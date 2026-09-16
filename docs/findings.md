@@ -6238,15 +6238,47 @@ drop its exemption. `config.EXCLUSIVE` names the three aspects and both
 **This repo's tools therefore need that PCSXROO change.** On an older `ps2ee`,
 `export.py` raises `TypeError: validate() got an unexpected keyword argument`.
 
-### Not verified
+### Verified live, exactly
 
-The same gap the 19.5:9 group has, for the same reason. The arithmetic is
-verified - breakpoint after the `mul.s` two instructions past `00130BF0` and
-read `$f20`, group off versus on, against the predicted ratio - but **no render
-test in this project has ever distinguished one aspect from another on screen**,
-including PCSX2's official 16:9 values against stock. These constants are
-consumed at scene entry, so every quick path shows the projection the save state
-was captured with. Seeing it needs a battle entered fresh after boot.
+`00130BF0` feeds `$f20` through `mtc1`, and `00130C0C` multiplies it:
+
+```
+00130BEC  mov.s $f12, $f21
+00130BF0  lui   $at, 0x3F40      <- the patched word
+00130BF4  mtc1  $at, $f20
+00130BF8  jal   0x0028F3C0
+00130C0C  mul.s $f20, $f2, $f20
+00130C10  swc1  $f2, 4($s0)      <- breakpoint here
+```
+
+Breakpoint at `00130C10`, save state 3, each arm loaded fresh. **The stock
+`[Widescreen 16:9]` has to be off in the rig ini's `[Patches]` first** - it
+writes the same three addresses every frame and the last writer wins:
+
+| arm | `00130BF0` in RAM | `$f20` | measured ratio | predicted |
+|---|---|---|---|---|
+| no widescreen (4:3) | `3C013F40` | 0.6495191 | 1.0000000 | 1.0000000 |
+| 16:10 | `3C013F20` | 0.5412659 | **0.8333333** | 0.8333333 |
+| 21:9 (64:27) | `3C013ED8` | 0.3653545 | **0.5625000** | 0.5625000 |
+
+Both exact to seven decimal places, and the 4:3 baseline is the same 0.6495191
+the 19.5:9 work measured on 2026-09-08, so this is the same path.
+
+**`frame_advance` before arming the breakpoint, or the arms all read the same.**
+The first run of this measurement returned 0.6495191 for all three. The cheat
+engine writes an enabled group's words at a frame boundary, and `resume()`
+reached `00130C10` before the first boundary - so the breakpoint fired on the
+unpatched instruction every time, three arms agreeing perfectly on the wrong
+answer. Four frame advances between `patchctl.apply` and `bp_add` fixes it.
+Reading the patched address back before trusting an arm is what caught it.
+
+### Still not verified
+
+**No render test in this project has ever distinguished one aspect from another
+on screen**, including PCSX2's official 16:9 values against stock. These
+constants are consumed at scene entry, so every quick path - save-state load,
+mid-session toggle - shows the projection the state was captured with. Seeing it
+needs a battle entered fresh after boot. That gap is unchanged from 19.5:9.
 
 Both groups are in `config.OPTIONAL`: installed, listed, switched off. A display
 preference is not a fix. They also conflict with the stock `[Widescreen 16:9]`,
