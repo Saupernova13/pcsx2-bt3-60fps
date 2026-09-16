@@ -6159,3 +6159,100 @@ which contains `001D945C`, the winner decision found on 2026-09-10. **The rush
 struggle's 88-tick duration is almost certainly that manager's own clock**, not
 the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.
+
+
+## 2026-09-16 - issue #5, Hercule's ki blast: a second projectile system
+
+`[60FPS - projectile travel]` has been confirmed in play since v16 and halves
+the effect-node stepper at `00176A2C`, which is `pos += vel * step` for every
+moving effect node. So a report that a character's ki blasts are still fast
+should have been impossible. It is not, because Hercule does not throw one.
+
+### Finding Hercule at all
+
+#5 and #8 sat blocked for a session on "Hercule has not been located in
+character select", after five of fifteen roster rows were walked one screenshot
+at a time. The grid is 7 wide and in the same order as SuperCombo's character
+list, so Hercule is index 24, row 3, column 3 - **three `Down` presses from
+Vegeta (Scouter)**, who is already in save state 3 and shares his column. The
+rule is in [`rig.md`](rig.md).
+
+The scene is `work/state-backups/rocky-hercule-vs-standing-gohan.p2s`, also save
+slot 5: Hercule against a standing Ultimate Gohan on Rocky Area - Evening.
+
+### The stepper never runs
+
+A breakpoint on `00176A2C` fires zero times while the throw is in the air, from
+the press through the landing. Not "rarely" - never. So this is a different
+system, and the existing group could not have covered it.
+
+`FUN_00121EC0` is Vec3Add, which every mover in this game eventually calls.
+Breaking there and tallying `ra` against an idle baseline is a two-minute answer
+where a RAM scan is an afternoon:
+
+| `ra` | hits | |
+|---|---|---|
+| `00160FA8`, `00160FD0`, `00161018`, `00162EF0`, `0024A640` | 32, 32, 32, 32, 24 | idle too - auras |
+| `001373AC` | 7 | only with the blast - a bounded loop, not a mover |
+| **`00178D98`** | 1 | **only with the blast** |
+
+One hit is not weakness. That site fires once per tick per object, while the
+aura callers fire many times a tick, so a 160-stop sample is dominated by them.
+
+### A ballistic integrator, uncompensated on both terms
+
+```
+00178D90  jal Vec3Add           pos(+0x60) += vel(+0x80)
+00178D98  lwc1 $f0, 0x84($s0)   vel.y
+00178D9C  lwc1 $f1, 0xF0($s0)   the object's own gravity
+00178DA0  add.s $f0, $f0, $f1
+00178DA4  swc1 $f0, 0x84($s0)
+```
+
+Sampled per tick, the two arms are **identical** - step `-9.434` in x, gravity
+`+0.5` into vel.y, every tick, at both rates. That is the whole bug: twice the
+ticks per second means twice the ground per second.
+
+### Why one half is not enough
+
+The obvious fix is to halve the displacement, which is what every other travel
+group in this patch does. It makes things worse in a new way:
+
+| arm | airborne | distance | speed | landed at |
+|---|---|---|---|---|
+| 30fps | **34 vsyncs** | 370.8 | 10.91/vsync | (-112.3, -3.0, **216.7**) |
+| 60fps | 18 vsyncs | 370.6 | 20.59/vsync | (-112.1, -3.0, 216.6) |
+| 60fps, displacement only | 20 vsyncs | 251.0 | 12.55/vsync | (-41.2, 0.0, **99.9**) |
+| 60fps, both halves | **34 vsyncs** | 380.5 | 11.19/vsync | (-108.3, -2.8, **210.4**) |
+
+Halving the displacement alone leaves gravity pulling at full strength over
+twice as many ticks, so the blast drops out of the sky at **46% of its range**.
+An integrator has two terms and a rate change touches both.
+
+With both halved, the flight time is exact and the landing point is within 3%.
+The residual is a launch-phase offset: the throw animation ends on a different
+vsync in the two arms, so the object spawns a vsync or two apart.
+
+### The two changes
+
+**Gravity is one word.** `0017873C` is `lui $at, 0x3F00` - 0.5f as an immediate,
+loaded into `$f22` and stored to `+0xF0` in the constructor, with no other
+reader. `0x3E80` is 0.25f.
+
+**The displacement needs a trampoline.** Unlike every other travel site in this
+patch, `00178D90` is a bare `Vec3Add` with no scalar anywhere to halve. The
+trampoline scales the velocity into a fixed scratch vector at `000F1660` and
+adds that instead - the same shape as `[60FPS - airborne residual]`, and for
+the same reason: nothing runs between the scale and the add, so a fixed buffer
+needs no re-entrancy and the stack is left alone.
+
+`FUN_00178D18` saves `$ra` at `00178D30`, so the trampoline's own `jal`s are
+safe to make even though it is entered with `j`.
+
+### Not established
+
+- **Which other attacks are thrown objects.** `FUN_00178704` is a constructor
+  with no direct `jal` callers, so it is reached through a pointer and the
+  roster of moves that use it is unknown. Nothing else was observed changing.
+- **#8, the speed lines on Present Bomb**, is a separate effect and is not
+  addressed here.
