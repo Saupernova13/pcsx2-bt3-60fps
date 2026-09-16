@@ -165,6 +165,12 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
+# Thrown objects, found 2026-09-16. A ballistic mover separate from the effect
+# node stepper [60FPS - projectile travel] halves: pos += vel and vel.y += g,
+# both per tick and both uncompensated. Halving only the first makes the blast
+# fall out of the sky, which is why this group is two changes.
+THROWN = ["60FPS - thrown object travel"]
+
 # The rush struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
@@ -185,7 +191,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SPARES)
+                  + STRUGGLE + BEAMCLASH + THROWN + SPARES)
 
 PRESETS = {
     "off": [],
@@ -240,7 +246,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH),
+             + BEAMCLASH + THROWN),
+    # "full" without the thrown objects, so that group has a named A/B baseline.
+    "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

@@ -1113,3 +1113,60 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// Thrown objects, found 2026-09-16 for issue #5 - "Hercule's ki blasts are
+// sped up". They are, and [60FPS - projectile travel] does not touch them: a
+// breakpoint on the effect-node stepper at 00176A2C never fires once while
+// Hercule's throw is in the air. It is a different mover on a different object.
+//
+// FUN_00178D18 advances one thrown object per tick, ballistically:
+//
+//   00178D90  jal Vec3Add           pos(+0x60) += vel(+0x80)
+//   00178D98  lwc1 $f0, 0x84($s0)   vel.y
+//   00178D9C  lwc1 $f1, 0xF0($s0)   the object's own gravity
+//   00178DA0  add.s $f0, $f0, $f1   vel.y += g
+//   00178DA4  swc1 $f0, 0x84($s0)
+//
+// No delta-time in either line, so at 60fps the object covers twice the ground
+// per second AND is pulled down twice as hard. Measured per tick the two arms
+// are identical - step -9.434, g +0.5 - which is the whole bug.
+//
+// A ballistic integrator needs BOTH halves halved, and the control run proves
+// it. Halving only the displacement leaves gravity running at full rate over
+// twice as many ticks, and the blast drops out of the sky at less than half its
+// range:
+//
+//   arm                          airborne   landed at
+//   30fps                        34 vsyncs  (-112.3, -3.0, 216.7)
+//   60fps                        18 vsyncs  (-112.1, -3.0, 216.6)
+//   60fps, displacement only     20 vsyncs  ( -41.2,  0.0,  99.9)   FALLS SHORT
+//   60fps, this group            34 vsyncs  (-108.3, -2.8, 210.4)
+//
+// Flight time is exact and the landing point is within 3%. Speed goes 10.91 ->
+// 20.59 -> 11.19 units per vsync against a 30fps 10.91.
+//
+// Gravity is a `lui $at, 0x3F00` immediate in the constructor at 0017873C, with
+// one reader, so that half is one word. The displacement is a bare Vec3Add with
+// no scalar to halve, so it needs the trampoline: scale the velocity into a
+// fixed scratch vector and add that instead. Nothing runs between the scale and
+// the add, so a fixed buffer needs no re-entrancy.
+//
+// FUN_00178D18 saves $ra at 00178D30, so the trampoline's own calls are safe to
+// make even though it is entered with `j` rather than `jal`.
+[60FPS - thrown object travel]
+description=Halve the flight speed and gravity of thrown objects, so Hercule's ki blasts and other lobbed attacks cross the ground at their real speed.
+patch=1,EE,000F1600,word,3C013F00 // lui $at, 0x3F00
+patch=1,EE,000F1604,word,44816000 // mtc1 $at, $f12          0.5f
+patch=1,EE,000F1608,word,3C04000F // lui $a0, 0x000F
+patch=1,EE,000F160C,word,34841660 // ori $a0, $a0, 0x1660    dst = scratch vector
+patch=1,EE,000F1610,word,0C0487D4 // jal 0x00121F50          Vec3Scale
+patch=1,EE,000F1614,word,00C0282D // daddu $a1, $a2, $zero   (delay) src = velocity
+patch=1,EE,000F1618,word,0220202D // daddu $a0, $s1, $zero   dst = position
+patch=1,EE,000F161C,word,0220282D // daddu $a1, $s1, $zero   a   = position
+patch=1,EE,000F1620,word,3C06000F // lui $a2, 0x000F
+patch=1,EE,000F1624,word,0C0487B0 // jal 0x00121EC0          Vec3Add
+patch=1,EE,000F1628,word,34C61660 // ori $a2, $a2, 0x1660    (delay) b = scratch vector
+patch=1,EE,000F162C,word,0805E366 // j 0x00178D98
+patch=1,EE,000F1630,word,00000000 // nop
+patch=1,EE,00178D90,word,0803C580 // jal Vec3Add -> j 000F1600
+patch=1,EE,0017873C,word,3C013E80 // lui $at, 0x3F00 -> 0x3E80   thrown gravity 0.5 -> 0.25
