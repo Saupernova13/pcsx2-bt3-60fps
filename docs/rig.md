@@ -97,7 +97,16 @@ the opponent, and then **Map Select**, which is where the stage-specific reports
 live.
 
 To browse a long list cheaply, press and crop only the name band into one tall
-strip rather than screenshotting the whole screen each time.
+strip rather than screenshotting the whole screen each time. `tools/menu.py`
+does all of this:
+
+    python tools/menu.py press Start Down Down Cross --shot pause
+    python tools/menu.py strip Down 10 --band 0.62,0.80 --shot rows
+
+The roster is **15 rows of 7**, and both axes wrap. Rows seen so far, in Down
+order: Goku (Early), Goku (Mid), Goku (End), Goku (GT), Master Roshi, Captain
+Ginyu, Frieza, Cell, Majin Buu, Bardock, Cooler, Pikkon, Demon King Piccolo,
+Kid Goku, Password Character. Map Select has the same shape, six rows.
 
 ## Cutting a state worth keeping
 
@@ -147,6 +156,29 @@ shipped set without editing anything:
 `60FPS - spare 1/2/3` are names the ini already enables that no group uses. A new
 group given one of those names can be tested **without restarting the emulator**,
 which otherwise costs a full boot per experiment.
+
+## The three instruments
+
+Beyond `patchctl`, `ratediff` and `shot`, three tools carry most of the work.
+
+**`tools/lookup.py`** answers the ELF questions without booting anything:
+`state 238` gives a state's handler, `callers 001E16C0` finds every `jal` to an
+address, and `gp 6D80` prints a gp-relative word's value **and how many
+instructions read it**. That last count is the one that matters: a constant with
+exactly one reader can be halved in data, which is how gravity, the smash charge
+and the stage animation were all fixed in one word each.
+
+**`tools/animtrace.py`** traces a move by its beats. `fighter+0x974` is the
+current animation id, and the scripted handlers advance by asking whether that
+animation has finished rather than by counting ticks, so the ids ARE the beats.
+Use it before a pixel score on anything cinematic: it is what proved the Great
+Ape animation is not cut short, only rushed past.
+
+**`tools/drift.py`** scores a group set by how far its picture drifts from the
+30fps arm at fixed vsyncs. Always pass the reference preset twice - the second
+copy must read 0.00, and if it does not, nothing else in the run means anything.
+`--band` crops to a horizontal slice, which is the difference between measuring
+a blimp and measuring two fighters standing in front of a crowd.
 
 ## Reading a rate scan
 
