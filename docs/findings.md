@@ -6174,7 +6174,7 @@ gives four systems, and two of the four already had a group written for them.
 | 5 | Hercule's ki blasts too fast | spawned projectile travel |
 | 8, 13 | speed lines, Special Beam Cannon twirl | effect animation |
 | 9, 11 | blimp, helicopter, wind | stage ambient animation - suspected, NOT confirmed |
-| 7, 10 | Cell's and Vegeta's transformations break | scripted sequence - REGRESSIONS |
+| 7, 10 | Cell's and Vegeta's transformations break | uncompensated cinematic - see the #7 section below |
 
 Items 7 and 10 are the only two where the patch makes the game *worse* than the
 30fps game rather than faster than it; everything else is something the patch
@@ -6355,3 +6355,74 @@ is measured against rather than by halving its step: a correctly fixed counter
 still reads 2x. The global frame counter at `00331D64` reads 2x by design, and
 so does every tween the tween-duration group already fixed. Only world
 quantities can be read straight off the report.
+
+### Issue #7, Cell's transformation: reproduced, and it is not a regression
+
+**Correction to the triage table above.** #7 and #10 were listed as REGRESSIONS,
+on the reasoning that a broken transformation is the patch making the game worse
+rather than faster. For #7 that is measurably wrong, and #10 is untested.
+
+The scene: `work/state-backups/rocky-cell-match-start.p2s` advanced past the
+`Fight!` banner, Cell 1st Form on Rocky Area - Evening. **`R3` transforms** -
+transformations cost blast stock, not ki, and Cell carries 3 against a cost of
+2. The move puts the fighter in **state 239** (`FUN_001FE960`), which it is
+still in 700 vsyncs later, so 239 is the second form rather than the cinematic.
+
+#### Turning "it looks broken" into a number
+
+A desynchronised cinematic cannot be scored by duration - both arms enter 239 at
+vsync 10 and neither leaves. What differs is *what is on screen at a given real
+time*, so the metric is the mean absolute pixel difference against the unpatched
+arm at four fixed vsyncs (210, 252, 336, 420), each arm frame-stepped from the
+same state. It is exactly reproducible: the unpatched arm scores **0.00** against
+itself.
+
+At 210v and 252v the 30fps game shows Android 17 and then Cell; the patched game
+shows **empty desert**. By 420v the patched arm carries a large red polygon
+artifact. That is the user's "missing models and camera issues", and the patched
+cinematic runs roughly 126 vsyncs *behind* the 30fps one - late, not early.
+
+#### Which group does it: none of them
+
+| group set | drift |
+|---|---|
+| unpatched 30fps | 0.00 |
+| `60FPS - battle` alone | **51.29** |
+| `60FPS - battle` + `animation clock` | 25.05 |
+| `60FPS - battle` + `aura update rate` | 50.95 |
+| `shipped` (5 groups) | 24.80 |
+| `nofx`, `noseqwait2`, `nopursuit`, `nocamera` | 24.50 |
+| `nomouth` | 24.22 |
+| `full` (28 groups) | 22.11 |
+
+**The base 60fps switch breaks it on its own**, the animation clock recovers
+about half, and every other group in the patch - sequence wait, camera pacing,
+mouth clock, the phase timers - moves it by less than three points between them.
+So this is an uncompensated system in exactly the same sense as everything else
+this project has fixed. Nothing regressed; the cinematic was never covered.
+
+#### Why the usual instrument finds nothing
+
+`ratediff` across the transformation window, holding `R3`, reports 28 words still
+at 2x, and all of them are the families that read 2x by design - the tween
+counters stepping -1.0 a tick and the manager block around `01870000`. There is
+no world quantity running at double speed here.
+
+That is consistent with what the pictures show. The defect is not a value moving
+too fast; it is **beats firing in the wrong order or at the wrong moment** - a
+model that has not spawned when the camera cuts to it. A rate scan cannot see
+that. `tools/eventdiff.py`, which stops both arms at the same *event* rather
+than the same time, is the instrument for it, and that is the next step.
+
+State 239's handler does carry a phase timer at `001FEB3C`, counting to `0x3D`
+(61 frames), and it is one of the 21 sites the reinstated phase-timer group
+gates. Gating it is worth 2 points of the 25 and no more, so the 61-frame beat
+is one of several and not the one that matters.
+
+#### Not established
+
+- #10 (Vegeta Scouter's Great Ape transformation) has **not** been tested. It is
+  a transformation cinematic too, so the same class is likely, but "likely" is
+  what the triage table already got wrong once.
+- What actually paces the cinematic. The measurement above says which groups do
+  *not* fix it, which is not the same as knowing what would.
