@@ -39,10 +39,20 @@ is under the menu's sampling rate: four presses out of five are simply not seen,
 which looks exactly like a menu that ignores you. Use `--frames 8` with roughly
 0.75s between presses and every press registers.
 
-**3. Save state slots are 0-9 only.** `savestate --slot 10` appears to succeed;
-`loadstate --slot 10` then fails with `slot must be between 0 and 9`. To keep
-more than ten states, copy the `.p2s` files out of `<pcsxroo>/bin/sstates/` into
-`work/state-backups/` and copy the one you want back over a slot.
+**3. Save state slots are 0-9 only, and this one bites hard.** `savestate --slot
+10` exits **1** with `bad_args: slot must be between 0 and 9`. A script that
+runs it through `subprocess.run(..., capture_output=True)` and does not check
+`returncode` sees nothing and carries on - and `<pcsxroo>/bin/sstates/` very
+likely already holds a `.10.p2s` from an older session, so the file you then
+copy around is *someone else's scene*. That happened on 2026-09-16 and three
+measurements were attributed to the wrong stage before it was caught.
+
+**Always check the return code, and always confirm a new state by loading it and
+looking at it.** One screenshot is cheaper than re-running the analysis.
+
+To keep more than ten states, copy the `.p2s` files out of
+`<pcsxroo>/bin/sstates/` into `work/state-backups/` and copy the one you want
+back over a slot. Back up the slot you are about to overwrite first.
 
 **4. `Roo.input_set` takes buttons as separate arguments, not a list.**
 
@@ -96,10 +106,14 @@ a fight. Polling it until it is non-null catches the **first frame the battle
 exists**, which is what makes the opening seconds of a match testable:
 
     work/state-backups/rocky-cell-match-start.p2s     Cell 1st Form, Rocky Area - Evening, frame 0
-    work/state-backups/rocky-cell-controllable.p2s    the same match, past the Fight! banner
 
 Save with every group **off** so the snapshot carries the game's original words
 and each arm can apply its own.
+
+A state cut past the `Fight!` banner is what action tests need, and it is one
+`frame_advance` away from the above - but cut it into a real slot, back up
+whatever that slot held, and look at the result before measuring anything from
+it. See trap 3.
 
 ## Running the A/B
 
