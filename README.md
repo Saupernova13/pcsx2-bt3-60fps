@@ -172,7 +172,13 @@ from the same state; the rules are under [Testing loop](#testing-loop). The
 acceptance tests are `speedtest.py`, `stomptest.py`, `blasttest.py` and
 `realclock.py`.
 
+**[`docs/rig.md`](docs/rig.md) is the runbook for this step** - the exact order
+an A/B has to run in, how to reach any character and stage by driving the game's
+menus, and the handful of traps that silently produce a wrong answer instead of
+an error. Read it before the first measurement, not after.
+
 **8. Read what is already known** before changing anything:
+[`docs/rig.md`](docs/rig.md) for how to drive the emulator,
 [`docs/status.md`](docs/status.md) for the state of every group,
 [`docs/versions/`](docs/versions/README.md) for what each of v01 to v23 changed
 and discovered, [`docs/findings.md`](docs/findings.md) for the full log, and

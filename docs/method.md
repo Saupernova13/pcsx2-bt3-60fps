@@ -42,6 +42,16 @@ is the source. The companion toolset lives at
 4. **Shrinking a live group needs a restart too** - dropped hooks stay patched
    in RAM with nothing left to restore them.
 
+## Driving the machine
+
+The four rules above are the ones that cost the most *thinking*. The ones that
+cost the most *time* are mechanical - a screenshot path that silently writes
+nothing, a menu press too short to be sampled, a save state slot that accepts a
+write it will not read back. They are all in [`rig.md`](rig.md), together with
+how to reach any character and stage by driving the game's own menus, which is
+what makes a report about a particular fighter on a particular map testable at
+all.
+
 ## What shipped
 
 Per-build confidence: [`status.md`](status.md).
