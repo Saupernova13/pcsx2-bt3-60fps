@@ -185,7 +185,7 @@ ranges. So v16 fixes plain ki blasts and nothing else yet confirmed.
 
 ### The second mover: a fourth candidate ruled out
 
-Frieza's rocks were found in RAM easily - nine or more moving vec3s around
+Frieza's I Might Die This Time rocks were found in RAM easily - nine or more moving vec3s around
 `01ACCxxx` and `01A20xxx`, stepping 37.04 units a vsync, matching the fitted
 speed. Every watchpoint on them still lands in a **copy**: `0015AB90`
 (`ra 0015AB70`), which reads its source from `[obj+0x38]` exactly like
@@ -289,7 +289,7 @@ control behind every fast projectile:
 - **Idle battle:** the site never fires, so the group is inert in normal play.
 - **Plain ki blasts:** never fire it either, so it cannot double-compensate with
   `[60FPS - projectile travel]`, which hooks a different class at `00176A2C`.
-- **Buu's charged blast:** `FUN_0015BFB8` does not run for it *at all*. Filmed
+- **Buu's Super Kamehameha:** `FUN_0015BFB8` does not run for it *at all*. Filmed
   with and without the group, Buu's blast is identical vsync for vsync - hit at
   v59, state 272 ending at v117. That beam is a different subsystem and is
   **still unfixed**.
@@ -299,7 +299,7 @@ paced correctly; Buu's beam is the third and remains open.
 
 ## The third mover: beams are a sibling of the rock mover
 
-Buu's charged blast is **not** on the rock class - `FUN_0015BFB8` never runs for
+Buu's Super Kamehameha is **not** on the rock class - `FUN_0015BFB8` never runs for
 it, and the beam is byte-identical with and without `[60FPS - blast object
 travel]`. It is on a sibling class whose update is `FUN_00155C5C`:
 
@@ -350,7 +350,7 @@ The travel component paces **18.42 units/vsync in both arms** - taking the slope
 between the two ranges, an exact match. The residual ~5 vsyncs is the pre-launch
 animation, the same separate defect the rocks show (124 against 128 there).
 
-Inert at idle, for plain ki blasts, and for Frieza's rocks, so it cannot
+Inert at idle, for plain ki blasts, and for Frieza's I Might Die This Time rocks, so it cannot
 double-compensate with either shipped projectile group. Frieza re-measures at
 v124, unchanged.
 
@@ -363,8 +363,8 @@ containing function actually starts at `00155C5C`; the hooked instruction is
 Three movers, three classes, all the same defect and all now paced:
 
 - `00176A2C` - plain ki blasts (`[60FPS - projectile travel]`, v16)
-- `0015C28C` - spawned projectiles, Frieza's rocks (`[60FPS - blast object travel]`, v17)
-- `00156004` - travelling beams, Buu's charged blast (`[60FPS - beam object travel]`, v18)
+- `0015C28C` - spawned projectiles, Frieza's I Might Die This Time rocks (`[60FPS - blast object travel]`, v17)
+- `00156004` - travelling beams, Buu's Super Kamehameha (`[60FPS - beam object travel]`, v18)
 
 The shared shape is worth stating plainly: a projectile keeps a per-tick delta
 vector, and doubling the tick rate doubles the distance covered per second. The

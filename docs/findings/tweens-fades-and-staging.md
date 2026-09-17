@@ -447,7 +447,7 @@ identical under `nofade` and `full`. The fade is cosmetic and moves no beat.
 
 ### What this does not cover
 
-Not every impact flashes the screen. **Frieza's rocks and Buu's charged blast do
+Not every impact flashes the screen. **Frieza's I Might Die This Time rocks and Buu's Super Kamehameha do
 not construct a fade node at all** - a breakpoint on `FUN_00172810` through both
 moves, in both arms, never fires. So no second *visual* sample was available
 without a character-select run. The globality claim rests on the fix being at

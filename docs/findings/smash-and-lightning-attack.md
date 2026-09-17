@@ -2,12 +2,12 @@
 
 Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain.
 
-## 2026-09-07 - the pursuit stomp, and five frame counts in one chain
+## 2026-09-07 - the Lightning Attack, and five frame counts in one chain
 
 The user reported it precisely: hold Square with Up to launch someone with a
-heavy smash, then tap Circle and Goku teleports above them and stomps them into
+Full Power Smash, then tap Circle and Goku teleports above them and stomps them into
 the ground. **At 30fps he lands it every time. At 60fps he never does** - and
-the stomp comes down "sort of awkward diagonal" instead of straight.
+the Lightning Attack comes down "sort of awkward diagonal" instead of straight.
 
 ### The reproduction
 
@@ -49,7 +49,7 @@ instinct to fix what the report names would have gone straight past this.
 ### What was wrong: five frame counts, in one chain
 
 Every defect found is the same shape - a duration authored in 30Hz frames -
-and every one of them had to be fixed or the stomp still missed.
+and every one of them had to be fixed or the Lightning Attack still missed.
 
 **1. The launch flight.** `FUN_001E9590` (states 213, 214, 223) counts
 `fighter+0x3D8` down once a tick from a per-move value: 50 for the D5 smash, 15
@@ -130,7 +130,7 @@ Two choices worth defending:
 
 Nine out of nine, within one to three vsyncs of the 30fps arm at every delay.
 Confirmed in play with the VM running free and the pad driven on the wall clock
-(`tools/stomptest.py`): the stomp connects 1.08s after the smash against 30fps's
+(`tools/stomptest.py`): the Lightning Attack connects 1.08s after the smash against 30fps's
 1.20s, and the contact sheet shows the second hit and the ground impact.
 
 No regression: the charge oracle (99 vsyncs) and the ultimate oracle (161) are

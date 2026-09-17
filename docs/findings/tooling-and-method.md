@@ -212,8 +212,8 @@ Two guards now, both cheap:
 
 ### What the confirmations actually settled
 
-`v13`, `v14` and `v15` all confirmed in play: the pursuit stomp after a heavy
-smash, the Cell Perfect Barrier camera, and the mouths.
+`v13`, `v14` and `v15` all confirmed in play: the Lightning Attack after a Full Power
+Smash, the Cell Perfect Barrier camera, and the mouths.
 
 **The pre-fight intro mouths are fixed too**, which retires a wrong reading. That
 row had said "not a speed problem" since the first defect list, on the strength

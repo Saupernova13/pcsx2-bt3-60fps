@@ -13,7 +13,7 @@ The user's observation that reframed it: **everything wrong is in the air.**
 | correct | wrong |
 |---|---|
 | ground idle | air idle |
-| general fighting, grabs, rush blasts | knockback flight after a heavy smash |
+| general fighting, grabs, rush blasts | Hard Knockback after a Full Power Smash |
 | ground dash | falling after a stun |
 | | ki blast and beam travel |
 
@@ -81,7 +81,7 @@ supply here. Everything else is guesswork.
 
 
 The last unsolved symptom. **Everything airborne runs at 2x; everything grounded is
-correct.** Air idle, knockback flight after a heavy smash, falling after a stun, ki blast
+correct.** Air idle, Hard Knockback after a Full Power Smash, falling after a stun, ki blast
 and beam travel, beam duration. Ground idle, general fighting, grabs, rush blasts and
 ground dash are all right.
 

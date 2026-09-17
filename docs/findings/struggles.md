@@ -2,9 +2,9 @@
 
 Both stick-rotation contests, their tick clocks and the CPU's synthetic stick.
 
-## 2026-09-10 - the rush struggle: confirmed doubled, mechanism found, fix unfinished
+## 2026-09-10 - the Rush Struggle: confirmed doubled, mechanism found, fix unfinished
 
-The user, playing Cell against Devilman, hit a rush struggle - both fighters
+The user, playing Cell against Devilman, hit a Rush Struggle - both fighters
 throw a rush attack, they collide, and both players rotate the left stick as
 fast as they can - and reported the CPU's hit count doubled at 60fps. It is
 worse than that: **every part of the minigame is authored in ticks, so at 60fps
@@ -130,7 +130,7 @@ is native now, and both fighters enter state 250 within a second of loading.
 ### 2026-09-10, continued - what the second pass ruled out, and a reframing
 
 **The outcome decision, found.** `001D945C`/`001D9460` loads both fighters'
-`+0xE50` and compares them with `slt` both ways. The winner of a rush struggle
+`+0xE50` and compares them with `slt` both ways. The winner of a Rush Struggle
 is simply whoever has more hits, so the whole fix reduces to making each side's
 hits-per-real-second match the 30fps arm.
 
@@ -240,9 +240,9 @@ model this patch halves, and that object is still unfound. Doubling the duration
 would restore the counts; it would not change the ratio, so it is a separate and
 much less urgent defect than the one now fixed.
 
-## 2026-09-12 - the beam clash: the whole contest is on a tick clock
+## 2026-09-12 - the Beam Struggle: the whole contest is on a tick clock
 
-The user hit a beam clash - both fighters fire a beam, the beams collide, and
+The user hit a Beam Struggle - both fighters fire a beam, the beams collide, and
 both players rotate their sticks - and asked for the 30fps and 60fps screens to
 be compared and the difference fixed. There is no hit counter on screen for this
 one, so the comparison has to be made against the game's own internals.
@@ -263,7 +263,7 @@ against vsyncs.
 |---|---|
 | fighter state | **304**, handler `FUN_001FB660` |
 | rotations counted into | **`fighter+0xE4C`** - and it does **not** start at zero |
-| the rotation query | condition **0x33** at `001FB9BC`, the same condition the rush struggle uses, gated on `+0x964 >= 16` |
+| the rotation query | condition **0x33** at `001FB9BC`, the same condition the Rush Struggle uses, gated on `+0x964 >= 16` |
 | the contest itself | **`FUN_001D8E50`**, an event manager dispatched once per tick from `FUN_001D9900` for modes 1..5 |
 | the clash point | `pt = tug/(|tug|+20)`, written at `001D92BC`; `[m+0x10]` is its world position, lerped between the two fighters' bone 0x11 |
 
@@ -291,7 +291,7 @@ The +-0.64 thresholds on `pt` only pick a camera mode; they do not end anything.
 
 **The outcome flips**, and for two reasons at once: the whole cinematic plays in
 half its real time, and a human's hands do not speed up while the CPU's
-synthetic stick steps once per tick, exactly as in the rush struggle.
+synthetic stick steps once per tick, exactly as in the Rush Struggle.
 
 ### What was tried and rejected: gating the manager itself
 
@@ -421,10 +421,10 @@ the `+0x1278` test - and would reproduce the original's blind spot exactly. It i
 deliberately not done: it would make the game eat input a player can feel
 themselves giving it. Recorded here so the choice is visible rather than assumed.
 
-### A lead for the rush struggle
+### A lead for the Rush Struggle
 
-The same dispatcher runs the rush struggle: modes 6-8 go to `FUN_001D9330`,
-which contains `001D945C`, the winner decision found on 2026-09-10. **The rush
-struggle's 88-tick duration is almost certainly that manager's own clock**, not
+The same dispatcher runs the Rush Struggle: modes 6-8 go to `FUN_001D9330`,
+which contains `001D945C`, the winner decision found on 2026-09-10. **The Rush
+Struggle's 88-tick duration is almost certainly that manager's own clock**, not
 the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.

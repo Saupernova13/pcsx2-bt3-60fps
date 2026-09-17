@@ -141,8 +141,8 @@ one". `README` states the opposite rule and states it for a reason. Save state 4
     slot 4 off  load -> apply -> LOAD  60.0 ticks/s   0012BCE4 = 24040001
 
 The "30fps" arm of every contact sheet ever taken of Perfect Barrier was running
-at 60fps. Slot 9 was captured *unpatched* and is immune, which is why the pursuit
-stomp measured on it is unaffected, and the deterministic memory trace was written
+at 60fps. Slot 9 was captured *unpatched* and is immune, which is why the Lightning
+Attack measured on it is unaffected, and the deterministic memory trace was written
 separately and was always correct - the 2026-09-08 rotation table reproduces to
 the decimal. Fixed in both tools.
 
@@ -216,7 +216,7 @@ symptom and it is gone.
 
 ### No regression
 
-    arm             charge   melee  ultimate   pursuit stomp
+    arm             charge   melee  ultimate   Lightning Attack
     off (30fps)        168    None       191   CONNECTED 1.22s
     nocamera (v13)      99    None       161   CONNECTED 1.09s
     full (v14)          99    None       161   CONNECTED 1.11s
@@ -380,7 +380,7 @@ What it does **not** clear:
 - **The pre-fight intro mouths**, which do not move at all rather than stopping
   early. Different symptom, never A/B'd, and it is still unknown whether the
   intro even uses the same clip player.
-- **v13's pursuit stomp** has still not been play-tested.
+- **v13's Lightning Attack** has still not been play-tested.
 
 The v15 half that remains unverified is the *second* track object, `009212F0`,
 which drives the radial speed-line effect in Goku's ultimate. It changed on 90 of

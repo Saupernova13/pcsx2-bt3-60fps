@@ -7,8 +7,8 @@ The running summary, the user's defect lists and every play-test.
 Last revised 2026-09-08. **20 groups ship**, in `patches/428113C2.pnach` and
 exported to `releases/latest/`.
 
-**v13, v14 and v15 are confirmed in play by the user, 2026-09-08.** The pursuit
-stomp, the Cell Perfect Barrier camera, and the mouths - cut-in and pre-fight
+**v13, v14 and v15 are confirmed in play by the user, 2026-09-08.** The Lightning
+Attack, the Cell Perfect Barrier camera, and the mouths - cut-in and pre-fight
 intro both. v14's star is cleared. None of it touches v12's input-timing flag,
 which still stands unverified.
 
@@ -44,8 +44,8 @@ vsyncs - and the ones the user can see have been confirmed in play.
 | `60FPS - blast hit cadence` | gates the hitbox tick counter `H[0x0A]`, so multi-hit attacks land at their authored spacing |
 | `60FPS - blast effect duration` | halves 19 coupled per-tick steps in the two effect classes that draw a ki blast |
 | `60FPS - sequence wait` | counts scripted-sequence waits down on even ticks - camera cuts, mouth lines, fades, beam releases |
-| `60FPS - knockback flight` | doubles the three launch durations a heavy smash puts someone into, `FUN_001E9590` |
-| `60FPS - pursuit timing` | the five frame counts and the intercept lead behind the Circle pursuit stomp |
+| `60FPS - knockback flight` | doubles the three launch durations a Full Power Smash puts someone into, `FUN_001E9590` |
+| `60FPS - pursuit timing` | the five frame counts and the intercept lead behind the Lightning Attack |
 | `60FPS - camera pacing` | halves the camera blend rate and counts scripted camera moves down on even ticks, `FUN_001C69C8` / `001C5720` |
 | `60FPS - mouth clock` | halves the cut-in keyframe clock, the second clip player, at `0024ED2C` / `0024F3D4` - scripted mouth and face tracks |
 | `60FPS - state phase timers` | advances 22 of the fighter state machine's 28 phase counters on even ticks - charge lengths, recoveries |
@@ -96,10 +96,10 @@ is gated is an effect that does not get built.**
 | ~~Character switch: the sky stops rotating (item 5)~~ | **Solved**, reported by the user 2026-09-08. Never measured; closed on play |
 | Death by a body-erasing attack: camera too fast, cuts weirdly (item 2) | **ASSUMED solved\*** - not checked by anyone. The user expects it to have gone with items 3 and 5. Asterisked deliberately: nothing has verified it |
 | ~~The Galick Cannon fade to white ends early (item 7b)~~ | **FIXED** by `screen fade`, v19, **confirmed in play 2026-09-09**. Not a sequence beat at all: `FUN_00172810` is the game's fullscreen fade SERVICE and its init converts seconds to frames with a hard-coded 30.0 |
-| ~~**Real-time blast travel speed** (item 1)~~ | **FIXED** across three movers. `projectile travel` (v16, ki blasts) and `beam object travel` (v18, Buu's charged blast **and his breath**) are **confirmed in play 2026-09-09**. `blast object travel` (v17, Frieza's rocks) is measured at 1.77x and halved, but the user **feels no change** - correctly, because at play range the rocks are 94% summon animation; see the 2026-09-09 play-test entry. **Explosive waves** are confirmed fixed in play, by which group nobody knows |
-| ~~A beam clash runs in half its real time, and the CPU wins it~~ | **FIXED** by `beam clash`, v22. The contest is an event manager counted in ticks; doubling its phase lengths restores 4.3s and the player's count matches the 30fps game exactly. **Duration confirmed in play 2026-09-12**; the outcome is not yet reported |
-| A beam clash: the CPU ends 10-18% low in the full build | **Not the gate** - with the 60fps base patch alone it reproduces the 30fps game outright, 72-72 idle and 91-86 at 5 rotations a second. It is `beam object travel`: beams at their correct speed change where and when the clash forms, and the AI reacts to that geometry. At ~3.5 rotations a second - a near-tie the 30fps game gives the CPU 73-75 - this build gives it to the player 73-69 |
-| Frieza's rocks: the ~5-vsync fast **summon** phase | The travel is fixed; the 103-vsync pre-launch animation that dominates the move is not. 98.3 vsyncs at 60fps against 103.2 at 30. This is the part of that move a player can actually see. **The most legible thing still wrong** |
+| ~~**Real-time blast travel speed** (item 1)~~ | **FIXED** across three movers. `projectile travel` (v16, ki blasts) and `beam object travel` (v18, Buu's Super Kamehameha **and his breath**) are **confirmed in play 2026-09-09**. `blast object travel` (v17, Frieza's I Might Die This Time rocks) is measured at 1.77x and halved, but the user **feels no change** - correctly, because at play range the rocks are 94% summon animation; see the 2026-09-09 play-test entry. **Explosive waves** are confirmed fixed in play, by which group nobody knows |
+| ~~A Beam Struggle runs in half its real time, and the CPU wins it~~ | **FIXED** by `beam clash`, v22. The contest is an event manager counted in ticks; doubling its phase lengths restores 4.3s and the player's count matches the 30fps game exactly. **Duration confirmed in play 2026-09-12**; the outcome is not yet reported |
+| A Beam Struggle: the CPU ends 10-18% low in the full build | **Not the gate** - with the 60fps base patch alone it reproduces the 30fps game outright, 72-72 idle and 91-86 at 5 rotations a second. It is `beam object travel`: beams at their correct speed change where and when the clash forms, and the AI reacts to that geometry. At ~3.5 rotations a second - a near-tie the 30fps game gives the CPU 73-75 - this build gives it to the player 73-69 |
+| Frieza's I Might Die This Time rocks: the ~5-vsync fast **summon** phase | The travel is fixed; the 103-vsync pre-launch animation that dominates the move is not. 98.3 vsyncs at 60fps against 103.2 at 30. This is the part of that move a player can actually see. **The most legible thing still wrong** |
 | Circling an opponent cruises at 0.80 of its 30fps speed | Root cause narrowed to a target value rather than the step. Refinement, not defect |
 | Training-mode health regeneration ticks once per game tick | Cosmetic, training only, unfixed |
 
@@ -171,7 +171,7 @@ by the user**.
 
 | # | What the player sees | Status |
 |---|---|---|
-| 1 | Blasts end too fast and travel too fast - **including explosive waves** | **CLOSED.** *ends* fixed and confirmed in play (v12-v15). *travels* fixed across three movers: ki blasts (v16) and Buu's charged blast + breath (v18) **confirmed in play 2026-09-09**; Frieza's rocks (v17) measured and halved but **still starred - the user feels no change**, see below. **Explosive waves confirmed fixed in play 2026-09-09**, group unattributed |
+| 1 | Blasts end too fast and travel too fast - **including explosive waves** | **CLOSED.** *ends* fixed and confirmed in play (v12-v15). *travels* fixed across three movers: ki blasts (v16) and Buu's Super Kamehameha + breath (v18) **confirmed in play 2026-09-09**; Frieza's I Might Die This Time rocks (v17) measured and halved but **still starred - the user feels no change**, see below. **Explosive waves confirmed fixed in play 2026-09-09**, group unattributed |
 | 2 | Death by a body-erasing attack: the camera moves around the victim too fast and cuts weirdly | **ASSUMED solved\*** - nobody has ever checked it. Still the oldest unexamined item on this list |
 | 3 | Death of an ordinary character: the camera revolves around the corpse too fast | **CLOSED**, user-confirmed 2026-09-08 |
 | 4 | Camera is still too fast in some attack animations - Perfect Barrier named | **CLOSED**, user-confirmed 2026-09-08 (v14). But the user reported a *new* "some camera angles/speeds seem off" the same day - uncharacterised, open |
@@ -361,7 +361,7 @@ the running process, so the pnach was in force, not merely on disk).
 | build | group | what the user confirmed |
 |---|---|---|
 | v16 | `projectile travel` | ki blast travel |
-| v18 | `beam object travel` | Buu's charged blast **and his breath** |
+| v18 | `beam object travel` | Buu's Super Kamehameha **and his breath** |
 | v19 | `screen fade` | the Galick Cannon's white flash covers what it should |
 
 The user's word for these is **milestones**. v16 and v18 are the first fixes in
@@ -377,7 +377,7 @@ being global, now with an independent confirmation behind it.
 
 ### v17 stays starred - and the numbers say why
 
-Frieza's rocks feel unchanged in play. **The fix is real and the report is also
+Frieza's I Might Die This Time rocks feel unchanged in play. **The fix is real and the report is also
 right.** Impact is `pre-launch + gap / speed`, and the fitted 30fps split is
 **103.2 vsyncs of summon** against rocks crossing at **18.75 units/vsync**:
 
@@ -395,7 +395,7 @@ would be plainly visible - but nobody fights at 628 units.
 **So the remaining legible defect in that move is the summon phase, not the
 travel**: 98.3 vsyncs at 60fps against 103.2 at 30, roughly 5 vsyncs fast and
 uncompensated. That is the same ~5-vsync pre-launch residual measured on Buu's
-charged blast during v18. **It is now the most legible thing still wrong that
+Super Kamehameha during v18. **It is now the most legible thing still wrong that
 has a known address to start from.**
 
 The lesson is not "the measurement was wrong" - it was right, and it predicted
@@ -423,7 +423,7 @@ unattributed fix can regress without anyone knowing which change to look at.
 
 ### What this leaves open
 
-1. Frieza's rocks: the ~5-vsync fast **summon** phase (the travel is done).
+1. Frieza's I Might Die This Time rocks: the ~5-vsync fast **summon** phase (the travel is done).
 2. An ultimate's beam lands its first hit ~0.5s early - still unfound after all
    513 integer tick counters and all 140 per-tick float steps.
 3. Item 2, death by a body-erasing attack: never checked by anyone.
