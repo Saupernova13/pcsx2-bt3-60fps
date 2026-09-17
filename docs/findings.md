@@ -6398,12 +6398,31 @@ on the 30fps arm's value and the picture intact.
 Spending ki on a move is **not** affected: that happens on the move's own code
 path, not per tick, so the cost of a Kamehameha is still a Kamehameha.
 
+### Max Power Mode: the drain was covered, the charge was not (2026-09-17)
+
+The "not established" item below, measured. Save state 4 is Goku (Early) against
+a standing Ultimate Gohan (`work/state-backups/rocky-goku-early-vs-standing-gohan.p2s`),
+roster index 0. Holding `L2` at full Ki is state 55, and the blue overlay that
+fills over the Ki bars is the meter object's fourth gauge, `fighter+0x0A00`,
+capped at 30000. At the cap the game shows "MAX POWER!" and spends a Blast Stock.
+
+| arm | fill to 30000 | drain from 30000 |
+|---|---|---|
+| 30fps | 112 vsyncs | ~1080 vsyncs |
+| every shipped group | 56 vsyncs | ~480 vsyncs |
+| shipped + meter economy | 56 vsyncs | ~1020 vsyncs, the 30fps slope |
+
+The drain is `FUN_001CEE10`, inside the gated economy. The fill is not: the
+charge state's handler adds to the gauge once a tick at `001EB90C`, and the
+amount comes from `FUN_0020F000`, which spreads 30000 over a charge time in
+seconds with a hard-coded 30.0 at `0020F028`. It has one caller.
+
+`[60FPS - max power charge]` makes that 60.0. From the pnach, with the economy
+gate: **113 vsyncs**, 265 a tick. Ki charging itself (`L2` below full Ki, Ki
+poked to one bar) was already right with the economy gate: +35k per 20 vsyncs
+in both arms.
+
 ### Not established
 
-- **Max Power mode was not reached.** The report names it as where the drain is
-  most obvious. `FUN_001CEE10` (`obj+0x1C -= amount`, floored at 0) is a drain
-  and it is inside the gated function, so the class is covered, but the mode
-  itself was never entered and the drain was never watched. This is the part
-  that needs a play test.
-- **Which button charges ki** is still unknown. It was never needed: the gauge
-  refills on its own from this state, which is what the measurement used.
+- **Max Power Mode in play.** The drain and the charge are measured above; the
+  mode's own moves (Violent Rush, Hyper Smash) were not.
