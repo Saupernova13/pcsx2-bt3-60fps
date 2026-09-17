@@ -6325,98 +6325,114 @@ where a RAM scan is an afternoon:
 One hit is not weakness. That site fires once per tick per object, while the
 aura callers fire many times a tick, so a 160-stop sample is dominated by them.
 
-### A ballistic integrator, uncompensated on both terms
+### Two classes, and neither is only a flight
 
-```
-00178D90  jal Vec3Add           pos(+0x60) += vel(+0x80)
-00178D98  lwc1 $f0, 0x84($s0)   vel.y
-00178D9C  lwc1 $f1, 0xF0($s0)   the object's own gravity
-00178DA0  add.s $f0, $f0, $f1
-00178DA4  swc1 $f0, 0x84($s0)
-```
+A tapped `Triangle` and a held one throw different objects. Breaking on each
+mover while pressing each tells them apart in one run:
 
-Sampled per tick, the two arms are **identical** - step `-9.434` in x, gravity
-`+0.5` into vel.y, every tick, at both rates. That is the whole bug: twice the
-ticks per second means twice the ground per second.
-
-### Why one half is not enough
-
-The obvious fix is to halve the displacement, which is what every other travel
-group in this patch does. It makes things worse in a new way:
-
-| arm | airborne | distance | speed | landed at |
-|---|---|---|---|---|
-| 30fps | **34 vsyncs** | 370.8 | 10.91/vsync | (-112.3, -3.0, **216.7**) |
-| 60fps | 18 vsyncs | 370.6 | 20.59/vsync | (-112.1, -3.0, 216.6) |
-| 60fps, displacement only | 20 vsyncs | 251.0 | 12.55/vsync | (-41.2, 0.0, **99.9**) |
-| 60fps, both halves | **34 vsyncs** | 380.5 | 11.19/vsync | (-108.3, -2.8, **210.4**) |
-
-Halving the displacement alone leaves gravity pulling at full strength over
-twice as many ticks, so the blast drops out of the sky at **46% of its range**.
-An integrator has two terms and a rate change touches both.
-
-With both halved, the flight time is exact and the landing point is within 3%.
-The residual is a launch-phase offset: the throw animation ends on a different
-vsync in the two arms, so the object spawns a vsync or two apart.
-
-### The one-word gravity fix was a trap
-
-Gravity looked like this project's favourite shape. `0017873C` is
-`lui $at, 0x3F00` - 0.5f as an immediate, loaded into `$f22` and stored to
-`+0xF0` in Hercule's constructor. `0x3E80` is 0.25f. One word, and it measures
-exactly as well as what shipped.
-
-It fixes one character.
-
-The object layout is recognisable - a float store to `+0xF0` in a function that
-also writes `+0xDC`, `+0xE0` and `+0xE4`. **Nine constructors match, with four
-different gravities:**
-
-| site | function | gravity |
+| input | update | mover |
 |---|---|---|
-| `00177770` | `FUN_00177548` | `lui $at, 0x3F00` = 0.5 |
-| `001787AC` | `FUN_00178704` | `lui $at, 0x3F00` = 0.5 (Hercule) |
-| `0018A4E0` | `FUN_0018A1D8` | `lui $at, 0x3F80` = 1.0 |
-| `001A4D7C` | `FUN_001A4C98` | `lui $at, 0x3F80` = 1.0 |
-| `0017A434`, `00183CF4`, `0018DD1C`, `00191CE8`, `00231010` | five more | **computed at runtime** |
+| tap `Triangle` | `FUN_00178A28` | `FUN_00178D18` |
+| hold `Triangle` (charged ki blast) | `FUN_00177968` | `FUN_00177CF8` |
 
-Five of them are not constants at all, so no data patch could ever reach them.
-Patching the one that Hercule happens to use would have closed the issue, passed
-its own A/B, and left eight other thrown attacks at double gravity.
+Both movers start the same way - `pos(+0x60) += vel(+0x80)`, then
+`vel.y += gravity(+0xF0)` - and neither stops there. Read field by field at
+30fps, per tick:
 
-**The mover is the global site.** `FUN_00178D18` reads `+0xF0` once per tick for
-every object it advances, whatever built it, so halving it there covers all nine
-and anything added later. The trampoline swallows the whole gravity block and
-returns past it, to `00178DA8`. The measured result is identical - 34 vsyncs,
-landing at (-108.3, -2.8, 210.4) - and the coverage is not.
+| field | tapped | charged |
+|---|---|---|
+| flight | 17 ticks, then lands | flies, bounces three times, rests |
+| spin angle `+0xE8` | `age(+0xF4) * spin(+0xEC)`, -34.48 degrees a tick | same, 35.6 halving at each bounce |
+| debris | 5 fragments at `+0x130`, ballistic, for 15 ticks (`+0x1D4`) | - |
+| fuse `+0xF6` | - | 300 ticks |
+| rest before exploding `+0xD4` | - | 24 ticks |
+| after-life `+0xFA` | - | 15 ticks |
 
-The general rule, which this project keeps re-learning: **a constant with one
-reader is a one-word fix; a constant with one reader per instance is not.** The
-one-reader test asks how many sites read the value, and the answer here is one -
-but it is one site reading nine different values. Halve it where it is *used*,
-not where it is *set*, unless the setter is unique too.
+All of it runs twice as fast at 60fps. The first version of this fix halved the
+flight of the tapped class only.
 
-### The displacement half
+### Why the halved flight landed 7 units short
 
-Unlike every other travel site in this patch, `00178D90` is a bare `Vec3Add`
-with no scalar anywhere to halve, so it needed the trampoline regardless. The
-trampoline scales the velocity into a fixed scratch vector at `000F1660` and
-adds that instead - the same shape as `[60FPS - airborne residual]`, and for the
-same reason: nothing runs between the scale and the add, so a fixed buffer needs
-no re-entrancy and the stack is left alone.
+It flew for exactly the right time and landed at (-108.3, -2.8, 210.4) instead
+of (-112.3, -3.0, 216.7). The first write-up blamed a launch offset. Traced per
+vsync, that is wrong: both arms spawn on the same vsync at the same point, and x
+and z match the 30fps arc to 0.01 at every matched moment. Only y differs.
 
-`FUN_00178D18` saves `$ra` at `00178D30`, so the trampoline's own `jal`s are
-safe to make even though it is entered with `j`.
+The game adds velocity to position **before** it adds gravity to velocity. At
+30fps gravity therefore reaches the position one whole tick late. Halving both
+terms and running two half ticks lets it reach the position after half a tick,
+so the arc sags by `g/4` more every tick:
+
+```
+30fps, n ticks:          y0 + n*v0 + g*n*(n-1)/2
+two half ticks, n times: y0 + n*v0 + g*n*(2n-1)/4     lower by n*g/4
+```
+
+With g = 0.5 over 17 ticks that is 2.1 units, measured 2.17. A lower arc meets
+the ground sooner, which is where the 7 units along the path went.
+
+Subtracting `g/8` from each half step cancels it exactly - even ticks match the
+30fps positions and odd ticks fall on the same parabola between them. That
+landed the tapped blast within 0.13 units.
+
+### Why half steps are still wrong
+
+Collision is tested at the positions the object visits, and half steps visit
+positions the 30fps game never does. The exact half-step integrator, with every
+timer above counted on even ticks, on the charged blast:
+
+| arm | first bounce | second bounce | rests at | explodes |
+|---|---|---|---|---|
+| 30fps | v59 (-286.3, -5.0, 322.0) | v81 (-349.4, -27.4, 382.7) | (-384.7, -25.5, 412.1) | v211 |
+| half steps | v59 (-285.7, -5.1, 321.7) | **v76 (-334.1, -25.6, 366.6)** | **(-356.4, -4.4, 318.5)** | **v242** |
+
+The second bounce met a rock lip that the 30fps arc steps over, bounced back
+toward Hercule, and the bomb came to rest 70 units away, 31 vsyncs late.
+Unpatched 60fps does not have this problem - it bounces where 30fps does, only
+twice as fast - because it samples the same positions.
+
+### The fix: think at 30Hz, draw at 60
+
+Both updates begin by calling the game's own freeze check, `FUN_0012CED0`, and
+skip the tick when it says so. `[60FPS - particle update rate]` already reuses
+that check. `[60FPS - thrown object rate]` wraps it so the answer is also "skip"
+on odd ticks: one 11-word helper at `000F1600` and a `jal` at each of
+`0017797C` and `00178A3C`. The object keeps drawing every frame.
+
+Verified as shipped from the pnach, save state 5:
+
+| | spawn | lands / rests | explodes | gone |
+|---|---|---|---|---|
+| tapped, 30fps | v18 | v53 (-112.28, -2.95, 216.68) | - | v85 |
+| tapped, 60fps | v19 | v37 (-112.09, -2.95, 216.52) | - | v53 |
+| tapped, this group | v19 | **v54** (-112.12, -2.95, 216.57) | - | **v86** |
+| charged, 30fps | v50 | v163 (-384.68, -25.53, 412.13) | v211 | v239 |
+| charged, 60fps | v50 | v107 (-384.2, -25.6, 412.1) | v131 | v145 |
+| charged, this group | v51 | **v164** (-384.22, -25.55, 412.09) | **v212** | **v240** |
+
+Every beat is one vsync after 30fps because the throw leaves the hand one vsync
+later. The positions differ from 30fps by the throw's aim, which unpatched 60fps
+shares. Debris directions are random, so only their lifetime compares: 30
+vsyncs in both.
+
+### What this section used to claim
+
+That 9 constructors write gravity at `+0xF0` for this mover, so halving it in
+the mover was the global fix. `+0xF0` is a common offset: the scan matched
+unrelated structures, and `00177770` belongs to the charged class, whose mover
+the old fix never touched. The rule it was illustrating still holds - patch
+where a per-object value is used unless its setter is unique - but here the real
+miss was a second mover, found only by pressing a second button.
 
 ### Not established
 
-- **Which other attacks are thrown objects.** The nine constructors above are
-  the static evidence that there are several; which moves they belong to was not
-  traced. `FUN_00178704` has no direct `jal` callers, so it is reached through a
-  pointer. Only Hercule's throw was measured.
-- **Whether the mover handles objects that should NOT be halved.** Everything it
-  advances now moves at half the per-tick rate. That is right for anything
-  paced in game ticks, which is everything this game does, but it has been
-  checked on one move.
+- **Damage.** From this save both throws pass over a standing Gohan, so a hit
+  was never compared. Identical positions and timings mean the hit test sees
+  the same inputs, but that is inference.
+- **Other characters' thrown objects.** Only Hercule's two classes were traced.
+  Any object with its own update and a mover like these needs the same check.
+- **How 30Hz motion looks.** The object now moves every other frame while the
+  camera moves every frame. That is how the original game looks, but next to a
+  60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
