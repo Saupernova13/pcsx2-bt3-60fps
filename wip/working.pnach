@@ -1,7 +1,7 @@
 gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 
 // 60fps patch for Budokai Tenkaichi 3 - battles.
-// See docs/findings.md for the full derivation.
+// See docs/findings/ for the full derivation.
 
 [60FPS - battle]
 description=Run the battle loop at 60fps. Menus and other modes untouched.
@@ -116,7 +116,7 @@ patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 // straight to 00164A9C: the aura advances at its authored 30Hz while still
 // being drawn every frame. Found by measurement - a guarded 0-ki vs max-ki
 // activity diff isolated the aura's memory, and a pointer-ownership scan
-// named the node that owns it. See docs/findings.md.
+// named the node that owns it. See docs/findings/.
 [60FPS - aura update rate]
 description=Advance the ki aura every other frame so it plays at its real-time speed, while still drawing it at 60fps.
 patch=1,EE,000F0740,word,8ED20038 // lw    $s2, 0x38($s6)     replay displaced
@@ -144,7 +144,7 @@ patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
 // halves at once: 60.0 doubles the frame count and halves the step.
 // Found by sweeping RAM for words that REVERSE DIRECTION twice as often rather
 // than words that step twice as far - the airborne idle's tell was a triangle
-// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings.md.
+// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings/.
 [60FPS - tween duration]
 description=Count tween durations in 60Hz frames so eases, pulses, fades and blends take their intended real time.
 patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0
@@ -778,8 +778,8 @@ patch=1,EE,001DED58,word,0803C280 // lwc1 -> j trampoline
 patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 
 
-// The knockback flight, found 2026-09-07. A fighter sent flying by a heavy
-// smash enters state 213 (or 214 / 223), and FUN_001E9590 counts a phase timer
+// The Hard Knockback, found 2026-09-07. A fighter sent flying by a Full Power
+// Smash enters state 213 (or 214 / 223), and FUN_001E9590 counts a phase timer
 // at fighter+0x3D8 down once a tick from a value chosen per move - 50 for the
 // D5 smash, 15 for D6, 32 for DF. Those are 30Hz frame counts, so at 60fps the
 // victim leaves the constant-speed launch and drops into the gravity tumble in
@@ -790,14 +790,14 @@ patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 // restores it. The counter still decrements every tick, so unlike a parity gate
 // this cannot leave a fighter stuck in the state.
 [60FPS - knockback flight]
-description=Double the launch-flight durations behind a heavy smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590). The three constants are dispatched on fighter+0x948, the STATE, not on a character or a move - every character launched into 213/214/223 is covered.
+description=Double the launch-flight durations behind a Full Power Smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590). The three constants are dispatched on fighter+0x948, the STATE, not on a character or a move - every character launched into 213/214/223 is covered.
 patch=1,EE,001E9614,word,2402001E // fighter STATE 214 launch: 15 -> 30 ticks
 patch=1,EE,001E962C,word,24020064 // fighter STATE 213 launch: 50 -> 100 ticks
 patch=1,EE,001E963C,word,24020040 // fighter STATE 223 launch: 32 -> 64 ticks
 
-// The Circle pursuit, found 2026-09-07 - the stomp that follows a heavy smash.
+// The Lightning Attack, found 2026-09-07 - the Lightning Attack that follows a Full Power Smash.
 // Four separate 30Hz frame counts and one lead prediction, all in the same
-// chain, and every one of them has to be doubled or the stomp misses:
+// chain, and every one of them has to be doubled or the Lightning Attack misses:
 //
 //   state 43  FUN_001F30E0  a 6-tick windup before the teleport fires
 //   state 48  FUN_001F3668  the rise: (target - pos) * 0.25, added once a tick,
@@ -819,7 +819,7 @@ patch=1,EE,001E963C,word,24020040 // fighter STATE 223 launch: 32 -> 64 ticks
 // literal 4.0 only corrects the move whose fVar7 is zero. FUN_001DE8A8 has
 // exactly one caller, so changing the scale it uses touches nothing else.
 [60FPS - pursuit timing]
-description=Double the four frame counts and the intercept lead behind the Circle pursuit stomp, so it connects at 60fps as it does at 30.
+description=Double the four frame counts and the intercept lead behind the Lightning Attack, so it connects at 60fps as it does at 30.
 patch=1,EE,001F3194,word,28430008 // windup effect onset: 4 -> 8 ticks
 patch=1,EE,001F31B0,word,2842000C // windup before the teleport: 6 -> 12 ticks
 patch=1,EE,001F3754,word,3C013E00 // rise step 0.25 -> 0.125
@@ -1035,7 +1035,7 @@ patch=1,EE,000F13D4,word,00000000 // nop
 patch=1,EE,00176A2C,word,0803C4F0 // lwc1 -> j 000F13C0
 
 [60FPS - blast object travel]
-description=Halve the per-tick advance of spawned projectiles - Frieza's summoned rocks and everything else on the same object class - so they cross the gap in real time rather than twice as fast.
+description=Halve the per-tick advance of spawned projectiles - the rocks of Frieza's I Might Die This Time and everything else on the same object class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F13E0,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
 patch=1,EE,000F13E4,word,0080302D // move $a2, $a0          a2 = the position
 patch=1,EE,000F13E8,word,3C013F00 // lui $at, 0x3f00        0.5f
@@ -1046,7 +1046,7 @@ patch=1,EE,000F13F8,word,00000000 // nop
 patch=1,EE,0015C28C,word,0803C4F8 // jal Vec3Add -> j 000F13E0
 
 [60FPS - beam object travel]
-description=Halve the per-tick advance of travelling beam objects - Buu's charged blast and everything else on that class - so they cross the gap in real time rather than twice as fast.
+description=Halve the per-tick advance of travelling beam objects - Buu's Super Kamehameha and everything else on that class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F1400,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
 patch=1,EE,000F1404,word,0080302D // move $a2, $a0          a2 = the position
 patch=1,EE,000F1408,word,3C013F00 // lui $at, 0x3f00        0.5f
@@ -1071,7 +1071,7 @@ description=Convert the fullscreen fade node's phase durations from seconds at 3
 patch=1,EE,00172744,word,3C014270 // lui $at, 0x4270      30.0 -> 60.0, seconds to frames
 patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 frames
 
-// The rush struggle, found 2026-09-10. Two rush attacks collide, both fighters
+// The Rush Struggle, found 2026-09-10. Two rush attacks collide, both fighters
 // enter state 250 (FUN_001F47C8) and rotate their sticks; the game counts hits
 // into fighter+0xE50 and at 001D945C simply compares the two counts to pick a
 // winner. Every part of that is authored in ticks: the struggle is exactly 88
@@ -1087,7 +1087,7 @@ patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 fr
 // This gates ONLY the AI's rotation, on the state's own tick counter, using the
 // game's own human/AI flag. The player's input is untouched.
 [60FPS - rush struggle]
-description=Honour the CPU's synthetic stick rotation every other tick in a rush struggle, so the AI cannot out-rotate the player twice as fast at 60fps as it does at 30.
+description=Honour the CPU's synthetic stick rotation every other tick in a Rush Struggle, so the AI cannot out-rotate the player twice as fast at 60fps as it does at 30.
 patch=1,EE,000F1500,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
 patch=1,EE,000F1504,word,10600005 // beqz $v1, 0x000F151C   human: unchanged
 patch=1,EE,000F1508,word,00000000 // nop
@@ -1101,7 +1101,7 @@ patch=1,EE,000F1524,word,03E00008 // jr $ra
 patch=1,EE,000F1528,word,0000102D // move $v0, $zero        (delay slot)
 patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
 
-// The beam clash, found 2026-09-12. Two beams collide, both fighters enter
+// The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter
 // state 304 (FUN_001FB660) and rotate their sticks. Rotations are counted into
 // fighter+0xE4C - seeded on entry from the move's power and the character's
 // attributes, so it does not start at zero - and the contest itself is run by
@@ -1123,12 +1123,12 @@ patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
 // magnitude - which is why the clash point constant halves too, leaving the
 // point exactly where 30fps puts it while updating smoothly every frame rather
 // than in 30Hz steps. The AI's rotation is gated to every other tick using the
-// game's own human/AI flag, as the rush struggle does; the player's input is
+// game's own human/AI flag, as the Rush Struggle does; the player's input is
 // untouched. Against the 30fps game with the 60fps base patch alone, where the
 // AI draws the same random stream, this reproduces it exactly: 72-72 idle and
 // 91-86 at 5 rotations a second, over the same 4.3 seconds.
 [60FPS - beam clash]
-description=Pace the beam clash in real time at 60fps - every phase of its event manager, the clash point, and the CPU's stick rotation - so the clash lasts as long as it does at 30fps and is decided the same way.
+description=Pace the Beam Struggle in real time at 60fps - every phase of its event manager, the clash point, and the CPU's stick rotation - so the clash lasts as long as it does at 30fps and is decided the same way.
 patch=1,EE,000F1540,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
 patch=1,EE,000F1544,word,10600005 // beqz $v1, 0x000F155C   human: unchanged
 patch=1,EE,000F1548,word,00000000 // nop
