@@ -40,6 +40,7 @@ SAFE_ZONE_SIZE = identity.SAFE_ZONE_SIZE
 EE_RAM_SIZE = _generic.EE_RAM_SIZE
 NEVER_SHIP = identity.NEVER_SHIP
 OPTIONAL = identity.OPTIONAL
+EXCLUSIVE = identity.EXCLUSIVE
 
 # Re-export the generic discovery, identity-driven helpers.
 from ps2ee.config import (  # noqa: E402, F401

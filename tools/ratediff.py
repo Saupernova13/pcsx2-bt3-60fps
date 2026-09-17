@@ -120,8 +120,16 @@ def report(path: str, ints: bool, top: int, any_start: bool) -> None:
     print(f"  compensated (1x)             : {int(one_x.sum())}")
 
     idx = np.flatnonzero(two_x)
-    runs = np.split(idx, np.flatnonzero(np.diff(idx) != 1) + 1)
+    # np.split of an empty array returns one empty piece, not none, so the
+    # empties are dropped here rather than crashing on run[0] below.
+    runs = [r for r in np.split(idx, np.flatnonzero(np.diff(idx) != 1) + 1) if r.size]
     runs.sort(key=lambda r: -r.size)
+    if not runs:
+        # A real answer, and the two counts above prove the scan ran: the
+        # 30fps arm found movers and the patch compensated them.
+        print("")
+        print("Nothing in this window is still running at 2x.")
+        return
     print(f"\n{len(runs)} contiguous runs, largest first:")
     for run in runs[:top]:
         i = run[0]
