@@ -33,7 +33,7 @@ Newest sections at the bottom.
 > ps2ee library and 13 tools moved to the PCSXROO repo (now
 > `pcsxroo/ps2ee/` and `pcsxroo/tools/` there); this game's knowledge now lives in `tools/game/`. Tool
 > names in this log are unchanged and still resolve - the current index is
-> [`docs/tools.md`](tools.md). `patches/428113C2.pnach` is now
+> [`docs/tools.md`](../tools.md). `patches/428113C2.pnach` is now
 > `wip/working.pnach`, the install file is `patch/428113C2.pnach`, and
 > released versions are git tags, not directories. Sections below keep the
 > paths they were written with.
