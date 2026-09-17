@@ -1151,3 +1151,46 @@ patch=1,EE,001D8FD0,word,284300D4 // slti $v1, $v0, 0xd4    the tug phase runs t
 patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 ticks
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
+
+// Solar Flare, found 2026-09-17 for issue #32. SuperCombo says it "causes
+// opponent to lock off" and gives no duration; the 30fps game is the oracle.
+//
+// fighter+0x0FF8 is the victim's blind timer, armed at 001C82F4 from move data.
+// The fighter's per-tick update counts it down and, while it is positive, sets
+// flags 0x93, 0x137 and 0x96 - the lock-off:
+//
+//   001E1F3C  addiu $v0, $v0, -1           once a tick, after a <= 0 test
+//   001E1F44  sw    $v0, 0xFF8($s1)
+//   001E1F74  jal   FUN_001DC030           flash (+0xFFC) moves toward 2 * timer,
+//   001E1F78  li    $a2, 15                  by at most 15 a tick
+//
+// The decrement is hooked on the addiu itself, not on the load: when the
+// victim is not paralysed the load happens in a delay slot at 001E1EB4 and
+// jumps past 001E1F30. The flash blend is given a step of 0 on odd ticks, so it
+// rises at 15 per 30Hz tick. FUN_001DC030 has no other caller.
+//
+// Save state 3, Krillin 66 units from a standing Ultimate Gohan, L2 + Circle,
+// from the pnach:
+//
+//                       timer runs   flash peaks      flash rise per 2 vsyncs
+//   30fps               150 vsyncs   132 at +18       15
+//   60fps, shipped      75 vsyncs    132 at +9        30
+//   60fps, this group   150 vsyncs   132 at +18       15
+//
+// The stagger itself, state 198, is 50 vsyncs in every arm.
+[60FPS - solar flare]
+description=Keep Solar Flare's lock-off and white flash for their real time, so a 2.5-second blind lasts 2.5 seconds at 60fps instead of 1.25.
+patch=1,EE,000F1780,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1784,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1788,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F178C,word,2442FFFF // addiu $v0, $v0, -1       the original decrement
+patch=1,EE,000F1790,word,03E00008 // jr $ra
+patch=1,EE,000F1794,word,00481021 // addu $v0, $v0, $t0       odd tick: undo it
+patch=1,EE,000F17A0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F17A4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F17A8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F17AC,word,0008300B // movn $a2, $zero, $t0     odd tick: step the flash by 0
+patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returning to its caller
+patch=1,EE,000F17B4,word,00000000 // nop
+patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
+patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
