@@ -36,6 +36,7 @@ recovers that version's file.
 | [`v21`](v21-rush-struggle.md) | 2026-09-10 | 26 | the CPU can no longer out-rotate the player in a rush struggle | not yet played\* |
 | [`v22`](v22-beam-clash.md) | 2026-09-12 | 27 | the beam clash paced in real time, and the CPU's rotation gated | duration confirmed\* |
 | [`v23`](v23-known-issues-refresh.md) | 2026-09-15 | 27 | no patch change - the beam clash caveat added to the shipped header; the first GitHub Release | duration confirmed\* |
+| [`v24`](v24-state-phase-timers.md) | 2026-09-17 | 33 | fix(tools): stop tools/ shadowing the python stdlib, which broke every tool on linux | **DRAFT - not played** |
 
 Group counts are the groups in each release file. From v16 on, one of them is the
 optional 19.5:9 widescreen group, which ships switched off.
