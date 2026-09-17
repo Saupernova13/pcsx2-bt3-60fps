@@ -322,7 +322,18 @@ def original_word(elf: ElfImage, addr: int) -> int:
 
 
 def apply(roo: Roo, wanted: list[str], quiet: bool = False) -> None:
-    """Make exactly ``wanted`` active, and restore what the rest overwrote."""
+    """Make exactly ``wanted`` active, and restore what the rest overwrote.
+
+    **An enabled group is not in RAM when this returns.** Disabling writes the
+    original words here, but the cheat engine writes an *enabled* group's words
+    at a frame boundary, so the patch only lands once the VM runs a frame.
+
+    Advance a few frames before reading a patched address or arming a
+    breakpoint on patched code. Skipping that does not raise: every arm quietly
+    measures the unpatched game and agrees with every other arm, which reads
+    exactly like a fix that does nothing. Reading one patched address back and
+    checking it changed is the cheap guard.
+    """
     path, pnach = read_pnach()
     elf = ElfImage.load(config.elf_path())
 
