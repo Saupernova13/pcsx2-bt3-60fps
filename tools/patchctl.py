@@ -190,11 +190,16 @@ BEAMCLASH = ["60FPS - beam clash"]
 # caller, so one gate fixes the system rather than a dozen constants.
 ECONOMY = ["60FPS - meter economy"]
 
+# Max Power Mode's charge, found 2026-09-17. Holding L2 at full Ki fills the
+# Max Power gauge from the charge state's handler, outside the economy gate, at
+# an amount FUN_0020F000 derives from seconds * 30.0. That 30.0 becomes 60.0.
+MPMCHARGE = ["60FPS - max power charge"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + ECONOMY + SPARES)
+                  + STRUGGLE + BEAMCLASH + ECONOMY + MPMCHARGE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -249,7 +254,7 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + ECONOMY),
+             + BEAMCLASH + ECONOMY + MPMCHARGE),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER

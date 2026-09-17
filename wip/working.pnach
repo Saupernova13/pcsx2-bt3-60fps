@@ -1176,3 +1176,33 @@ patch=1,EE,000F1598,word,00000000 // nop
 patch=1,EE,000F159C,word,03E00008 // jr $ra
 patch=1,EE,000F15A0,word,00000000 // nop
 patch=1,EE,001E2584,word,0C03C560 // jal 001E16C0 -> jal 000F1580
+
+// Max Power Mode's charge, found 2026-09-17, the other half of issue #4.
+// SuperCombo: Max Power Mode is "activated by charging while both having a full
+// Ki gauge and at least one Blast Stock", shown as a blue gauge over the Ki bars.
+//
+// That gauge is the meter object's +0x1C (fighter+0x0A00), capped at 30000. The
+// charge state's handler (state 55, FUN_001EB718) adds to it once a tick at
+// 001EB90C, and the amount comes from FUN_0020F000, which spreads 30000 over a
+// charge time in seconds at a hard-coded 30 ticks a second:
+//
+//   0020F028  lui   $at, 0x41F0          30.0
+//   0020F03C  div.s $f20, $f20, $f0
+//   0020F040  mul.s $f20, $f20, $f1       seconds * 30.0 = ticks
+//   0020F04C  div   $v0, $v1              30000 / ticks = amount a tick
+//
+// [60FPS - meter economy] does not reach it: the add is in the state handler, not
+// in FUN_001E16C0. It fixes the DRAIN after activation, not the fill. One word
+// makes the divisor 60.0, so the amount halves and the tick count doubles.
+// FUN_0020F000 has one caller.
+//
+// Save state 4, Goku (Early) at full Ki, L2 held, first add to 30000 ("MAX
+// POWER!"), from the pnach:
+//
+//   30fps                                112 vsyncs   535 a tick
+//   60fps, shipped + meter economy        56 vsyncs   535 a tick
+//   60fps, the same + this group         113 vsyncs   265 a tick
+[60FPS - max power charge]
+description=Fill the Max Power Mode gauge at its real-time speed while charging, so Max Power Mode takes as long to reach at 60fps as on a real PS2.
+patch=1,EE,0020F028,word,3C014270 // lui $at, 0x41F0 -> 0x4270   30.0 -> 60.0 ticks a second
+
