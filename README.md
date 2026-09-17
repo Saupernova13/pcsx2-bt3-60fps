@@ -35,14 +35,14 @@ Movement, gravity and knockback; the animation clock; menu and combat input
 windows; the ki aura, particles, effect rotation and the hovering idle; the
 tween system; blast hit cadence and blast effect duration; the integer clock
 behind scripted-sequence waits; the launch-and-pursuit chain - the flight a
-heavy smash puts someone into, and the five frame counts behind the Circle
+Full Power Smash puts someone into, and the five frame counts behind the Circle
 stomp that follows it; the camera, whose blend rate and scripted move lengths
 are both counted in ticks; the three movers that carry projectiles across the
-ground - ki blasts, spawned objects like Frieza's rocks, and travelling beams
-like Buu's charged blast and his breath; and the fullscreen fade service, which
+ground - ki blasts, spawned objects like Frieza's I Might Die This Time rocks, and travelling beams
+like Buu's Super Kamehameha and his breath; and the fullscreen fade service, which
 took its phase durations in seconds and converted them at 30 Hz, so every fade
 in the game ran in half its real time. And the two contests decided by how fast
-a player turns the sticks - the rush struggle and the beam clash - both of
+a player turns the sticks - the Rush Struggle and the Beam Struggle - both of
 which were counted in ticks throughout, so at 60fps they ran in half their real
 time while the CPU, whose stick is synthetic and steps once per tick, rotated
 twice as fast in real time as it should. Both gate only the AI side; a human's
@@ -53,11 +53,11 @@ same save state, same input, same number of vsyncs. The ones a player can see
 are confirmed in play with the game running free, not by frame stepping.
 
 Known not fixed, stated in the shipped header: an ultimate's beam lands its
-first hit about half a second early; the summon animation before Frieza's rocks
+first hit about half a second early; the summon animation before Frieza's I Might Die This Time rocks
 - most of that move - still runs about five frames fast, as does the wind-up on
-Buu's charged blast; some pre-fight intro animations are paced wrong against
+Buu's Super Kamehameha; some pre-fight intro animations are paced wrong against
 the camera; the camera on a body-erasing death has never been re-checked since
-the camera work landed; and in a beam clash the CPU ends a little weaker than
+the camera work landed; and in a Beam Struggle the CPU ends a little weaker than
 it is at 30fps, so a near-tie can fall the player's way.
 
 ## Why the obvious patch does not work
@@ -76,7 +76,7 @@ BT3 turns out to have no master framerate variable. Its per-frame routine takes
 a vblank stride as an argument, and all eight call sites hardcode it (`addiu
 $a0, $zero, 2` for 30fps, `1` for 60fps). So the right lever is a one-word
 change at the specific loop you want to convert, not a global branch kill. The
-full table is in [`docs/findings.md`](docs/findings.md).
+full table is in [`docs/findings/`](docs/findings/README.md).
 
 ## Repository layout
 
@@ -181,7 +181,7 @@ an error. Read it before the first measurement, not after.
 [`docs/rig.md`](docs/rig.md) for how to drive the emulator,
 [`docs/status.md`](docs/status.md) for the state of every group,
 [`docs/versions/`](docs/versions/README.md) for what each of v01 to v23 changed
-and discovered, [`docs/findings.md`](docs/findings.md) for the full log, and
+and discovered, [`docs/findings/`](docs/findings/README.md) for the full log, and
 [`docs/tools.md`](docs/tools.md) for every tool.
 
 Decompilation is optional and needs Ghidra with the Emotion Engine extension.

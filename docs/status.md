@@ -13,13 +13,13 @@ What every version changed and discovered, v01 through v23, is in
 > confirmed its duration in play on 2026-09-12, but not yet who wins a clash.
 
 **v16, v18 and v19 are confirmed in play by the user, 2026-09-09.** Ki blast
-travel, Buu's charged blast *and his breath*, and the screen fade - the user
-calls these milestones. **v17 is not confirmed**: Frieza's rocks still feel
+travel, Buu's Super Kamehameha *and his breath*, and the screen fade - the user
+calls these milestones. **v17 is not confirmed**: Frieza's I Might Die This Time rocks still feel
 unchanged in play. The measurements say why, and it is not that the fix failed -
 see the v17 section. It stays starred.
 
 **v13, v14 and v15 are all confirmed in play by the user, 2026-09-08** - the
-pursuit stomp after a heavy smash, the Cell Perfect Barrier camera, and the
+Lightning Attack after a Full Power Smash, the Cell Perfect Barrier camera, and the
 mouths, in the cut-in AND in the pre-fight intro. v14's star is cleared.
 None of it touches v12's input-timing flag, which still stands.
 
@@ -30,15 +30,15 @@ None of it touches v12's input-timing flag, which still stands.
 > ground movement, the state 157 trap - since at least 2026-09-05, while every
 > test ran against PCSXROO. `deploy.py` now refuses them.
 
-| Build | Groups | Confidence | Ultimate's blast | Notes |
+| Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
-| `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a beam clash - which had been written in after v22 was tagged |
+| `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
 | `v20-known-issues-refresh` | 24 | **CONFIRMED IN PLAY** | correct | Patch content byte-identical to v19. The shipped header's KNOWN NOT FIXED list had gone stale - it still named the intro mouths and the transformation overshoot, both fixed and confirmed |
 | `v19-screen-fade` | 24 | **CONFIRMED IN PLAY** | correct | Adds `screen fade` - the game's fullscreen fade service counted its phases in 30Hz frames, so every fade in the game ran in half its real time |
-| `v18-beam-object-travel` | 23 | **CONFIRMED IN PLAY** | correct | Adds `beam object travel` - Buu's charged blast and its class crossed the gap at 2x |
-| `v17-blast-object-travel` | 22 | **MEASURED, NOT FELT IN PLAY\*** | correct | Adds `blast object travel` - Frieza's summoned rocks and their class crossed the gap at 2x |
+| `v18-beam-object-travel` | 23 | **CONFIRMED IN PLAY** | correct | Adds `beam object travel` - Buu's Super Kamehameha and its class crossed the gap at 2x |
+| `v17-blast-object-travel` | 22 | **MEASURED, NOT FELT IN PLAY\*** | correct | Adds `blast object travel` - the rocks of Frieza's I Might Die This Time and their class crossed the gap at 2x |
 | `v16-projectile-travel` | 21 | **CONFIRMED IN PLAY** | correct | Adds `projectile travel` - ki blasts crossed the ground at 2x speed. The first fix here that changes how the game PLAYS |
 | `v15-mouth-clock` | 20 | **CONFIRMED IN PLAY** | correct | Adds `mouth clock`. Confirmed 2026-09-08; inherits v12's flag |
 | `v14-camera-pacing` | 19 | **CONFIRMED IN PLAY** | correct | Adds `camera pacing`. Confirmed 2026-09-08, star cleared; inherits v12's flag |
@@ -55,7 +55,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 The baseline. Confirmed in play: no state 157 trap.
 
-**Its known tradeoff is accepted, not a defect.** The ultimate's blast ends
+**Its known tradeoff is accepted, not a defect.** The Ultimate Blast ends
 early, because `[60FPS - sequence wait]` is absent. Do not re-open that as a bug
 against this build - it is the price of the build.
 
@@ -72,12 +72,12 @@ again. Differs from v11 by exactly one group, `[60FPS - sequence wait]`.
 > Every later build inherits this flag until it is explicitly cleared by
 > testing. If input feel is ever in question, compare against v11 first.
 
-## v13 - the pursuit stomp
+## v13 - the Lightning Attack
 
 Adds `[60FPS - knockback flight]` and `[60FPS - pursuit timing]` to the v12 set.
-Fixes the heavy smash into Circle pursuit stomp, which missed at 60fps and
+Fixes the Full Power Smash into a Lightning Attack, which missed at 60fps and
 landed every time at 30. Five separate durations authored in 30Hz frames, in one
-chain; see findings.md for the derivation.
+chain; see findings/smash-and-lightning-attack.md for the derivation.
 
 Verified by automated test, not yet by the user:
 
@@ -114,7 +114,7 @@ which takes no input at all, mean error goes 5.00 -> 1.93 and peak 14.6 -> 0.7.
 Confirmed by contact sheet at 0.12s on the wall clock: the fixed arm matches the
 30fps arm tile for tile through the orbit, where unpatched 60fps is a beat ahead.
 
-No regression - charge 99, ultimate 161, pursuit stomp still connects, and the
+No regression - charge 99, ultimate 161, Lightning Attack still connects, and the
 **ordinary** battle camera improves from 3.71 to 2.88 degrees rather than going
 sluggish.
 
@@ -191,7 +191,7 @@ normal play. **Inherits v12's input-timing flag.**
 
 ## v17 - spawned projectile flight
 
-Adds `[60FPS - blast object travel]`. Frieza's summoned rocks - and everything
+Adds `[60FPS - blast object travel]`. The rocks of Frieza's I Might Die This Time - and everything
 else on the same object class - advanced `position += direction * 37.037` per
 **tick**, identical in both arms, so they crossed the gap in half the real time.
 The fix hooks the one `Vec3Add` both code paths converge on and halves the
@@ -200,7 +200,7 @@ advance.
 Verified as shipped from the pnach, at three ranges, against the 30fps oracle:
 impact moved 103 -> 106, 113 -> 124, 118 -> 134 against 30fps's 110 / 128 / 137.
 Inert at idle and for plain ki blasts, so it cannot double-compensate with
-`[60FPS - projectile travel]`. Buu's charged blast is untouched by it, vsync for
+`[60FPS - projectile travel]`. Buu's Super Kamehameha is untouched by it, vsync for
 vsync - that beam is a different subsystem and is still unfixed.
 
 **It stays starred. The user played it on 2026-09-09 and felt no difference.**
@@ -221,13 +221,13 @@ Nobody could feel that. The measurement was sound and so is the user's report.
 
 **What is left to feel is the summon phase itself**: 98.3 vsyncs at 60fps
 against 103.2 at 30, ~5 vsyncs fast, uncompensated, and the same ~5-vsync
-pre-launch defect seen on Buu's charged blast in v18. That is the part of this
+pre-launch defect seen on Buu's Super Kamehameha in v18. That is the part of this
 move a player can see, and it is not fixed. **Inherits v12's input-timing
 flag.**
 
 ## v18 - beam object travel
 
-Adds `[60FPS - beam object travel]`. Buu's charged blast runs on a sibling of
+Adds `[60FPS - beam object travel]`. Buu's Super Kamehameha runs on a sibling of
 the rock class - `FUN_00155C5C`, `position(+0x60) += delta(+0x80)` - with the
 same 37.037 per-tick delta, set once at launch and identical in both arms. The
 fix hooks the one `Vec3Add` at `00156004` that both code paths converge on.
@@ -237,7 +237,7 @@ and 59 -> 76 at gap 657, against 30fps's 50 and 81. The travel component paces
 18.42 units/vsync in both arms, an exact match; the residual ~5 vsyncs is the
 pre-launch animation, a separate defect.
 
-Inert at idle, for plain ki blasts and for Frieza's rocks - those re-measure at
+Inert at idle, for plain ki blasts and for Frieza's I Might Die This Time rocks - those re-measure at
 v124, unchanged - so it cannot double-compensate with v16 or v17.
 
 **Confirmed in play by the user, 2026-09-09.** The star is cleared. The user
@@ -288,8 +288,8 @@ The fall is value-for-value the 30fps curve over the same 28 vsyncs. On the node
 itself the durations go 15/30 frames to 30/60 and the blend step 1/15 to 1/30.
 
 No regression: the ultimate's eleven state transitions land on identical vsyncs
-with the group on and off, so the fade moves no beat. Frieza's rocks and Buu's
-charged blast construct no fade node at all, so it cannot touch them.
+with the group on and off, so the fade moves no beat. Frieza's I Might Die This Time rocks and Buu's
+Super Kamehameha construct no fade node at all, so it cannot touch them.
 
 **Confirmed in play by the user, 2026-09-09.** The star is cleared. The
 Galick Cannon's white flash now covers what it exists to cover. **Inherits
@@ -305,7 +305,7 @@ are both correct in play. Neither was ever worked on:
   Never investigated, never had a group written for it.
 - **Explosive waves** (the second half of item 1) were never separately checked
   after the travel work; the three movers were measured on ki blasts, rocks and
-  Buu's charged blast only.
+  Buu's Super Kamehameha only.
 
 The explosive wave is plausibly `[60FPS - projectile travel]` or one of the two
 object movers reaching a fourth caller, which is what a class-level hook is for.
@@ -348,13 +348,13 @@ which is the only documentation most people who use this patch will ever read.
 It was still telling them the pre-fight intro's mouths do not move (fixed in
 v15, confirmed 2026-09-08) and that transformations run long (confirmed fixed
 2026-09-09). It now names what is actually left: the ultimate's beam, the fast
-summon phase on Frieza's rocks and Buu's charged blast, the intro animation
+summon phase on Frieza's I Might Die This Time rocks and Buu's Super Kamehameha, the intro animation
 pacing, and the never-re-checked camera on a body-erasing death.
 
 Cut as its own version rather than rewriting v19 in place - a release is a
 record, and v19's file stays as it shipped.
 
-## v21 - the rush struggle
+## v21 - the Rush Struggle
 
 Two rush attacks collide, both fighters enter state 250, the game counts hits
 into `fighter+0xE50` and at `001D945C` picks whoever has more. All of it is
@@ -378,7 +378,7 @@ The struggle still runs in 1.63s rather than 2.95s, so the counts read low - the
 **Starred pending the user's own play-test.** **Inherits v12's input-timing
 flag.**
 
-## v22 - the beam clash
+## v22 - the Beam Struggle
 
 Two beams collide and both players rotate their sticks. There is no counter on
 screen, so this was measured against the game's own internals: rotations land in
@@ -409,7 +409,7 @@ the AI reacts to that. At 3.5 rotations a second - a near-tie the 30fps game
 gives the CPU 73-75 - this build gives it to the player 73-69. Every other speed
 tested picks the 30fps winner.
 
-**Play-test, 2026-09-12:** the user played a beam clash from their own save with
+**Play-test, 2026-09-12:** the user played a Beam Struggle from their own save with
 v22 installed and confirmed the duration - "it indeed was fixed in terms of
 duration". The outcome is still unreported, so the star stands.
 
@@ -418,14 +418,14 @@ human's stick is still read every tick, 60 times a second. Below about 7.5
 rotations a second that is indistinguishable from 30fps - the counts are
 identical, 55/55, 73/73, 91/91 - and above it the 60fps build counts crossings
 the 30fps game aliases away. Matching the original exactly would mean throwing
-away input the player can feel themselves giving. See docs/findings.md.
+away input the player can feel themselves giving. See docs/findings/struggles.md.
 
-## v23 - the shipped header caught up with the beam clash
+## v23 - the shipped header caught up with the Beam Struggle
 
 **No patch change.** The patch at the `v23-known-issues-refresh` tag has the
 same 27 groups and the same 313 patch lines as v22; only comments differ.
 
-v22 was tagged before its known gap - the CPU ending 10-18% low in a beam clash -
+v22 was tagged before its known gap - the CPU ending 10-18% low in a Beam Struggle -
 was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
