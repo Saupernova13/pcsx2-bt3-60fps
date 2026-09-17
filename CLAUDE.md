@@ -9,7 +9,7 @@ instead of an error. Several of them have each cost an hour or more. Do not
 rediscover them.
 
 Then [`docs/status.md`](docs/status.md) for what every group is and whether it is
-trusted, and [`docs/findings.md`](docs/findings.md) for the derivation of any of
+trusted, and [`docs/findings/`](docs/findings/README.md), split by topic, for the derivation of any of
 it.
 
 ## Pull requests

@@ -1,7 +1,7 @@
 gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 
 // 60fps patch for Budokai Tenkaichi 3 - battles.
-// See docs/findings.md for the full derivation.
+// See docs/findings/ for the full derivation.
 
 [60FPS - battle]
 description=Run the battle loop at 60fps. Menus and other modes untouched.
@@ -116,7 +116,7 @@ patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 // straight to 00164A9C: the aura advances at its authored 30Hz while still
 // being drawn every frame. Found by measurement - a guarded 0-ki vs max-ki
 // activity diff isolated the aura's memory, and a pointer-ownership scan
-// named the node that owns it. See docs/findings.md.
+// named the node that owns it. See docs/findings/.
 [60FPS - aura update rate]
 description=Advance the ki aura every other frame so it plays at its real-time speed, while still drawing it at 60fps.
 patch=1,EE,000F0740,word,8ED20038 // lw    $s2, 0x38($s6)     replay displaced
@@ -144,7 +144,7 @@ patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
 // halves at once: 60.0 doubles the frame count and halves the step.
 // Found by sweeping RAM for words that REVERSE DIRECTION twice as often rather
 // than words that step twice as far - the airborne idle's tell was a triangle
-// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings.md.
+// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings/.
 [60FPS - tween duration]
 description=Count tween durations in 60Hz frames so eases, pulses, fades and blends take their intended real time.
 patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0

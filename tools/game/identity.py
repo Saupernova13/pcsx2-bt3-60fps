@@ -13,7 +13,7 @@ CRC = "428113C2"
 ELF_NAME = "SLUS_216.78"
 GAME = "Dragon Ball Z: Budokai Tenkaichi 3 (USA)"
 
-# ELF load layout, confirmed against a live save state (see docs/findings.md).
+# ELF load layout, confirmed against a live save state (see docs/findings/).
 TEXT_BASE = 0x00100000
 TEXT_END = 0x002C33C0
 DATA_BASE = 0x002C3400

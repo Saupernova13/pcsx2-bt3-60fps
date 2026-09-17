@@ -76,7 +76,7 @@ BT3 turns out to have no master framerate variable. Its per-frame routine takes
 a vblank stride as an argument, and all eight call sites hardcode it (`addiu
 $a0, $zero, 2` for 30fps, `1` for 60fps). So the right lever is a one-word
 change at the specific loop you want to convert, not a global branch kill. The
-full table is in [`docs/findings.md`](docs/findings.md).
+full table is in [`docs/findings/`](docs/findings/README.md).
 
 ## Repository layout
 
@@ -181,7 +181,7 @@ an error. Read it before the first measurement, not after.
 [`docs/rig.md`](docs/rig.md) for how to drive the emulator,
 [`docs/status.md`](docs/status.md) for the state of every group,
 [`docs/versions/`](docs/versions/README.md) for what each of v01 to v23 changed
-and discovered, [`docs/findings.md`](docs/findings.md) for the full log, and
+and discovered, [`docs/findings/`](docs/findings/README.md) for the full log, and
 [`docs/tools.md`](docs/tools.md) for every tool.
 
 Decompilation is optional and needs Ghidra with the Emotion Engine extension.
