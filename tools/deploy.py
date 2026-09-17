@@ -67,7 +67,7 @@ def main() -> int:
         parser.error("give a pnach path, or use --off / --status")
 
     source = Pnach.load(args.pnach)
-    problems = source.validate()
+    problems = source.validate(exclusive=config.EXCLUSIVE)
     if problems:
         print("VALIDATION FAILED")
         for problem in problems:
