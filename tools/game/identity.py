@@ -63,4 +63,18 @@ NEVER_SHIP = [
 # addresses every frame. Installed, listed, off until the user says otherwise.
 OPTIONAL = [
     "Widescreen 19.5:9 - S24 Ultra",
+    "Widescreen 16:10",
+    "Widescreen 21:9",
+]
+
+# Groups that are alternatives of one another, and so are meant to write the
+# same addresses. Only one display aspect can be on at a time, and all three
+# write the same three words - without this, validate() reports every pair as
+# an overwrite. Overlap with anything outside a set is still a problem.
+EXCLUSIVE = [
+    [
+        "Widescreen 19.5:9 - S24 Ultra",
+        "Widescreen 16:10",
+        "Widescreen 21:9",
+    ],
 ]
