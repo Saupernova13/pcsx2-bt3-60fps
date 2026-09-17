@@ -1,0 +1,122 @@
+# Versioning: a merge that changes what ships becomes a version.
+#
+# A release is a record, so it is never written retroactively onto the PR that
+# caused it. After a merge to main this runs two steps, in order:
+#
+#   1. publish   if the merge just brought in a release PR (head branch
+#                `release/...`), its note is final: export patch/, tag, and
+#                dispatch release.yml to publish the GitHub Release.
+#   2. stage     if the shipped patch= lines in wip/working.pnach still differ
+#                from patch/, a version is owed: scaffold docs/versions/vNN-*.md,
+#                export the patch, and open a release PR. A human rewrites the
+#                note; merging that PR is what publishes.
+#
+# Step 2 also runs straight after step 1. That is what stops a patch merge from
+# being stranded when it lands while a release PR is waiting: the release
+# publishes, then the next version is staged to carry it.
+#
+# The test is the exported patch= lines, never file paths. Comment prose, docs
+# and tooling can edit wip/working.pnach as much as they like without owing a
+# version; only a change PCSX2 would execute counts.
+#
+# Manual runs (Actions -> Version -> Run workflow) take the same path, which is
+# the recovery route for a run that failed halfway.
+name: Version
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Serialised: two merges landing together must not both stage a version.
+concurrency:
+  group: version
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged && github.event.pull_request.base.ref == 'main')
+    runs-on: ubuntu-latest
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0        # the tags, for choosing the next version
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tools import ps2ee from a sibling checkout of PCSXROO.
+      - name: Check out PCSXROO
+        uses: actions/checkout@v5
+        with:
+          repository: Saupernova13/pcsxroo
+          path: _pcsxroo
+          ref: master
+
+      - name: Point the tools at PCSXROO
+        run: echo "PCSXROO_REPO=${GITHUB_WORKSPACE}/_pcsxroo" >> "$GITHUB_ENV"
+
+      # ps2ee imports keystone at module load, so export.py cannot run without
+      # its dependencies even though nothing here assembles code.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the tools' dependencies
+        run: pip install --quiet keystone-engine capstone numpy zstandard
+
+      - name: Report the starting state
+        run: python tools/version.py status
+
+      # ---- 1. publish a release PR that just merged ---------------------------
+      - name: Publish the merged release
+        id: publish
+        if: startsWith(github.event.pull_request.head.ref, 'release/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The tag is the merged branch name, so nothing has to be guessed.
+          tag="${HEAD_REF#release/}"
+          # The note and patch/ both arrived with the merge, so the note
+          # describes exactly the file being tagged. Exporting again here would
+          # fold in any patch PR that landed in the meantime and leave the note
+          # describing a build that is not the one released.
+          python tools/version.py verify --tag "$tag"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$(head -n 1 "docs/versions/${tag}.md" | sed 's/^# *//')"
+          git push origin "$tag"
+          # A tag pushed with GITHUB_TOKEN does not fire other workflows, so
+          # release.yml is dispatched explicitly rather than relying on the tag.
+          gh workflow run release.yml --ref main -f tag="$tag"
+          echo "published ${tag}"
+
+      # ---- 2. stage a version if one is owed ----------------------------------
+      - name: Stage the next version
+        if: always() && steps.publish.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY_FILE: ${{ runner.temp }}/pr-body.md
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${PR_BODY}" > "$PR_BODY_FILE"
+          bash .github/scripts/stage-release.sh \
+            "${PR_NUMBER}" "${PR_TITLE}" "${PR_URL}" "$PR_BODY_FILE"
+
+      - name: Done
+        if: always()
+        run: |
+          echo "publish: ${{ steps.publish.outcome }}"
+          python tools/version.py status
