@@ -31,6 +31,11 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # `gh workflow run` to dispatch release.yml is a POST to the workflows
+  # dispatches endpoint, which needs actions:write. Without it the publish step
+  # tags the version and then fails on the last line, leaving a tag with no
+  # Release.
+  actions: write
 
 # Serialised: two merges landing together must not both stage a version.
 concurrency:
