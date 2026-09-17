@@ -165,11 +165,13 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
-# Thrown objects, found 2026-09-16. A ballistic mover separate from the effect
-# node stepper [60FPS - projectile travel] halves: pos += vel and vel.y += g,
-# both per tick and both uncompensated. Halving only the first makes the blast
-# fall out of the sky, which is why this group is two changes.
-THROWN = ["60FPS - thrown object travel"]
+# Thrown objects, found 2026-09-16. Hercule's tapped and charged ki blasts are
+# objects with their own update, separate from the effect node stepper that
+# [60FPS - projectile travel] halves, and everything in it is per tick: flight,
+# gravity, spin, debris, fuse and explosion. Halving the step changes where a
+# bouncing bomb lands, because collision is tested at positions 30fps never
+# visits, so this runs the whole update on even ticks instead.
+THROWN = ["60FPS - thrown object rate"]
 
 # The rush struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever

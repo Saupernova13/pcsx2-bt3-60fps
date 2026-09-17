@@ -1147,78 +1147,60 @@ patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug 
 // Thrown objects, found 2026-09-16 for issue #5 - "Hercule's ki blasts are
 // sped up". They are, and [60FPS - projectile travel] does not touch them: a
 // breakpoint on the effect-node stepper at 00176A2C never fires once while
-// Hercule's throw is in the air. It is a different mover on a different object.
+// Hercule's throw is in the air. They are objects with their own update, and
+// Hercule has two classes of them:
 //
-// FUN_00178D18 advances one thrown object per tick, ballistically:
+//   tapped ki blast    update FUN_00178A28 -> mover FUN_00178D18
+//   charged ki blast   update FUN_00177968 -> mover FUN_00177CF8
 //
-//   00178D90  jal Vec3Add           pos(+0x60) += vel(+0x80)
-//   00178D98  lwc1 $f0, 0x84($s0)   vel.y
-//   00178D9C  lwc1 $f1, 0xF0($s0)   the object's own gravity
-//   00178DA0  add.s $f0, $f0, $f1   vel.y += g
-//   00178DA4  swc1 $f0, 0x84($s0)
+// Everything either update does is counted in ticks. Measured at 30fps:
 //
-// No delta-time in either line, so at 60fps the object covers twice the ground
-// per second AND is pulled down twice as hard. Measured per tick the two arms
-// are identical - step -9.434, g +0.5 - which is the whole bug.
+//   both   pos(+0x60) += vel(+0x80), then vel.y += gravity(+0xF0)
+//   both   spin angle = age(+0xF4) * spin(+0xEC), age +1 a tick
+//   tapped on landing, 5 debris fragments that fly ballistically for 15 ticks
+//   charged a 300-tick fuse(+0xF6), three bounces, a 24-tick rest before it
+//          explodes (+0xD4), and 15 ticks of after-life (+0xFA)
 //
-// A ballistic integrator needs BOTH halves halved, and the control run proves
-// it. Halving only the displacement leaves gravity running at full rate over
-// twice as many ticks, and the blast drops out of the sky at less than half its
-// range:
+// So at 60fps the whole object runs at double speed, not only its flight.
 //
-//   arm                          airborne   landed at
-//   30fps                        34 vsyncs  (-112.3, -3.0, 216.7)
-//   60fps                        18 vsyncs  (-112.1, -3.0, 216.6)
-//   60fps, displacement only     20 vsyncs  ( -41.2,  0.0,  99.9)   FALLS SHORT
-//   60fps, this group            34 vsyncs  (-108.3, -2.8, 210.4)
+// THE FIX RUNS THE UPDATE ON EVEN TICKS, IT DOES NOT HALVE THE STEP. Both
+// updates start by asking the game's own freeze check, FUN_0012CED0, whether to
+// skip this tick - the same check [60FPS - particle update rate] reuses. This
+// makes the answer "yes" on odd ticks too, so the object thinks at 30Hz and is
+// still drawn every frame.
 //
-// Flight time is exact and the landing point is within 3%. Speed goes 10.91 ->
-// 20.59 -> 11.19 units per vsync against a 30fps 10.91.
+// Halving was tried first and is WRONG for this class, measurably. A half step
+// samples positions the 30fps game never visits, and collision is tested at the
+// sampled positions. On Rocky Area the charged blast's second bounce clipped a
+// rock lip that the 30fps arc steps over, bounced back, and came to rest 70
+// units from where the original puts it, 31 vsyncs late. Only positions the
+// 30fps game itself samples give the 30fps outcome.
 //
-// BOTH HALVES ARE DONE AT THE MOVER, NOT AT THE CONSTRUCTOR. Gravity is a `lui
-// $at, 0x3F00` immediate in Hercule's constructor at 0017873C, and halving it
-// there is one word and measures the same - but it fixes one move. Nine
-// different constructors write +0xF0 on this object layout, with four
-// different values:
+// Measured from save state 5, Hercule against a standing Ultimate Gohan:
 //
-//   00177770 in FUN_00177548   lui $at, 0x3F00   0.5
-//   001787AC in FUN_00178704   lui $at, 0x3F00   0.5     Hercule
-//   0018A4E0 in FUN_0018A1D8   lui $at, 0x3F80   1.0
-//   001A4D7C in FUN_001A4C98   lui $at, 0x3F80   1.0
-//   0017A434, 00183CF4, 0018DD1C, 00191CE8, 00231010   computed at runtime
+//   tapped    30fps   spawn v18  lands v53 (-112.28, -2.95, 216.68)  gone v85
+//             60fps   spawn v19  lands v37 (-112.09, -2.95, 216.52)  gone v53
+//             gate    spawn v19  lands v54 (-112.09, -2.95, 216.52)  gone v86
+//   charged   30fps   spawn v50  rests v163 (-384.68, -25.53, 412.13)  boom v211  gone v239
+//             60fps   spawn v50  rests v107 (-384.2, -25.6, 412.1)     boom v131  gone v145
+//             gate    spawn v51  rests v164 (-384.22, -25.55, 412.09)  boom v212  gone v240
 //
-// Five of those are not constants at all, so no data patch could reach them.
-// The mover reads +0xF0 once per tick for every object it advances, so halving
-// it there covers all nine and anything added later. The trampoline therefore
-// swallows the whole gravity block and returns past it, to 00178DA8.
-//
-// The displacement is a bare Vec3Add with no scalar to halve, so it needs the
-// trampoline anyway: scale the velocity into a fixed scratch vector and add
-// that instead. Nothing runs between the scale and the add, so a fixed buffer
-// needs no re-entrancy.
-//
-// FUN_00178D18 saves $ra at 00178D30, so the trampoline's own calls are safe to
-// make even though it is entered with `j` rather than `jal`.
-[60FPS - thrown object travel]
-description=Halve the flight speed and gravity of thrown objects, so Hercule's ki blasts and other lobbed attacks cross the ground at their real speed.
-patch=1,EE,000F1600,word,3C013F00 // lui $at, 0x3F00
-patch=1,EE,000F1604,word,44816000 // mtc1 $at, $f12          0.5f
-patch=1,EE,000F1608,word,3C04000F // lui $a0, 0x000F
-patch=1,EE,000F160C,word,34841660 // ori $a0, $a0, 0x1660    dst = scratch vector
-patch=1,EE,000F1610,word,0C0487D4 // jal 0x00121F50          Vec3Scale
-patch=1,EE,000F1614,word,00C0282D // daddu $a1, $a2, $zero   (delay) src = velocity
-patch=1,EE,000F1618,word,0220202D // daddu $a0, $s1, $zero   dst = position
-patch=1,EE,000F161C,word,0220282D // daddu $a1, $s1, $zero   a   = position
-patch=1,EE,000F1620,word,3C06000F // lui $a2, 0x000F
-patch=1,EE,000F1624,word,0C0487B0 // jal 0x00121EC0          Vec3Add
-patch=1,EE,000F1628,word,34C61660 // ori $a2, $a2, 0x1660    (delay) b = scratch vector
-patch=1,EE,000F162C,word,C6000084 // replay 00178D98         lwc1 $f0, 0x84($s0)  vel.y
-patch=1,EE,000F1630,word,C60100F0 // replay 00178D9C         lwc1 $f1, 0xF0($s0)  gravity
-patch=1,EE,000F1634,word,3C013F00 // lui $at, 0x3F00
-patch=1,EE,000F1638,word,44811000 // mtc1 $at, $f2           0.5f
-patch=1,EE,000F163C,word,46020842 // mul.s $f1, $f1, $f2     THIS object's gravity, halved
-patch=1,EE,000F1640,word,46010000 // replay 00178DA0         add.s $f0, $f0, $f1
-patch=1,EE,000F1644,word,E6000084 // replay 00178DA4         swc1 $f0, 0x84($s0)
-patch=1,EE,000F1648,word,0805E36A // j 0x00178DA8            past the gravity block
-patch=1,EE,000F164C,word,00000000 // nop
-patch=1,EE,00178D90,word,0803C580 // jal Vec3Add -> j 000F1600
+// Every beat lands one vsync after 30fps because the throw leaves the hand one
+// vsync later; the positions differ only by the throw's aim, which unpatched
+// 60fps shares. Debris directions are random, so only their lifetime compares:
+// 30 vsyncs at 30fps, 30 with the gate.
+[60FPS - thrown object rate]
+description=Run thrown objects - Hercule's ki blasts, tapped and charged - at the game's own 30Hz, so they fly, bounce, spin and explode on their real schedule while still drawing at 60fps.
+patch=1,EE,000F1600,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1604,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1608,word,0C04B3B4 // jal 0x0012CED0          the game's own freeze check
+patch=1,EE,000F160C,word,00000000 // nop
+patch=1,EE,000F1610,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1614,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1618,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F161C,word,00481025 // or $v0, $v0, $t0        odd frame: frozen too
+patch=1,EE,000F1620,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1624,word,03E00008 // jr $ra
+patch=1,EE,000F1628,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0017797C,word,0C03C580 // jal 0012CED0 -> jal 000F1600   charged ki blast update
+patch=1,EE,00178A3C,word,0C03C580 // jal 0012CED0 -> jal 000F1600   ki blast update
