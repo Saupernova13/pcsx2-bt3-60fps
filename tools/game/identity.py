@@ -42,18 +42,20 @@ IDENTITY = GameIdentity(
 )
 
 # Groups that exist in the working pnach and must NEVER be enabled in a real
-# install. Two of them are withdrawn because gating deleted the beam, one is
-# the state 157 trap, one deliberately breaks ground movement, and `animation
-# rate` is a superseded alternative to `animation clock` - both on together
-# give QUARTER speed animation. Handing the working pnach to deploy.py enables
-# every group in it, which is exactly how an install ends up broken beyond
-# belief.
+# install. Two of them are withdrawn because gating deleted the beam, one
+# deliberately breaks ground movement, and `animation rate` is a superseded
+# alternative to `animation clock` - both on together give QUARTER speed
+# animation. Handing the working pnach to deploy.py enables every group in it,
+# which is exactly how an install ends up broken beyond belief.
+#
+# `60FPS - state phase timers` left this list on 2026-09-16. It was here for
+# the state 157 trap, and the site that explains the trap - 001E6F40, an index
+# rather than a clock - has been removed from the group. See docs/findings.md.
 NEVER_SHIP = [
     "60FPS - animation rate",
     "60FPS - EXPERIMENT halve root motion",
     "60FPS - blast effect rate",
     "60FPS - blast sequence rate",
-    "60FPS - state phase timers",
 ]
 
 # A display-aspect hack is a preference, not a fix, and this one additionally

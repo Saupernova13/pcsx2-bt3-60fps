@@ -245,21 +245,55 @@ also confirms **Buu's breath attack** is fixed by this group - a move that was
 never measured, and evidence the hook sits on the class rather than on the one
 blast it was found through. **Inherits v12's input-timing flag.**
 
-## The state 157 trap
+## The state 157 trap - explained 2026-09-16
 
-Goku parks in fighter state 157 (`FUN_001E6DC8`), an airborne dash/flight state,
-with pending state `0xFFFFFFFF` - no queued transition - and no button held. The
-game keeps ticking normally; only that fighter is trapped. A save-state reload
-clears it.
+Goku parks in fighter state 157 (`FUN_001E6DC8`) with pending state
+`0xFFFFFFFF` - no queued transition - and no button held. The game keeps ticking
+normally; only that fighter is trapped. A save-state reload clears it.
 
-Seen on v9 (17 groups). Not seen on v11 (15) or so far on v12 (16). The group
-that differs and is out of both is `[60FPS - state phase timers]`, which is the
-only group that gates counters **inside the fighter state machine** and whose 28
-sites were all validated against two **grounded** oracles - a held charge and a
-mashed rush. No airborne state was ever tested, and the trap is airborne.
+Seen on v9 (17 groups). Not seen on v11 (15) or v12 (16). The group that differs
+and is out of both is `[60FPS - state phase timers]`, which is the only group
+that gates counters **inside the fighter state machine** and whose 28 sites were
+all validated against two **grounded** oracles - a held charge and a mashed rush.
 
-That is a strong circumstantial case, not a proof. It was never reproduced under
-controlled conditions.
+**The cause has since been found by reading the binary rather than by
+reproducing it.** `FUN_001E6DC8` is state 157's own handler, and one of the 22
+gated sites - `001E6F40` - is inside it. That counter is **an index into a table,
+not a count of frames**: the bound is the entry count `lb [s2+8]`, the exit test
+is `i >= N-1`, and the body does `sll i,1` / `addu s2` / `lh [+6]`. Gating an
+index makes the state walk its table at half rate, and since the advance is
+conditional on `FUN_001C48B8`, an entry finishing on an odd tick advances it by
+nothing. A state that cannot reach `i >= N-1` cannot leave.
+
+An audit of all 22 sites classified 21 as clocks - each compared against an
+authored frame count - and `001E6F40` as the only index. It is out of the group,
+which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
+
+**Still not reproduced.** The mechanism is a reading of the code, and a strong
+one, but the trap itself has never been triggered on demand, so the reinstated
+group wants a play test before a release carries it.
+
+## v24 (proposed) - the state phase timers, reinstated
+
+Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
+210 lines. Closes issue #12: `FUN_001EE968`, the idle handler, counts to
+`0x5B` - 91 frames authored at 30Hz - at `001EEBAC` and then hands over to state
+67, the taunt, so at 60fps an idle fighter taunts in half the real time.
+
+Measured from a match-start state, timing the counter itself:
+
+| arm | counter starts | taunts | counting took |
+|---|---|---|---|
+| unpatched 30fps | vsync 198 | 378 | **180 vsyncs** |
+| v23 | - | 248 | ~90 |
+| v23 + this group | vsync 158 | 338 | **180 vsyncs** |
+
+The timer is exact. The counter still *starts* 40 vsyncs early, which is a
+separate defect in the pre-fight sequence, not in this group.
+
+**Not confirmed in play.** Two things are open: the state 157 trap above, and
+whether this also fixes issue #6, the perfect smash cue, which is a window
+inside a held charge and was not isolated.
 
 ## v19 - screen fade
 
@@ -317,6 +351,26 @@ overshoot.
 Recorded as fixed because the user played it. **Recorded as unattributed
 because it is: an unattributed fix can regress without anyone knowing why.** If
 a transformation ever runs long again, this is the note to come back to.
+
+## v24 (proposed) - the stage's own animation
+
+Adds `[60FPS - stage animation]`, one data word. Closes issue #9: the World
+Tournament stage's moving scenery runs at double speed.
+
+A stage's animated props are a scene graph with keyframe tracks, walked by
+`FUN_00115478` and evaluated by `FUN_00123890`. The time that indexes the track
+lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
+60 units of track a second at 30Hz, 120 at 60Hz.
+
+| World Tournament - Noon, 80 vsyncs | stage time |
+|---|---|
+| unpatched 30fps | 94 -> 172, **+78** |
+| v23 | 122 -> 280, +158 |
+| **v23 + this group** | 92 -> 171, **+79** |
+
+**Not confirmed in play.** Measured on one map. The evaluator does not run at
+all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
+untouched by this.
 
 ## v20 - the shipped header caught up
 
