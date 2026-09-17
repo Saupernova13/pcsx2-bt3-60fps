@@ -196,11 +196,19 @@ STRUGGLE = ["60FPS - rush struggle"]
 # point where 30fps puts it, and gates only the AI's rotation.
 BEAMCLASH = ["60FPS - beam clash"]
 
+# The stage's own scenery, found 2026-09-16 chasing the World Tournament report.
+# FUN_00115478 walks the map's scene graph once a tick and FUN_00123890 lerps
+# each node between two keyframes by a time at node+0x1C. That time is advanced
+# by a bare 2.0 immediate at 001153C8, so every animated prop covers twice its
+# track per second at 60fps. Not every map has one: the evaluator never runs on
+# Rocky Area.
+STAGE = ["60FPS - stage animation"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SOLARFLARE + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -258,18 +266,24 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + SOLARFLARE),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE),
+    # "full" without the stage animation, kept so the new group has a named
+    # baseline to be diffed against without editing a preset.
+    "nostage": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + SOLARFLARE),
     # "full" without Solar Flare, so that group has a named A/B baseline.
     "noflare": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                + BEAMCLASH + PHASE),
-    # The 27-group set without the phase timers, kept so the reinstated group
-    # has a named baseline to be diffed against without editing a preset.
+                + BEAMCLASH + PHASE + STAGE),
+    # "full" without the phase timers, kept so the reinstated group has a named
+    # baseline to be diffed against without editing a preset.
     "nophase2": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                 + BEAMCLASH + SOLARFLARE),
+                 + BEAMCLASH + STAGE + SOLARFLARE),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

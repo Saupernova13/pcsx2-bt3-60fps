@@ -352,6 +352,26 @@ Recorded as fixed because the user played it. **Recorded as unattributed
 because it is: an unattributed fix can regress without anyone knowing why.** If
 a transformation ever runs long again, this is the note to come back to.
 
+## v24 (proposed) - the stage's own animation
+
+Adds `[60FPS - stage animation]`, one data word. Closes issue #9: the World
+Tournament stage's moving scenery runs at double speed.
+
+A stage's animated props are a scene graph with keyframe tracks, walked by
+`FUN_00115478` and evaluated by `FUN_00123890`. The time that indexes the track
+lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
+60 units of track a second at 30Hz, 120 at 60Hz.
+
+| World Tournament - Noon, 80 vsyncs | stage time |
+|---|---|
+| unpatched 30fps | 94 -> 172, **+78** |
+| v23 | 122 -> 280, +158 |
+| **v23 + this group** | 92 -> 171, **+79** |
+
+**Not confirmed in play.** Measured on one map. The evaluator does not run at
+all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
+untouched by this.
+
 ## v20 - the shipped header caught up
 
 **No patch change.** The patch at the `v20-known-issues-refresh` tag has the
