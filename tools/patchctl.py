@@ -174,6 +174,14 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
+# Thrown objects, found 2026-09-16. Hercule's tapped and charged ki blasts are
+# objects with their own update, separate from the effect node stepper that
+# [60FPS - projectile travel] halves, and everything in it is per tick: flight,
+# gravity, spin, debris, fuse and explosion. Halving the step changes where a
+# bouncing bomb lands, because collision is tested at positions 30fps never
+# visits, so this runs the whole update on even ticks instead.
+THROWN = ["60FPS - thrown object rate"]
+
 # Solar Flare, found 2026-09-17. The victim's blind timer, fighter+0xFF8, holds
 # the lock-off flags while positive and drives the white flash; both counted
 # per tick. 2.50s at 30fps, 1.25s at 60fps. This decrements it on even ticks
@@ -208,7 +216,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
 
 PRESETS = {
     "off": [],
@@ -266,24 +274,29 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the thrown objects, so that group has a named A/B baseline.
+    "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE),
     # "full" without the stage animation, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "nostage": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                + BEAMCLASH + PHASE + SOLARFLARE),
+                + BEAMCLASH + PHASE + SOLARFLARE + THROWN),
     # "full" without Solar Flare, so that group has a named A/B baseline.
     "noflare": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                + BEAMCLASH + PHASE + STAGE),
+                + BEAMCLASH + PHASE + STAGE + THROWN),
     # "full" without the phase timers, kept so the reinstated group has a named
     # baseline to be diffed against without editing a preset.
     "nophase2": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                 + BEAMCLASH + STAGE + SOLARFLARE),
+                 + BEAMCLASH + STAGE + SOLARFLARE + THROWN),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
