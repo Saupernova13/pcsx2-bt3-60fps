@@ -5,6 +5,8 @@ The docs use SuperCombo's names for BT3 mechanics
 **patch group names** used casual terms. Group names are not renamed: players
 enable groups by name, so a rename would silently switch a fix off.
 
+For the owner's everyday names, see [`names.md`](names.md).
+
 | SuperCombo name | Old term in this repo | Groups that still use the old term |
 |---|---|---|
 | Full Power (Level 3) Smash Attack | heavy smash | - |
