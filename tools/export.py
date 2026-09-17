@@ -158,7 +158,7 @@ def main() -> int:
         # LF, as .gitattributes stores every pnach. CRLF made a release export of an
         # unchanged patch show patch/ as modified on Windows. PCSX2 reads either.
         dest.write_text(text, encoding="utf-8", newline="\n")
-        problems = Pnach.load(dest).validate()
+        problems = Pnach.load(dest).validate(exclusive=config.EXCLUSIVE)
         if problems:
             raise SystemExit("the exported pnach did not validate:\n  "
                              + "\n  ".join(problems))

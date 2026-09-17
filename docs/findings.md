@@ -6161,6 +6161,132 @@ the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.
 
 
+## 2026-09-16 - issue #23, widescreen: the model generalises, so put it in a tool
+
+The 19.5:9 group was worked out by hand on 2026-09-08 and its derivation sat in
+a findings section. Issue #23 asked for 21:9 and 16:10, which is the same
+arithmetic twice more, so the arithmetic moved into `tools/widescreen.py` and
+the next aspect costs one command.
+
+Nothing about the model changed. The three words are:
+
+| address | what it is | value |
+|---|---|---|
+| `002FE4CC` | projection scale, 7/6 at 4:3 | `(7/6) * aspect / (4/3)` |
+| `002FE594` | the same constant x256 | the above x256 |
+| `00130BF0` | `lui $at, imm` - an instruction | top 16 bits of `float32(1/aspect)` |
+
+### The tool is checked against words nobody in this project chose
+
+`--selftest` runs the model against BT3's stock 4:3 and PCSX2's own shipped
+`[Widescreen 16:9]` from `resources/patches.zip`:
+
+```
+ok   stock 4:3
+       scale  ours 3F955555 1.1666667   theirs 3F955555 1.1666666   0.0000%
+       lui    ours 0x3F40    theirs 0x3F40    exact
+ok   PCSX2's shipped [Widescreen 16:9]
+       scale  ours 3FC71C72 1.5555556   theirs 3FC70FB6 1.5551670   0.0250%
+       lui    ours 0x3F10    theirs 0x3F10    exact
+```
+
+The `lui` immediate - the part that actually carries the aspect - matches both
+bit for bit. The 16:9 scale is 0.025% off, and the arithmetic says exactly why:
+`7/6 * 1.333` is `1.5551667`, so the official patch typed the widen factor as
+`1.333` rather than `4/3`. That is a field of view 0.025% narrow, about half a
+pixel across 1920. Fed 19.5:9 the tool reproduces the group already in the file,
+all three words.
+
+### 16:10 and 21:9 both land exactly
+
+| aspect | `002FE4CC` | `002FE594` | `00130BF0` | `lui` error |
+|---|---|---|---|---|
+| 19.5:9 (2.166667) | `3FF2AAAB` | `43F2AAAB` | `3C013EEC` | 0.13% |
+| 16:10 (1.600000) | `3FB33333` | `43B33333` | `3C013F20` | **exact** |
+| 21:9 as 64:27 (2.370370) | `4004BDA1` | `4404BDA1` | `3C013ED8` | **exact** |
+| 43:18 (3440x1440) | `4005C71C` | `4405C71C` | `3C013ED6` | 0.15% |
+
+`lui` sets only the top 16 bits, so 1/aspect is rounded to what fits there.
+`1/1.6` is 0.625 and `27/64` is 0.421875; both are exact in a handful of
+mantissa bits, so the two new groups have nothing to round away. 19.5:9 does not
+have that luck, which is where its 0.13% comes from.
+
+### "21:9" is a marketing name, not a ratio
+
+No panel is 21/9 = 2.333333. 2560x1080 and 3840x1620 are **64:27** (2.370370),
+which is the aspect the standard defines; 3440x1440 is **43:18** (2.388889).
+The group carries 64:27. Rendering it into a 3440x1440 window stretches the
+picture 0.8% horizontally, which is not visible, and anyone who wants their
+panel exact can run `python tools/widescreen.py 3440x1440`.
+
+### Overlapping groups, and what it cost to allow them
+
+Every display aspect writes the same three addresses, and `Pnach.validate()`
+has always reported two groups writing one address as an overwrite - correctly,
+because the cheat engine's last write wins and a fix can be silently undone by
+an unrelated one. With one aspect in the file that never fired. With three it
+fired six times, and the only options were to ship a single aspect or to stop
+checking overlaps.
+
+`validate(exclusive=[[...]])` in PCSXROO (`Saupernova13/pcsxroo#4`) takes sets of
+group names that are alternatives of one another. Overlap inside a set is
+expected; overlap with anything outside it is still a problem, and a name in a
+set that matches no group is reported too, so renaming a group cannot quietly
+drop its exemption. `config.EXCLUSIVE` names the three aspects and both
+`export.py` and `deploy.py` pass it.
+
+**This repo's tools therefore need that PCSXROO change.** On an older `ps2ee`,
+`export.py` raises `TypeError: validate() got an unexpected keyword argument`.
+
+### Verified live, exactly
+
+`00130BF0` feeds `$f20` through `mtc1`, and `00130C0C` multiplies it:
+
+```
+00130BEC  mov.s $f12, $f21
+00130BF0  lui   $at, 0x3F40      <- the patched word
+00130BF4  mtc1  $at, $f20
+00130BF8  jal   0x0028F3C0
+00130C0C  mul.s $f20, $f2, $f20
+00130C10  swc1  $f2, 4($s0)      <- breakpoint here
+```
+
+Breakpoint at `00130C10`, save state 3, each arm loaded fresh. **The stock
+`[Widescreen 16:9]` has to be off in the rig ini's `[Patches]` first** - it
+writes the same three addresses every frame and the last writer wins:
+
+| arm | `00130BF0` in RAM | `$f20` | measured ratio | predicted |
+|---|---|---|---|---|
+| no widescreen (4:3) | `3C013F40` | 0.6495191 | 1.0000000 | 1.0000000 |
+| 16:10 | `3C013F20` | 0.5412659 | **0.8333333** | 0.8333333 |
+| 21:9 (64:27) | `3C013ED8` | 0.3653545 | **0.5625000** | 0.5625000 |
+
+Both exact to seven decimal places, and the 4:3 baseline is the same 0.6495191
+the 19.5:9 work measured on 2026-09-08, so this is the same path.
+
+**`frame_advance` before arming the breakpoint, or the arms all read the same.**
+The first run of this measurement returned 0.6495191 for all three. The cheat
+engine writes an enabled group's words at a frame boundary, and `resume()`
+reached `00130C10` before the first boundary - so the breakpoint fired on the
+unpatched instruction every time, three arms agreeing perfectly on the wrong
+answer. Four frame advances between `patchctl.apply` and `bp_add` fixes it.
+Reading the patched address back before trusting an arm is what caught it.
+
+### Still not verified
+
+**No render test in this project has ever distinguished one aspect from another
+on screen**, including PCSX2's official 16:9 values against stock. These
+constants are consumed at scene entry, so every quick path - save-state load,
+mid-session toggle - shows the projection the state was captured with. Seeing it
+needs a battle entered fresh after boot. That gap is unchanged from 19.5:9.
+
+Both groups are in `config.OPTIONAL`: installed, listed, switched off. A display
+preference is not a fix. They also conflict with the stock `[Widescreen 16:9]`,
+which must be turned off in the per-game ini's `[Patches]` section, and PCSX2
+offers no 21:9 or 16:10 display aspect - `AspectRatioType` is Stretch, Auto
+4:3/3:2, 4:3, 16:9, 10:7 - so both need **Aspect Ratio = Stretch** against a
+window of the matching shape.
+
 ## 2026-09-16 - issue #20, the Blast 1 buffs: the wiki is the oracle
 
 Every other fix in this project needed a 30fps arm to say what "right" is.
