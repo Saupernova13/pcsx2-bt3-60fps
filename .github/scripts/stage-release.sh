@@ -16,8 +16,11 @@ set -euo pipefail
 pr_number="${1:-}" pr_title="${2:-}" pr_url="${3:-}" pr_body="${4:-/dev/null}"
 repo="${GITHUB_REPOSITORY:?must be run from GitHub Actions, or set GITHUB_REPOSITORY}"
 work="$(mktemp -d)"
-output="${GITHUB_OUTPUT:-/dev/stdout}"
-say() { echo "$1"; echo "$1" >> "$output"; }
+# $GITHUB_OUTPUT takes key=value lines only. Human-readable notes must not be
+# written to it, or the runner rejects the file and fails the step after the
+# work has already succeeded ("Invalid format 'staged ...'").
+out() { [ -n "${GITHUB_OUTPUT:-}" ] && echo "$1=$2" >> "$GITHUB_OUTPUT" || true; }
+say() { echo "$1"; }
 
 # One release PR at a time: a branch already open for a version is someone
 # else's to finish, and staging a second would make two versions out of one.
@@ -27,7 +30,7 @@ if [ "$(gh pr list --repo "$repo" --state open --limit 100 \
         --json headRefName \
         --jq '[.[] | select(.headRefName | startswith("release/"))] | length')" != "0" ]; then
   say "a release PR is already open; not staging another"
-  say "changed=false"
+  out changed false
   exit 0
 fi
 
@@ -41,7 +44,7 @@ cat "${work}/prepare.log"
 tag="$(sed -n 's/^tag=//p' "${work}/prepare.log")"
 if [ -z "${tag}" ]; then
   say "nothing that ships changed; no version owed"
-  say "changed=false"
+  out changed false
   exit 0
 fi
 
@@ -73,5 +76,5 @@ git push -u origin "${branch}"
 gh pr create --base main --head "${branch}" --title "${tag}" --body-file "${work}/pr-body.md"
 
 say "staged ${tag} on ${branch}"
-say "changed=true"
-say "tag=${tag}"
+out changed true
+out tag "${tag}"
