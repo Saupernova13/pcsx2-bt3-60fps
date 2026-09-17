@@ -62,8 +62,16 @@ def find_pcsxroo() -> Path:
 
 PCSXROO = find_pcsxroo()
 
-# This repo's own modules first, so a name in tools/ always wins over PCSXROO's.
-for index, path in enumerate((TOOLS, PCSXROO / "pcsxroo")):
-    if str(path) in sys.path:
+# Appended, never prepended, so a tool can never shadow a stdlib module. Running
+# `python tools/<tool>.py` puts tools/ at sys.path[0], and tools/bisect.py then
+# wins over the stdlib `bisect` that `random` imports - which breaks any later
+# import of capstone, and with it ps2ee, on an interpreter that has not already
+# loaded `bisect` (Windows loads it at startup; Linux does not). Both paths go
+# on the end, stdlib stays ahead of them.
+#
+# Order between the two is kept: tools/ before PCSXROO's, so this repo's own
+# module wins a name collision.
+for path in (TOOLS, PCSXROO / "pcsxroo"):
+    while str(path) in sys.path:
         sys.path.remove(str(path))
-    sys.path.insert(index, str(path))
+    sys.path.append(str(path))
