@@ -9,7 +9,7 @@ instead of an error. Several of them have each cost an hour or more. Do not
 rediscover them.
 
 Then [`docs/status.md`](docs/status.md) for what every group is and whether it is
-trusted, and [`docs/findings.md`](docs/findings.md) for the derivation of any of
+trusted, and [`docs/findings/`](docs/findings/README.md), split by topic, for the derivation of any of
 it.
 
 ## Pull requests
@@ -42,3 +42,10 @@ been measured; say it is ready for a play test and let the owner decide.
 `patch/428113C2.pnach` is the released file and only `tools/export.py --release`
 writes it. Never deploy `wip/working.pnach` to a real install: it carries groups
 that must never be enabled.
+
+## Names
+
+The owner often calls a mechanic by what it looks like ("Frieza's rock attack",
+"the stomp", "buffs"). [`docs/names.md`](docs/names.md) maps those names to the
+real ones and to the group that fixes each. When the owner uses a name that is
+not in the table, work out what it is and add a row.

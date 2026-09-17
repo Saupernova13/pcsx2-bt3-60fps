@@ -6,7 +6,7 @@ CPU, so everything built on top of it - watchpoints, frame-precise capture -
 needs the same resolution without a second dependency.
 
 Offsets recovered by write watchpoint rather than by reading disassembly; see
-docs/findings.md for which routine writes which field.
+docs/findings/ for which routine writes which field.
 """
 
 from __future__ import annotations
