@@ -20,6 +20,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing and the second clip player behind the mouths. | 4 |
 | [Rush Struggle and Beam Struggle](struggles.md) | Both stick-rotation contests, their tick clocks and the CPU's synthetic stick. | 2 |
 | [Widescreen](widescreen.md) | The widescreen model and every aspect group. | 2 |
+| [Blast 1 buffs and timed status effects](buff-durations.md) | The durations behind Blast 1 stat boosts and After Image Strike. | 1 |
 
 ## The original introduction
 

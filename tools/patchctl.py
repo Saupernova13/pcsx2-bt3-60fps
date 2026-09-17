@@ -165,6 +165,13 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
+# Blast 1 buff durations, found 2026-09-16. One register carries the duration
+# through all 54 cases of FUN_00200408's jump table, and it is set in exactly
+# one place, so one word doubles every buff timer. SuperCombo publishes these
+# in seconds, which is the oracle - Saiyan Soul's 20s reads 20.00s at 30fps,
+# 10.00s at 60fps, and 20.00s with this on.
+BUFFDUR = ["60FPS - buff duration"]
+
 # The Rush Struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
@@ -185,7 +192,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SPARES)
+                  + STRUGGLE + BEAMCLASH + BUFFDUR + SPARES)
 
 PRESETS = {
     "off": [],
@@ -240,7 +247,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH),
+             + BEAMCLASH + BUFFDUR),
+    # "full" without the buff durations, so that group has a named A/B baseline.
+    "nobuff": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
