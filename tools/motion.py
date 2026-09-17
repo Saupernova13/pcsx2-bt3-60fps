@@ -27,7 +27,7 @@ from ps2ee.pine import Pine, PineNotRunning
 
 MODEL_TABLE = 0x0031C640
 MODEL_WORDS = 0x1000 // 4
-POS = 0x15A0            # fighter position, from the write breakpoint in findings.md
+POS = 0x15A0            # fighter position, from the write breakpoint in docs/findings/
 
 
 def as_f32(words: np.ndarray) -> np.ndarray:

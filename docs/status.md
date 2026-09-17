@@ -77,7 +77,7 @@ again. Differs from v11 by exactly one group, `[60FPS - sequence wait]`.
 Adds `[60FPS - knockback flight]` and `[60FPS - pursuit timing]` to the v12 set.
 Fixes the heavy smash into Circle pursuit stomp, which missed at 60fps and
 landed every time at 30. Five separate durations authored in 30Hz frames, in one
-chain; see findings.md for the derivation.
+chain; see findings/smash-and-lightning-attack.md for the derivation.
 
 Verified by automated test, not yet by the user:
 
@@ -398,7 +398,7 @@ human's stick is still read every tick, 60 times a second. Below about 7.5
 rotations a second that is indistinguishable from 30fps - the counts are
 identical, 55/55, 73/73, 91/91 - and above it the 60fps build counts crossings
 the 30fps game aliases away. Matching the original exactly would mean throwing
-away input the player can feel themselves giving. See docs/findings.md.
+away input the player can feel themselves giving. See docs/findings/struggles.md.
 
 ## v23 - the shipped header caught up with the beam clash
 
