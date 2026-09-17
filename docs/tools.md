@@ -53,7 +53,7 @@ automatically; PCSXROO's take it from `pcsxroo/local.json` in that checkout
 | `realclock.py` | PCSXROO | Time and photograph a move in REAL time, with the game running free. |
 | `shot.py` | PCSXROO | Drive an input for N frames from a save state, then photograph the result. |
 | `speedtest.py` | PCSXROO | The acceptance test: how far does a fighter travel in a fixed real time? |
-| `stomptest.py` | PCSXROO | The heavy smash and its Circle pursuit stomp, played in REAL time. |
+| `stomptest.py` | PCSXROO | The Full Power Smash and its Lightning Attack, played in REAL time. |
 | `sweep.py` | PCSXROO | Change one site at a time and score it against the oracles that matter. |
 | `traj.py` | PCSXROO | Record a fighter's trajectory frame by frame, and compare two of them. |
 | `transplant.py` | PCSXROO | Carry a save state into PCSXROO from a PCSX2 build whose format it refuses. |

@@ -55,4 +55,4 @@ all.
 ## What shipped
 
 Per-build confidence: [`status.md`](status.md).
-The full derivation of every group: [`docs/findings.md`](findings.md).
+The full derivation of every group: [`docs/findings/`](findings/README.md).
