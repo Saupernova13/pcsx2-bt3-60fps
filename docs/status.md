@@ -318,6 +318,29 @@ Recorded as fixed because the user played it. **Recorded as unattributed
 because it is: an unattributed fix can regress without anyone knowing why.** If
 a transformation ever runs long again, this is the note to come back to.
 
+## v24 (proposed) - the smash charge
+
+Adds `[60FPS - smash charge]`, one data word. Closes issue #6: a smash attack
+charges in half the real time at 60fps, and the Perfect Smash - releasing on the
+exact moment level 3 is reached - gets half as long to do it in.
+
+`FUN_001E33E0` adds `gp-0x6D80` (`002FD4F0`, 0.0444444 = 1/22.5) to the charge
+every tick. One reader, so it is halved in data. All eleven charge states use
+it: 71-76, the six Smash directions, and 83-87.
+
+| Cell, Rocky Area, Square held | charge fills in | Perfect Smash accepted on |
+|---|---|---|
+| unpatched 30fps | 44 vsyncs | **2 vsyncs** |
+| v23, no gate | 22 vsyncs | 1 vsync |
+| **v23 + this group** | **44 vsyncs** | **2 vsyncs** |
+
+The charge is not merely the same length - it is the same sequence, 0.04 0.09
+0.13 ... 0.98 1.00, sample for sample against the 30fps arm. The window was
+measured by releasing on each vsync in turn with a breakpoint on the grant at
+`001E4810`.
+
+**Not confirmed in play.** Only the neutral Smash was tested, on one character.
+
 ## v20 - the shipped header caught up
 
 **No patch change.** The patch at the `v20-known-issues-refresh` tag has the

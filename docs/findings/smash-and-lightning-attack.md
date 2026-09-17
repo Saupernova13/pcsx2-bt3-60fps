@@ -145,3 +145,92 @@ approach happens at the **teleport**, not during the dive, so the number
 measured the teleport placement and was blind to everything after it. The HP
 drop was the only honest signal. A metric that does not move when the thing it
 scores obviously moves is broken, not stable.
+
+## 2026-09-16 - issue #6, the perfect smash: a charge at 2x and a one-tick window
+
+The report: *"There is a frame perfect attack you can do in the game, where if
+you hold square to do a heavy smash, your character can start flashing white.
+Let go during that and then an opponent guarding will have their guard broken."*
+
+The user pointed this session at the [SuperCombo BT3
+wiki](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3), which
+names the mechanic and settles what the code is doing:
+
+> Smash Attacks ... hold Square while pressing up/back/forward/down/neutral.
+> Level 3 is "indicated by your character flashing white". **Perfect Smash** is
+> "releasing the attack button at the exact moment your character reaches level
+> three of charge".
+
+It also states, in the stat-sheet glossary, that BT3's frame is **a 30th of a
+second**. That is the patch's whole premise, written down by someone who has
+never seen this repo.
+
+### Two separate defects, both measured
+
+**1. The charge fills in half the real time.** `FUN_001E33E0` is the charge
+step: it reads `gp-0x6D80` (`002FD4F0`, **0.0444444** = 1/22.5), scales it,
+adds it to the raw charge at `fighter+0xD7C`, and stores the normalised 0..1
+copy at `fighter+0xD78`. That constant has **exactly one reader**, so it can be
+halved in data the way the gravity group's acceleration was.
+
+| arm | charge starts | reaches 1.0 | elapsed |
+|---|---|---|---|
+| unpatched 30fps | vsync 18 | vsync 62 | **44 vsyncs** |
+| the 27 groups | vsync 16 | vsync 38 | 22 vsyncs |
+| **+ 0.0444444 -> 0.0222222** | vsync 16 | vsync 60 | **44 vsyncs** |
+
+Not just the same length - the same *sequence*: 0.04, 0.09, 0.13, 0.18 ... 0.98,
+1.00, sample for sample against the 30fps arm.
+
+**2. The Perfect Smash window is one tick wide, and a tick is half as long.**
+`fighter+0xD84` counts ticks since the charge hit maximum, and the release
+handler grants the Perfect Smash only when it reads exactly 1:
+
+```
+001E47FC  li   v0, 0x1
+001E4800  lw   a0, 0xD84(s1)
+001E4804  bne  a0, v0, 001E4820      # not 1 -> an ordinary Full Power smash
+001E4810  jal  001DA9D0
+001E4814  li   a1, 0x84              # condition 0x84: Perfect Smash
+```
+
+One tick is 1/30s at 30fps and 1/60s at 60fps, so **the window is half as long
+in real time even after the charge is corrected**. Halving a rate cannot fix
+this; the test itself has to widen. Accepting 1 **or** 2 restores the real-time
+width exactly, and is a small trampoline at `001E4804`.
+
+### The class this belongs to
+
+The wiki names several more one-input-frame mechanics:
+
+| mechanic | the wiki's words |
+|---|---|
+| Perfect Smash | "releasing ... at the exact moment" |
+| Z-Counter | "on the exact frame a melee attack" lands |
+| Defensive Vanish / Reflecting | "right before the Ki Blast hits you" |
+| the vanish window generally | "lowered health also makes the vanishing window smaller" |
+
+**Every one of them is a tick-counted input window, and every one of them is
+half as long in real time at 60fps.** No group in this patch addresses that
+class, and it is not something a rate fix reaches - a window counted in ticks
+needs its comparison widened, one mechanic at a time. Issue #6 is the first of
+them to be found, not the only one.
+
+### Also settled by the wiki, for the other open issues
+
+- **Hercule's tap-Triangle projectile is a grenade, not a rock** (#5). The wiki
+  lists only Great Ape Kid Goku and Yajirobe as rock throwers. `blast object
+  travel` was derived from Frieza's I Might Die This Time rocks and the user felt no change from it;
+  Hercule's grenade is a third mover class and is very likely uncovered.
+- **Cell's 2nd Form costs 2 Blast Stocks; Special Beam Cannon costs 4 Ki Bars**
+  (#7, #13) - the user's correction, confirmed in print.
+- **Vegeta Scouter's Great Ape costs 3 Blast Stocks** and "Fills Ki" (#10).
+  Blast Stock regenerates on a **per-second** timer, which is one of the blocks
+  the meter-economy gate corrects.
+- Several Blast 1s are documented in **seconds** - False Courage "takes 1.6
+  seconds" and "lasts 7.5 seconds", Saiyan Soul 1.9s and 20s. Those are
+  ready-made real-time oracles that need no 30fps arm at all.
+
+The wiki is behind an Anubis proof-of-work wall, so `WebFetch` and `curl` both
+get "Making sure you're not a bot". **`/api.php` at the root is not walled**,
+and returns the wikitext directly; `/w/api.php` is.
