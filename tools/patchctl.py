@@ -165,6 +165,12 @@ BEAMFLIGHT = ["60FPS - beam object travel"]
 # Galick Cannon's white flash lifted before the transition it exists to cover.
 SCREENFADE = ["60FPS - screen fade"]
 
+# Solar Flare, found 2026-09-17. The victim's blind timer, fighter+0xFF8, holds
+# the lock-off flags while positive and drives the white flash; both counted
+# per tick. 2.50s at 30fps, 1.25s at 60fps. This decrements it on even ticks
+# and steps the flash on even ticks.
+SOLARFLARE = ["60FPS - solar flare"]
+
 # The rush struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
@@ -185,7 +191,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + SPARES)
+                  + STRUGGLE + BEAMCLASH + SOLARFLARE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -240,7 +246,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH),
+             + BEAMCLASH + SOLARFLARE),
+    # "full" without Solar Flare, so that group has a named A/B baseline.
+    "noflare": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH),
     # The 21-group set without the fade, so the fade has a named A/B baseline.
     "nofade": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
