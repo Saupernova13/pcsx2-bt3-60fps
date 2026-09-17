@@ -1,6 +1,6 @@
-"""The heavy smash and its Circle pursuit stomp, played in REAL time.
+"""The Full Power Smash and its Lightning Attack, played in REAL time.
 
-The stomp is the one bug in this project that cannot be judged from a numeric
+The Lightning Attack is the one bug in this project that cannot be judged from a numeric
 trace alone: the question is whether Goku's dive lands on the victim or sails
 past behind them, and the answer is a picture. So this drives the pad on the
 wall clock with the VM running free - a hold on Square and Up until the charge
@@ -9,7 +9,7 @@ photographs the result. Frame-advancing instead would be worse than useless
 here, because a screenshot needs a running VM and every sample would leak ticks.
 
 The hit is read from the victim's HP at fighter+0x9E4: one drop for the smash,
-a second one if the stomp connects.
+a second one if the Lightning Attack connects.
 
     python tools/stomptest.py --presets off nopursuit full
     python tools/stomptest.py --presets full --sheet work/stomp-full.png
@@ -71,9 +71,9 @@ def play(roo: Roo, preset: str, slot: int, delay_s: float, tap_s: float,
             time.sleep(0.002)
         roo.screenshot(path)
         hp = roo.read(foe + HP)
-        # The stomp has to be caught while it happens. This mode regenerates the
+        # The Lightning Attack has to be caught while it happens. This mode regenerates the
         # victim to full within about a second, so a single read after the dive
-        # reports 40000 whether the stomp connected or sailed past.
+        # reports 40000 whether the Lightning Attack connected or sailed past.
         if impact_hp is not None and stomp_t is None and hp < impact_hp:
             stomp_t = time.monotonic() - impact_t
         if impact_t is None and hp < hp0:

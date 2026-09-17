@@ -32,7 +32,7 @@ Same directory, same VM, only the separator differs:
 
 The write is also asynchronous, so poll until the file exists *and* stops
 growing. `tools/` has no wrapper for this; the scratch helper pattern is in
-[`findings.md`](findings.md) under 2026-09-16.
+[`findings/`](findings/README.md) under 2026-09-16.
 
 **2. A menu press must be held for about 8 frames.** `input press X --frames 3`
 is under the menu's sampling rate: four presses out of five are simply not seen,
