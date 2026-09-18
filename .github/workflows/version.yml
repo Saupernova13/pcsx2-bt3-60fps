@@ -4,8 +4,8 @@
 # caused it. After a merge to main this runs two steps, in order:
 #
 #   1. publish   if the merge just brought in a release PR (head branch
-#                `release/...`), its note is final: export patch/, tag, and
-#                dispatch release.yml to publish the GitHub Release.
+#                `release/...`), its note is final: tag it, and dispatch
+#                release.yml to publish the GitHub Release.
 #   2. stage     if the shipped patch= lines in wip/working.pnach still differ
 #                from patch/, a version is owed: scaffold docs/versions/vNN-*.md,
 #                export the patch, and open a release PR. A human rewrites the
@@ -17,10 +17,17 @@
 #
 # The test is the exported patch= lines, never file paths. Comment prose, docs
 # and tooling can edit wip/working.pnach as much as they like without owing a
-# version; only a change PCSX2 would execute counts.
+# version; only a change PCSX2 would execute counts. Because the test is a diff
+# against patch/, a run that fails is not a version lost: the next merge, or a
+# manual run, sees the same difference and stages it.
 #
-# Manual runs (Actions -> Version -> Run workflow) take the same path, which is
-# the recovery route for a run that failed halfway.
+# `tools/version.py phase` decides which of the two this run is, so the decision
+# has one home and can be checked by hand rather than living in an `if:` here.
+# It also makes a manual run (Actions -> Version -> Run workflow) the recovery
+# route it is documented to be: with no merged PR to read, phase publishes the
+# newest finished note that has no tag, and otherwise stages. Nothing else
+# recovers a note that reached main untagged - patch/ already matches by then,
+# so no later merge notices it.
 name: Version
 
 on:
@@ -44,9 +51,15 @@ concurrency:
 
 jobs:
   version:
+    # A merged PR from a fork is skipped rather than half-run: `pull_request`
+    # from a fork gets a read-only token whatever the permissions above say, so
+    # nothing here could push a branch or a tag. The version is not lost - it is
+    # a diff against patch/ - and a manual run stages it.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged && github.event.pull_request.base.ref == 'main')
+      (github.event.pull_request.merged &&
+       github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     env:
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -84,44 +97,83 @@ jobs:
       - name: Report the starting state
         run: python tools/version.py status
 
-      # ---- 1. publish a release PR that just merged ---------------------------
-      - name: Publish the merged release
-        id: publish
-        if: startsWith(github.event.pull_request.head.ref, 'release/')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Decide what this run owes
+        id: phase
         run: |
           set -euo pipefail
-          # The tag is the merged branch name, so nothing has to be guessed.
-          tag="${HEAD_REF#release/}"
+          python tools/version.py phase \
+            --head-ref "${HEAD_REF}" --github-output "$GITHUB_OUTPUT"
+
+      # A note on main with no tag is the one state that does not clear itself:
+      # patch/ matches the tree, so no later merge sees a version owed. Said as
+      # a warning because the run itself is a legitimate success.
+      - name: A version is waiting to be published
+        if: steps.phase.outputs.phase == 'nothing' && steps.phase.outputs.waiting != ''
+        run: |
+          echo "::warning file=docs/versions/${{ steps.phase.outputs.waiting }}.md::" \
+               "${{ steps.phase.outputs.waiting }} is on main with no tag, so no version" \
+               "will be staged until it is published. Finish the note, then run this" \
+               "workflow by hand (Actions -> Version -> Run workflow)."
+
+      # ---- 1. publish a release whose note is finished -----------------------
+      - name: Publish the release
+        id: publish
+        if: steps.phase.outputs.phase == 'publish'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.phase.outputs.tag }}
+        run: |
+          set -euo pipefail
           # The note and patch/ both arrived with the merge, so the note
           # describes exactly the file being tagged. Exporting again here would
           # fold in any patch PR that landed in the meantime and leave the note
           # describing a build that is not the one released.
-          python tools/version.py verify --tag "$tag"
+          #
+          # phase has already run this, and it runs again because the next line
+          # is the irreversible one: a DRAFT tagged is a DRAFT players read.
+          python tools/version.py verify --tag "$TAG"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "$(head -n 1 "docs/versions/${tag}.md" | sed 's/^# *//')"
-          git push origin "$tag"
+          git tag -a "$TAG" -m "$(head -n 1 "docs/versions/${TAG}.md" | sed 's/^# *//')"
+          git push origin "$TAG"
           # A tag pushed with GITHUB_TOKEN does not fire other workflows, so
           # release.yml is dispatched explicitly rather than relying on the tag.
-          gh workflow run release.yml --ref main -f tag="$tag"
-          echo "published ${tag}"
+          if ! gh workflow run release.yml --ref main -f tag="$TAG"; then
+            echo "::error::tagged ${TAG} but could not dispatch release.yml." \
+                 "Publish it with: gh workflow run release.yml --ref main -f tag=${TAG}"
+            exit 1
+          fi
+          echo "published ${TAG}"
 
       # ---- 2. stage a version if one is owed ----------------------------------
+      #
+      # Not gated on phase: after a publish, patch/ and the tree can differ
+      # again, which phase could not have known when it ran. The script decides
+      # for itself and says so when nothing is owed.
       - name: Stage the next version
-        if: always() && steps.publish.outcome != 'failure'
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BODY_FILE: ${{ runner.temp }}/pr-body.md
+          PUBLISHED: ${{ steps.publish.outcome }}
         run: |
           set -euo pipefail
-          printf '%s\n' "${PR_BODY}" > "$PR_BODY_FILE"
+          # After a publish the merged PR is the release PR, and its body is
+          # about the version just published. Seeding the next note from it is
+          # how v24's scaffold came to describe a tooling PR instead of the six
+          # groups it carried, so nothing is passed and the note is left to its
+          # commit list.
+          if [ "${PUBLISHED}" = "success" ]; then
+            PR_NUMBER="" PR_TITLE="" PR_URL="" PR_BODY=""
+          fi
+          printf '%s\n' "${PR_BODY}" > "${PR_BODY_FILE}"
           bash .github/scripts/stage-release.sh \
-            "${PR_NUMBER}" "${PR_TITLE}" "${PR_URL}" "$PR_BODY_FILE"
+            "${PR_NUMBER}" "${PR_TITLE}" "${PR_URL}" "${PR_BODY_FILE}"
 
       - name: Done
         if: always()
         run: |
+          echo "phase:   ${{ steps.phase.outputs.phase }} ${{ steps.phase.outputs.tag }}"
           echo "publish: ${{ steps.publish.outcome }}"
-          python tools/version.py status
+          # A report, not a check: it must not turn a failed job into a second failure.
+          python tools/version.py status || true
