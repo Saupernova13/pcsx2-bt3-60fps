@@ -1,0 +1,76 @@
+# Pre-merge gate: what ships must export and validate, and every tool must run.
+#
+# This is the check the release pipeline was missing. `tools/export.py` builds
+# the shared copy of the patch, validates the file it writes and refuses a
+# shipping preset that names a group the pnach no longer has, so running it is
+# the test of a patch PR - a malformed group or a renamed one fails here rather
+# than in the middle of a release.
+#
+# The smoke step runs every tool with --help. That is what catches the breakage
+# that stopped the first release run: `tools/` shadowing a stdlib module is
+# invisible on a Windows interpreter that has already loaded it, and fatal on
+# Linux. Running each tool the way a person runs it is the only thing that sees
+# it. A tool that will not start is a defect whether or not a release needs it.
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: The patch exports and the tools run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The tools import ps2ee from a sibling checkout of PCSXROO.
+      - name: Check out PCSXROO
+        uses: actions/checkout@v5
+        with:
+          repository: Saupernova13/pcsxroo
+          path: _pcsxroo
+          ref: master
+
+      - name: Point the tools at PCSXROO
+        run: echo "PCSXROO_REPO=${GITHUB_WORKSPACE}/_pcsxroo" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # keystone, capstone, numpy and zstandard are what ps2ee needs; pillow is
+      # what the screenshot tools need. A tool that grows a new dependency fails
+      # the smoke step below until it is added here.
+      - name: Install the tools' dependencies
+        run: pip install --quiet keystone-engine capstone numpy zstandard pillow
+
+      - name: Export the shipped patch
+        run: python tools/export.py --to "${RUNNER_TEMP}/export"
+
+      - name: Report whether a version is owed
+        run: python tools/version.py status
+
+      - name: Every tool starts
+        run: |
+          set -uo pipefail
+          failed=0
+          for tool in tools/*.py; do
+            # _bootstrap is imported by the others, never run on its own.
+            [ "$(basename "$tool")" = "_bootstrap.py" ] && continue
+            if ! out="$(python "$tool" --help 2>&1)"; then
+              echo "::error file=${tool}::${tool} does not start"
+              echo "$out" | tail -n 20
+              failed=1
+            fi
+          done
+          exit "$failed"
