@@ -107,10 +107,13 @@ sees it. Three states, and what each needs:
 
 The third is the one to watch, and the only one that does not clear itself: once
 the note has merged, `patch/` matches the tree, so no later merge sees a version
-owed and every run says "nothing". Version says so as a warning when it happens,
-and `release-pr.yml` is what stops it arising.
+owed and every run says "nothing". The merge that causes it fails the Version
+run, any later run says so as a warning, and `release-pr.yml` is what stops it
+arising at all.
 
-Doing it by hand is the same steps:
+Doing it by hand is the same steps. **Commit the `wip/working.pnach` change
+first** - the scaffold's commit list comes from `git log`, so an uncommitted
+change is one the note cannot mention:
 
     python tools/version.py status                    what state the repo is in
     python tools/version.py phase                     what a run would do now

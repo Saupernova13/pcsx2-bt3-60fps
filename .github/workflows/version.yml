@@ -104,16 +104,30 @@ jobs:
           python tools/version.py phase \
             --head-ref "${HEAD_REF}" --github-output "$GITHUB_OUTPUT"
 
-      # A note on main with no tag is the one state that does not clear itself:
-      # patch/ matches the tree, so no later merge sees a version owed. Said as
-      # a warning because the run itself is a legitimate success.
+      # ---- 0. refuse a release PR that merged with an unfinished note --------
+      #
+      # Red, not a warning. The note is on main, there is no tag, and patch/
+      # already matches the tree - so no later merge sees a version owed and
+      # every run after this one is a quiet "nothing". A green check is the one
+      # thing this state must not look like.
+      - name: The merged release note is not finished
+        if: steps.phase.outputs.phase == 'blocked'
+        env:
+          TAG: ${{ steps.phase.outputs.tag }}
+        run: |
+          set -uo pipefail
+          python tools/version.py verify --tag "$TAG"       # prints what is wrong
+          echo "::error file=docs/versions/${TAG}.md::${TAG} merged with a note that is still a scaffold. Rewrite it, then run this workflow by hand to publish it."
+          exit 1
+
+      # A note on main with no tag, reached any other way: the same dead end,
+      # but this run is not the one that caused it, so it is a warning.
       - name: A version is waiting to be published
         if: steps.phase.outputs.phase == 'nothing' && steps.phase.outputs.waiting != ''
+        env:
+          WAITING: ${{ steps.phase.outputs.waiting }}
         run: |
-          echo "::warning file=docs/versions/${{ steps.phase.outputs.waiting }}.md::" \
-               "${{ steps.phase.outputs.waiting }} is on main with no tag, so no version" \
-               "will be staged until it is published. Finish the note, then run this" \
-               "workflow by hand (Actions -> Version -> Run workflow)."
+          echo "::warning file=docs/versions/${WAITING}.md::${WAITING} is on main with no tag, so no version will be staged until it is published. Finish the note, then run this workflow by hand (Actions -> Version -> Run workflow)."
 
       # ---- 1. publish a release whose note is finished -----------------------
       - name: Publish the release
@@ -172,8 +186,12 @@ jobs:
 
       - name: Done
         if: always()
+        env:
+          PHASE: ${{ steps.phase.outputs.phase }}
+          PHASE_TAG: ${{ steps.phase.outputs.tag }}
+          PUBLISHED: ${{ steps.publish.outcome }}
         run: |
-          echo "phase:   ${{ steps.phase.outputs.phase }} ${{ steps.phase.outputs.tag }}"
-          echo "publish: ${{ steps.publish.outcome }}"
+          echo "phase:   ${PHASE} ${PHASE_TAG}"
+          echo "publish: ${PUBLISHED}"
           # A report, not a check: it must not turn a failed job into a second failure.
           python tools/version.py status || true

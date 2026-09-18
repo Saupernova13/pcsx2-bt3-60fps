@@ -12,8 +12,8 @@ count - only the lines PCSX2 executes.
     python tools/version.py prepare --pr "#26"      scaffold the version note
     python tools/version.py verify                  refuse to publish a DRAFT
     python tools/version.py publish-tag             the note that is ready to tag
-    python tools/version.py phase --head-ref REF    stage, publish, or nothing
-                                                    (as phase= and tag= lines)
+    python tools/version.py phase --head-ref REF    stage, publish, blocked or
+                                                    nothing (as key=value lines)
 
 `prepare` writes docs/versions/<tag>.md and appends its row to the version
 history; it does not export. Write the note, then run
@@ -265,8 +265,9 @@ def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
     Decided from the merged PR's head branch, which is unambiguous - the release
     PR this tool opens is always ``release/<tag>``.
 
-    - a ``release/`` branch just merged means its note is final and needs
-      publishing; the tag is the branch name, so it never has to be guessed
+    - a ``release/`` branch just merged means its note should be final: it is
+      ``publish`` if it verifies and ``blocked`` if it does not, and the tag is
+      the branch name, so it never has to be guessed
     - otherwise, a release already waiting (an open ``release/`` PR, or a note
       with no tag) means a human still has to edit it, so a second patch merge
       must not stage a competing version
@@ -277,7 +278,7 @@ def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
     else can recover a version whose note reached ``main`` with no tag - the
     ``patch=`` test is satisfied by then, so no later merge will notice it.
 
-    The tag is only returned for ``publish``; ``stage`` names its own.
+    The tag is returned for ``publish`` and ``blocked``; ``stage`` names its own.
     """
     if head_ref.startswith("release/"):
         tag = head_ref[len("release/"):]
@@ -286,7 +287,11 @@ def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
         # pass is a no-op rather than a failure on `git tag`.
         if tag in tagged():
             return "nothing", tag
-        return ("publish", tag) if verify(tag) == 0 else ("nothing", tag)
+        # blocked, not nothing: the note is on main, there is no tag, and patch/
+        # already matches the tree, so nothing that runs later sees a version
+        # owed. The caller has to be able to fail on this, or the one state that
+        # never clears itself is the one that looks like a success.
+        return ("publish", tag) if verify(tag) == 0 else ("blocked", tag)
     if not head_ref:
         found = untagged()
         if found and verify(found[1]) == 0:
@@ -426,6 +431,9 @@ def main() -> int:
         print("nothing that ships has changed; no version owed")
         out({"changed": "false", "tag": "", "branch": ""}, args.github_output)
         return 0
+    if not shipping_commits():
+        print("warning: no commit since the last tag touches wip/working.pnach, so "
+              "the note's commit list will be empty. Commit the pnach change first.")
     tag = args.tag or f"{next_tag()}-{slug(added[0] if added else changed[0])}"
     body = Path(args.pr_body).read_text(encoding="utf-8") if args.pr_body else ""
     if args.pr_title:

@@ -30,6 +30,7 @@ jobs:
   check:
     name: The patch exports and the tools run
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -67,7 +68,10 @@ jobs:
           for tool in tools/*.py; do
             # _bootstrap is imported by the others, never run on its own.
             [ "$(basename "$tool")" = "_bootstrap.py" ] && continue
-            if ! out="$(python "$tool" --help 2>&1)"; then
+            # Bounded, because a tool that opens a socket or waits on the
+            # emulator before argparse sees --help would otherwise hold the
+            # runner until the job times out, with nothing said about which one.
+            if ! out="$(timeout 60 python "$tool" --help 2>&1)"; then
               echo "::error file=${tool}::${tool} does not start"
               echo "$out" | tail -n 20
               failed=1

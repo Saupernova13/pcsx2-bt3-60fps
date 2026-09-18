@@ -73,11 +73,22 @@ if git diff --cached --quiet; then
   exit 0
 fi
 git commit -m "chore(release): prepare ${tag}"
-# Forced, because a release/ branch can be left behind by a release PR that was
-# closed without merging: the note never reached main, so nothing above knows
-# the branch exists, and a plain push is rejected as non-fast-forward. There is
-# no open PR on it (checked at the top) and its only content is a scaffold this
-# script wrote, so it is replaced rather than merged with.
+# A release/ branch can be left behind with no open PR - by a PR closed without
+# merging, or by a run whose `gh pr create` failed - and a plain push to it is
+# then rejected as non-fast-forward. It is replaced, but only while its tip is
+# still this script's own scaffold commit. Anything else is someone's rewritten
+# note, which is the whole point of the release PR, and must not be thrown away.
+remote_tip="$(git ls-remote --heads origin "${branch}" | cut -f1)"
+if [ -n "${remote_tip}" ]; then
+  git fetch --quiet origin "${branch}"
+  tip_subject="$(git log -1 --format=%s "${remote_tip}" 2>/dev/null || true)"
+  if [ "${tip_subject}" != "chore(release): prepare ${tag}" ]; then
+    say "origin/${branch} ends in \"${tip_subject}\", which this script did not write."
+    say "Finish that branch and open its PR, or delete it and run this workflow again."
+    out changed false
+    exit 1
+  fi
+fi
 git push --force origin "HEAD:refs/heads/${branch}"
 
 {
