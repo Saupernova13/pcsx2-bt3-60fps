@@ -8,6 +8,10 @@
 #
 #   stage-release.sh <pr-number> <pr-title> <pr-url> <pr-body-file>
 #
+# Every argument is optional. A manual run has no PR to name, and so does the
+# run straight after a publish - the merged PR there is the release PR, whose
+# body describes the version just published, not the next one.
+#
 # The patch is exported here, not at publish time, so the release PR pins what
 # the version contains and the note describes exactly that file. A human
 # rewrites the note; merging the PR is what publishes the release.
@@ -34,8 +38,14 @@ if [ "$(gh pr list --repo "$repo" --state open --limit 100 \
   exit 0
 fi
 
+# Empty rather than "#", so a note with no PR behind it says so.
+pr_ref=""
+if [ -n "${pr_number}" ]; then
+  pr_ref="#${pr_number}"
+fi
+
 if ! python tools/version.py prepare \
-      --pr "#${pr_number}" --pr-url "${pr_url}" --pr-title "${pr_title}" \
+      --pr "${pr_ref}" --pr-url "${pr_url}" --pr-title "${pr_title}" \
       --pr-body "${pr_body}" > "${work}/prepare.log"; then
   cat "${work}/prepare.log"
   exit 1
@@ -54,17 +64,41 @@ git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 branch="release/${tag}"
 git checkout -b "${branch}"
 git add patch/428113C2.pnach docs/versions/
+if git diff --cached --quiet; then
+  # prepare leaves an existing note alone, and export writes the same bytes for
+  # the same tree, so a re-run of a staging that already committed has nothing
+  # to add. Committing nothing is a `git commit` failure, not a result.
+  say "${tag} is already staged in the tree; nothing to commit"
+  out changed false
+  exit 0
+fi
 git commit -m "chore(release): prepare ${tag}"
-git push -u origin "${branch}"
+# A release/ branch can be left behind with no open PR - by a PR closed without
+# merging, or by a run whose `gh pr create` failed - and a plain push to it is
+# then rejected as non-fast-forward. It is replaced, but only while its tip is
+# still this script's own scaffold commit. Anything else is someone's rewritten
+# note, which is the whole point of the release PR, and must not be thrown away.
+remote_tip="$(git ls-remote --heads origin "${branch}" | cut -f1)"
+if [ -n "${remote_tip}" ]; then
+  git fetch --quiet origin "${branch}"
+  tip_subject="$(git log -1 --format=%s "${remote_tip}" 2>/dev/null || true)"
+  if [ "${tip_subject}" != "chore(release): prepare ${tag}" ]; then
+    say "origin/${branch} ends in \"${tip_subject}\", which this script did not write."
+    say "Finish that branch and open its PR, or delete it and run this workflow again."
+    out changed false
+    exit 1
+  fi
+fi
+git push --force origin "HEAD:refs/heads/${branch}"
 
 {
-  echo "Prepares \`${tag}\`, after #${pr_number} changed what ships."
+  echo "Prepares \`${tag}\`${pr_ref:+, after ${pr_ref} changed what ships}."
   echo
   echo "**Edit \`docs/versions/${tag}.md\` before merging.** It is a DRAFT"
-  echo "scaffolded from that PR, and merging this one is what publishes the"
-  echo "release - so its text is what players read. Every other note on that"
-  echo "page says what the version changes over the last one, and what was"
-  echo "discovered on the way."
+  echo "scaffolded from the commits this version carries, and merging this one"
+  echo "is what publishes the release - so its text is what players read. Every"
+  echo "other note on that page says what the version changes over the last one,"
+  echo "and what was discovered on the way."
   echo
   echo "\`patch/428113C2.pnach\` here is exported from the tree as it stood when"
   echo "this PR opened, so the note and the file describe the same build. If"

@@ -12,7 +12,8 @@ count - only the lines PCSX2 executes.
     python tools/version.py prepare --pr "#26"      scaffold the version note
     python tools/version.py verify                  refuse to publish a DRAFT
     python tools/version.py publish-tag             the note that is ready to tag
-    python tools/version.py phase --head-ref REF    stage, publish, or nothing
+    python tools/version.py phase --head-ref REF    stage, publish, blocked or
+                                                    nothing (as key=value lines)
 
 `prepare` writes docs/versions/<tag>.md and appends its row to the version
 history; it does not export. Write the note, then run
@@ -37,7 +38,8 @@ from game import config
 
 REPO = Path(__file__).resolve().parent.parent
 VERSIONS = REPO / "docs" / "versions"
-WORKING = REPO / "wip" / "working.pnach"
+WORKING_PATH = "wip/working.pnach"        # as git spells it, on any platform
+WORKING = REPO / WORKING_PATH
 RELEASED = REPO / "patch" / f"{config.CRC}.pnach"
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 NUMBER_RE = re.compile(r"^v(\d+)")
@@ -118,6 +120,36 @@ def next_tag() -> str:
     return f"v{highest + 1:02d}"
 
 
+def latest_tag() -> str | None:
+    """The newest published tag, by number then name, so v06b beats v06."""
+    best: tuple[int, str] | None = None
+    for line in tagged():
+        found = NUMBER_RE.match(line)
+        if found:
+            key = (int(found.group(1)), line)
+            if best is None or key > best:
+                best = key
+    return best[1] if best else None
+
+
+def shipping_commits() -> list[str]:
+    """The commits that changed the working pnach since the last published tag.
+
+    The scaffold used to be seeded from one PR - whichever merge tripped the
+    check - and that PR is often not the one that owes the version: a run that
+    failed, or a release PR waiting, leaves several patch merges to be carried
+    by the next version. Listing them all is what stops the note describing the
+    wrong change.
+    """
+    since = latest_tag()
+    span = f"{since}..HEAD" if since else "HEAD"
+    try:
+        log = git("log", "--no-merges", "--format=%s (%h)", span, "--", WORKING_PATH)
+    except subprocess.CalledProcessError:
+        return []
+    return [line for line in log.splitlines() if line.strip()]
+
+
 def untagged() -> tuple[int, str, Path] | None:
     """The newest version note with no matching git tag, if there is one."""
     tags = tagged()
@@ -160,6 +192,9 @@ def write_note(tag: str, changed: list[str], body: str, pr: str, url: str) -> Pa
     prev = previous_note(number)
     built_on = f"[{prev[0]}]({prev[1]})" if prev else "(first version)"
     listed = "\n".join(f"- `{g}`" for g in changed) or "- (no shipped group changed)"
+    since = latest_tag()
+    carried = "\n".join(f"- {line}" for line in shipping_commits())
+    carried_from = f" since {since}" if since else ""
     text = f"""# {tag} - DRAFT
 
 | | |
@@ -170,10 +205,9 @@ def write_note(tag: str, changed: list[str], body: str, pr: str, url: str) -> Pa
 | Groups | {len(changed)} shipped group(s) changed |
 | Confidence | **DRAFT - fill this in** |
 
-> **DRAFT, scaffolded from {pr or 'the merge'}.** Every other note on this page
-> is written for a player: what this version changes over the last one, and what
-> was discovered on the way. Rewrite this before the release PR merges - its
-> merge is what publishes the release.
+> **DRAFT.** Every other note on this page is written for a player: what this
+> version changes over the last one, and what was discovered on the way. Rewrite
+> this before the release PR merges - its merge is what publishes the release.
 
 ## What it changed
 
@@ -181,9 +215,16 @@ Shipped groups this version carries that the last release did not:
 
 {listed}
 
+The commits to `wip/working.pnach` it carries{carried_from}:
+
+{carried or '- (none found in the log)'}
+
 ## What was discovered
 
 {body.strip() or '(fill this in)'}
+
+> Seeded from one merge's body, which may describe only one of the changes
+> listed above: {pr or 'the merge that owed this version'}.
 
 ## Get this version
 
@@ -204,36 +245,70 @@ def add_history_row(tag: str, path: Path, groups: int, what: str) -> None:
     label = tag.split("-")[0]
     row = (f"| [`{label}`]({path.name}) | {_dt.date.today().isoformat()} | {groups} "
            f"| {what} | **DRAFT - not played** |")
-    last = max(i for i, l in enumerate(lines) if l.startswith("| [`v"))
-    lines.insert(last + 1, row)
+    rows = [i for i, l in enumerate(lines) if l.startswith("| [`v")]
+    if rows:
+        at = max(rows) + 1
+    else:
+        # Before the first version there are no rows, so the new one goes
+        # directly under the table's separator.
+        rules = [i for i, l in enumerate(lines) if l.startswith("|---")]
+        if not rules:
+            raise SystemExit(f"{readme} has no version table to add a row to")
+        at = rules[0] + 1
+    lines.insert(at, row)
     readme.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
-def phase(head_ref: str, open_release: bool = False) -> str:
-    """What this merge should do: ``publish``, ``stage`` or ``nothing``.
+def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
+    """What this merge should do, and the tag to publish: ``(phase, tag)``.
 
     Decided from the merged PR's head branch, which is unambiguous - the release
     PR this tool opens is always ``release/<tag>``.
 
-    - a ``release/`` branch just merged means its note is final and needs
-      publishing; the tag is the branch name, so it never has to be guessed
+    - a ``release/`` branch just merged means its note should be final: it is
+      ``publish`` if it verifies and ``blocked`` if it does not, and the tag is
+      the branch name, so it never has to be guessed
     - otherwise, a release already waiting (an open ``release/`` PR, or a note
       with no tag) means a human still has to edit it, so a second patch merge
       must not stage a competing version
     - otherwise, a change to what ships owes a new version
 
-    An empty ``head_ref`` is a manual run, which is also the recovery path for a
-    half-finished one: publish the newest finished note, else stage.
+    An empty ``head_ref`` is a manual run, which is the recovery path for a run
+    that failed halfway: publish the newest finished note, else stage. Nothing
+    else can recover a version whose note reached ``main`` with no tag - the
+    ``patch=`` test is satisfied by then, so no later merge will notice it.
+
+    The tag is returned for ``publish`` and ``blocked``; ``stage`` names its own.
     """
     if head_ref.startswith("release/"):
-        return "publish" if verify(head_ref[len("release/"):]) == 0 else "nothing"
+        tag = head_ref[len("release/"):]
+        # A finished run that is re-run replays the same merge event. The tag it
+        # pushed is the record that the version is already out, so the second
+        # pass is a no-op rather than a failure on `git tag`.
+        if tag in tagged():
+            return "nothing", tag
+        # blocked, not nothing: the note is on main, there is no tag, and patch/
+        # already matches the tree, so nothing that runs later sees a version
+        # owed. The caller has to be able to fail on this, or the one state that
+        # never clears itself is the one that looks like a success.
+        return ("publish", tag) if verify(tag) == 0 else ("blocked", tag)
     if not head_ref:
         found = untagged()
-        return "publish" if found and verify(found[1]) == 0 else (
-            "stage" if pending() else "nothing")
-    if open_release or untagged():
-        return "nothing"
-    return "stage" if pending() else "nothing"
+        if found and verify(found[1]) == 0:
+            return "publish", found[1]
+        return ("stage" if pending() else "nothing"), ""
+    waiting = untagged()
+    if waiting:
+        # Said out loud because this is the one state nothing recovers on its
+        # own: a note that reached main with no tag leaves patch/ matching the
+        # tree, so no later merge sees a version owed, and every run after it is
+        # a quiet "nothing". Finish the note and run this workflow by hand.
+        print(f"{waiting[1]} is staged and not published; nothing else is staged "
+              "while it waits")
+        return "nothing", ""
+    if open_release:
+        return "nothing", ""
+    return ("stage" if pending() else "nothing"), ""
 
 
 def out(pairs: dict[str, str], github_output: str | None) -> None:
@@ -294,7 +369,10 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "phase":
-        print(phase(args.head_ref, open_release=args.open_release))
+        name, tag = phase(args.head_ref, open_release=args.open_release)
+        found = untagged()
+        out({"phase": name, "tag": tag,
+             "waiting": found[1] if found else ""}, args.github_output)
         return 0
 
     added, removed, modified = diff()
@@ -353,6 +431,9 @@ def main() -> int:
         print("nothing that ships has changed; no version owed")
         out({"changed": "false", "tag": "", "branch": ""}, args.github_output)
         return 0
+    if not shipping_commits():
+        print("warning: no commit since the last tag touches wip/working.pnach, so "
+              "the note's commit list will be empty. Commit the pnach change first.")
     tag = args.tag or f"{next_tag()}-{slug(added[0] if added else changed[0])}"
     body = Path(args.pr_body).read_text(encoding="utf-8") if args.pr_body else ""
     if args.pr_title:
