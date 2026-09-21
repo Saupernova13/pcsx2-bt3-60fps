@@ -521,3 +521,59 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-09-21 - issue #54, Devilman's fork: a fourth mover
+
+The report: Devilman's thrown fork is faster at 60fps. The issue asked for the
+wind-up and the flight to be timed separately, and they are wrong by different
+amounts for different reasons.
+
+### Not any known mover
+
+Fork Attack is `L2` + `Triangle`, state 262. With a breakpoint on each known
+mover in turn, none runs while the fork is out: not the effect-node stepper
+(`00176A34`), not the rock class (`0015C28C`, `FUN_0015BFB8`), not the beam class
+(`00156004`), not either thrown-object update (`0017797C`, `00178A3C`). A tapped
+ki blast from the same state hits the effect-node breakpoint at once, so the
+probe works.
+
+A memory scan during the flight finds the fork as the third model in the model
+table (`008C2FF0`, its root bone at `+0x970`), copied each frame from an object
+at `01AC8420`. A write watchpoint on that object's `+0x50` lands in a `Vec3Add`
+called from `001550C4`, inside `FUN_00154DE8`: the same layout as the rock class's
+update (freeze check `FUN_0012CE88`, script poll `FUN_0014A8C0`, a phase byte at
+`+1`), a sibling class that nothing hooked.
+
+```
+001550A0  lwc1  $f12, 0x4($s3)       speed
+001550A8  jal   Vec3Scale           vel(+0x70) = dir * speed    (one path)
+001550C4  jal   Vec3Add             pos += vel                  (both paths)
+001550C8  dmove $a1, $a0            (delay slot)
+```
+
+### Measured
+
+Save state 6, Devilman 227 units from a standing Ultimate Gohan
+(`work/state-backups/rocky-devilman-vs-standing-gohan.p2s`), the fork model's x
+each vsync from when it appears:
+
+| arm | fork appears | x per vsync | Gohan hit |
+|---|---|---|---|
+| 30fps | v59 | 47 47 47 47 27 27 8 8 -11 -11 ... -69 | v75 (16 after) |
+| v24 | v56 | 47 47 27 8 -11 -30 -50 -69 | v64 (8 after) |
+| v24 + `[60FPS - weapon object travel]` | v56 | 47 47 37 27 18 8 -1 -11 ... -59 | v69 (13 after) |
+
+The flight step is 37 units a tick in both arms: 2x in real time, the whole
+defect the report names. The group halves it at the add, the same trampoline
+shape as `[60FPS - blast object travel]`.
+
+### What is left, and it is not the flight
+
+- The throw animation's beats land 2 to 4 vsyncs early (anim `0x106` at v13
+  against v15, `0x108` at v63 against v67), so the fork appears 3 vsyncs early.
+- The fork then waits 2 vsyncs at its spawn point where 30fps waits 4 (two
+  ticks in both), before its first step.
+
+That is the pre-launch overshoot the shipped header already lists for Frieza's
+rocks and Buu's charged blast. `[60FPS - blast script clock]` (#31) does not
+move it: with it in the set every beat lands on the same vsync.

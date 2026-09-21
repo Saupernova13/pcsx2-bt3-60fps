@@ -154,6 +154,8 @@ group off:
 | `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+| `rocky-devilman-vs-standing-gohan.p2s` | Devilman against a standing Ultimate Gohan, 227 units, full Ki, Rocky Area - Evening | Fork Attack, his rush (#53) |
+| `rocky-krillin-703-from-standing-gohan.p2s` | Krillin backed off to 703 units from a standing Ultimate Gohan | ki blast range; the stage caps separation near 785 |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
