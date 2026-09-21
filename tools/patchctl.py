@@ -182,6 +182,11 @@ SCREENFADE = ["60FPS - screen fade"]
 # visits, so this runs the whole update on even ticks instead.
 THROWN = ["60FPS - thrown object rate"]
 
+# Sprite effects, found 2026-09-21 for issue #44. The effect class behind Great
+# Saiyaman 2's Ultimate hearts (FUN_001866C0) steps every particle channel once a
+# tick. Its freeze check is answered "frozen" on odd ticks, so it thinks at 30Hz.
+SPRITEFX = ["60FPS - sprite effect rate"]
+
 # Solar Flare, found 2026-09-17. The victim's blind timer, fighter+0xFF8, holds
 # the lock-off flags while positive and drives the white flash; both counted
 # per tick. 2.50s at 30fps, 1.25s at 60fps. This decrements it on even ticks
@@ -216,7 +221,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPRITEFX
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +280,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + SPRITEFX),
+    # "full" without the sprite effects, so that group has a named A/B baseline.
+    "nospritefx": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

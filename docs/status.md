@@ -273,6 +273,20 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - sprite effects (#44)
+
+Adds `[60FPS - sprite effect rate]`. The effect class behind Great Saiyaman 2's
+Ultimate hearts (`FUN_001866C0`) steps every particle channel once a tick; its
+freeze check now answers "frozen" on odd ticks, so it thinks at 30Hz and still
+draws at 60.
+
+| Justice Judgement, vsync | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| 365 | heart forming | already full | forming |
+| 380 | full heart | gone | full heart |
+
+The heart fades ~8 vsyncs later than at 30fps. **Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
