@@ -162,3 +162,25 @@ Krillin against a standing Ultimate Gohan, the same three-hit rush in every arm:
 
 So this group is a dependency of `[60FPS - smash charge]` (#17): without it a
 charge started from Momentum fills late, 22 vsyncs against 20 from half.
+
+## 2026-09-21 - the economy counts down the Blast 1 buffs too (#20), so PR #25 is redundant
+
+The 2026-09-17 play-test ran #16 and #25 together and found buffs lasting
+**twice** as long. They do. `FUN_00200AA0` counts down every Blast 1 timer
+(`fighter+0xE08`, `+0xE14`, `+0xE18`, `+0xE1C`, `+0xE24`), and its only caller
+is `001E1A98`, inside `FUN_001E16C0`. Gating the economy already puts the buffs
+on real time; #25's doubled duration at `0020055C` then doubles them a second
+time.
+
+Krillin's After Image Strike, published at 15 seconds, save state 3:
+
+| arm | armed | lasts |
+|---|---|---|
+| 30fps | 447 | 14.88s |
+| v24 | 444 | 7.40s |
+| v24 + #25 (buff duration) | 894 | 14.90s |
+| **v24 + this group** | 447 | **14.88s** |
+| v24 + this group + #25 | 897 | 29.88s |
+
+The four stat slots at `+0xF64` end on the same vsync as `+0xE08` in every arm.
+This group fixes #20 on its own, so #25 should not ship with it.
