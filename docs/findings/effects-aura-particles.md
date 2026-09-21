@@ -848,3 +848,61 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-09-21 - issue #44, Great Saiyaman 2's Ultimate heart: a sprite effect class at 2x
+
+The report: the heart effect of Great Saiyaman 2's Ultimate disappears early.
+Scene: `rocky-gs2-vs-standing-gohan.p2s` (save state 2). Justice Finishing Pose 2
+(`L2`+`Up`+`Circle`) turns Max Power Mode on; then Justice Judgement
+(`L2`+`Down`+`Triangle`).
+
+### What is early
+
+Photographed at exact vsyncs after the Ultimate press (paused VM, screenshot
+queued and flushed by one frame advance): at v365 the 30fps game is still
+forming the heart and v24 already shows it full; at v380 30fps has the full
+heart ring and v24 has lost it. The Ultimate's states run the same length in
+both arms (state 303, v324-v904 against v321-v901), so the move is on time and
+the effect is not.
+
+### Found by a rate scan of the growth window
+
+Scanning v352-v360 in both arms turns up objects of stride `0x130` at
+`01A10168…` with a float stepping 2.0 a tick at 30fps and 4.0 at 60fps. A write
+watchpoint lands in `FUN_00184BD8`, the update of the effect class with vtable
+`002C3EF0` (`FUN_001866C0`). Every channel in it is per tick: age `+0xA8`, a
+second age `+0xB8`, pulse counters `+0x100` and `+0x10C` stepping ±1.0, and
+position integrated from velocity with no timestep.
+
+Two things were not it. `FUN_0019DB90` (vtable `002C4278`), an effect with four
+1.0-a-tick countdowns, has an object whose life is 350-415 at 30fps and 350-380
+on v24; halving its countdowns moves nothing visible. `FUN_00190FE8` (vtable
+`002C40C0`), the other system alive in the move, gated alone changes nothing.
+
+### The fix
+
+`FUN_001866C0` asks the game's own freeze check (`001866EC jal FUN_0012D1D0`)
+and, when frozen, branches to `001868E0`, past the update and into the draw.
+`[60FPS - sprite effect rate]` calls the check through a wrapper that also
+answers "frozen" on odd ticks, the pattern `[60FPS - thrown object rate]` uses.
+The branch's delay slot loads the flags the draw path reads, so that path works
+unchanged.
+
+| vsync | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| 365 | heart forming | heart full | heart forming |
+| 380 | full heart ring | gone | full heart ring |
+| 392 | gone (camera cut) | gone | ring still showing |
+| 400 | - | - | fading out |
+
+No odd-frame flicker: the heart's pixel count over six consecutive vsyncs is
+306k 405k 526k 636k 727k 629k.
+
+### Not established
+
+- **The fade runs ~8 vsyncs long.** At 30fps the heart is gone on the camera
+  cut at v392; with this group it fades out by v400.
+- **The class is shared.** It also draws a tapped ki blast's sparkles, and
+  `FUN_0012D1D0` has 30 callers across the effect family. Only this one is
+  gated; the others are candidates for the same treatment, one measured effect
+  at a time.
