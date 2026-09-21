@@ -168,6 +168,11 @@ PROJECTILE = ["60FPS - projectile travel"]
 OBJFLIGHT = ["60FPS - blast object travel"]
 BEAMFLIGHT = ["60FPS - beam object travel"]
 
+# Thrown weapons, found 2026-09-21 for issue #54. Devilman's fork is a spawned
+# object on a third sibling class, FUN_00154DE8, that no other travel group hooks;
+# pos += vel once a tick at 001550C4. Halved the way the rock class is.
+WEAPONFLIGHT = ["60FPS - weapon object travel"]
+
 # The fullscreen fade node, found 2026-09-09. FUN_00172810 fades a colour in,
 # holds it, and fades it out, counting all three phases one frame per tick. At
 # 60fps every fade in the game runs in half its real time - which is why the
@@ -216,7 +221,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN
+                  + WEAPONFLIGHT + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +280,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + WEAPONFLIGHT),
+    # "full" without the thrown weapons, so that group has a named A/B baseline.
+    "noweapon": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
