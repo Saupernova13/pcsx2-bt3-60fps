@@ -204,6 +204,12 @@ STRUGGLE = ["60FPS - rush struggle"]
 # point where 30fps puts it, and gates only the AI's rotation.
 BEAMCLASH = ["60FPS - beam clash"]
 
+# Defensive input windows, found 2026-09-21 for issue #18. FUN_001DFFE0 counts
+# six press-armed windows down once a tick - the vanish window among them - so
+# at 60fps a vanish or Z-Counter had half its real time. Counted on even ticks,
+# except at the rest value, where re-arming depends on counting every tick.
+DEFENCE = ["60FPS - defence windows"]
+
 # The stage's own scenery, found 2026-09-16 chasing the World Tournament report.
 # FUN_00115478 walks the map's scene graph once a tick and FUN_00123890 lerps
 # each node between two keyframes by a time at node+0x1C. That time is advanced
@@ -216,7 +222,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + DEFENCE
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + DEFENCE),
+    # "full" without the defence windows, so that group has a named A/B baseline.
+    "nodefence": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

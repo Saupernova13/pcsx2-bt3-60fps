@@ -1284,3 +1284,56 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Defensive input windows, found 2026-09-21 for issue #18 - "one-tick input
+// windows are half as long in real time". FUN_001DFFE0 runs once a tick per
+// fighter and keeps six windows, fighter+0x1068 to +0x107C. A button press arms
+// one to a few ticks - the vanish window +0x1068 to 2, 3 or 4 by remaining
+// health, which is SuperCombo's "lowered health makes the vanishing window
+// smaller" - and each counts down once a tick, then on past zero into a cooldown
+// that ends at a rest value (-30, or -15 for +0x1074). The hit resolver
+// (FUN_001C8580, 001C863C) vanishes the defender while +0x1068 is still positive.
+// At 60fps every window and cooldown is half as long in real time.
+//
+// Each countdown is `addiu v0, v0, -1` followed by `slti v1, v0, rest`. The hook
+// makes the addiu a jal to a helper that nets the -1 to nothing on odd ticks and
+// replays the slti, which ran in the jal's delay slot on the old value. At the
+// rest value the helper counts every tick regardless: the game re-arms a window
+// only after the counter drops below rest, so a rest value that held still on an
+// odd tick would turn a press on that tick into the "pressed during cooldown"
+// branch and kill it. $t0 and $at are unused in FUN_001DFFE0.
+//
+// Measured in a 1P vs 2P match (save state 7): pad 2 throws a light smash, pad 1
+// taps Circle (vanish) or Up+Square (Z-Counter) one vsync later each run:
+//
+//   vanish window     30fps 8 vsyncs   v24 4   v24 + this 8
+//   Z-Counter window  30fps 2 vsyncs   v24 1   v24 + this 2
+//
+// (with the smash charge and meter economy groups, so both arms throw the same
+// level-1 smash; without them v24's smash is stronger).
+[60FPS - defence windows]
+description=Count the vanish, Z-Counter and other defensive input windows in real time, so they are as wide at 60fps as at 30fps.
+patch=1,EE,000F1910,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1914,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1918,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F191C,word,2841FFE3 // slti $at, $v0, -29        at rest (-30)?
+patch=1,EE,000F1920,word,0001400B // movn $t0, $zero, $at      at rest: count every tick
+patch=1,EE,000F1924,word,2442FFFF // addiu $v0, $v0, -1        the original decrement
+patch=1,EE,000F1928,word,00481021 // addu $v0, $v0, $t0        odd tick: undone
+patch=1,EE,000F192C,word,03E00008 // jr $ra
+patch=1,EE,000F1930,word,2843FFE2 // slti $v1, $v0, -30        (delay) replay the compare
+patch=1,EE,000F1940,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1944,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1948,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F194C,word,2841FFF2 // slti $at, $v0, -14        at rest (-15)?
+patch=1,EE,000F1950,word,0001400B // movn $t0, $zero, $at
+patch=1,EE,000F1954,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F1958,word,00481021 // addu $v0, $v0, $t0
+patch=1,EE,000F195C,word,03E00008 // jr $ra
+patch=1,EE,000F1960,word,2843FFF1 // slti $v1, $v0, -15        (delay) replay the compare
+patch=1,EE,001E0048,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1068 vanish window
+patch=1,EE,001E00B4,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x106C
+patch=1,EE,001E0100,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1070
+patch=1,EE,001E0158,word,0C03C650 // addiu $v0, -1 -> jal 000F1940   +0x1074 (rest -15)
+patch=1,EE,001E01A4,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1078
+patch=1,EE,001E01CC,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x107C
