@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Six traps, each of which cost an hour or more
+## Eight traps, each of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -66,6 +66,18 @@ state cut *after* the banner, not at the match start.
 **6. Screenshots need the VM running, and an armed breakpoint counts as
 paused.** This one is in PCSXROO's own agent guide and is still worth repeating,
 because a stray breakpoint makes every capture silently vanish.
+
+**7. A screenshot taken by resuming the VM lands a few frames late, and not
+always the same few.** `resume()` then `screenshot()` photographs whatever frame
+the GS presents when the write happens, so two runs of the same arm disagree
+and a fast cinematic looks early or late for no reason. #21's first photographs
+were taken that way. For a frame at an exact vsync, do what `drift.py` does:
+with the VM **paused**, call `screenshot()` to queue it, then `frame_advance(1)`
+to flush it. Two runs of the same arm then match pixel for pixel.
+
+**8. The first menu press after a state load is often dropped.** Load, resume,
+then press `Start` twice if the pause menu has to open, and look before pressing
+anything that selects.
 
 ## Getting to any scene
 
@@ -154,6 +166,9 @@ group off:
 | `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+| `rocky-super17-vs-standing-gohan.p2s` | Super 17 225 units from a standing Ultimate Gohan, full Ki | Hell's Storm (#40) |
+| `rocky-gs2-vs-standing-gohan.p2s` | Great Saiyaman 2 against a standing Ultimate Gohan | Justice Finishing Pose 2 turns Max Power Mode on, then her Ultimate (#44) |
+| `rocky-cell1-near-standing-gohan.p2s` | Cell 1st Form 11 units from a standing Ultimate Gohan | Giant Throw, Special Beam Cannon, Heavy Finish (#42, #13) |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
