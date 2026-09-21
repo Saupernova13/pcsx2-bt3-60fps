@@ -1284,3 +1284,40 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Devilman's Fork Attack, found 2026-09-21 for issue #54 - "the thrown fork is
+// faster". The fork is a spawned object on a class of its own: none of the
+// movers the other travel groups hook ever runs for it. Its update is
+// FUN_00154DE8, laid out like the rock class's FUN_0015BFB8 (the same freeze
+// check, script poll and phase byte), and it moves by
+//
+//   001550A8  jal Vec3Scale     vel(+0x70) = dir * speed(+0x04), on one path
+//   001550C4  jal Vec3Add       pos += vel, reached by both paths
+//   001550C8  dmove a1, a0      (delay slot)
+//
+// once a tick, so at 60fps the fork covers its path in half the real time. The
+// hook is the same shape as [60FPS - blast object travel]: the add becomes a jump
+// to a helper that calls the fused scale-add FUN_001225D0(dst, a1, a2) =
+// [a2] + [a1] * $f12 with $f12 = 0.5, then returns past the original call.
+//
+// Measured from save state 6, Devilman 227 units from a standing Ultimate Gohan,
+// L2 + Triangle, the fork's model (index 2) x per vsync after it appears:
+//
+//   30fps   47 47 47 47 27 27 8 8 -11 -11 ...   hits on v75, 16 vsyncs after it appears
+//   v24     47 47 27 8 -11 -30 -50 -69          hits on v64, 8 vsyncs after
+//   this    47 47 37 27 18 8 -1 -11 -21 ...     hits on v69, 13 vsyncs after
+//
+// What is left is before the flight: the throw animation starts about 3 vsyncs
+// early and the fork waits 2 vsyncs at its spawn point where 30fps waits 4 - the
+// same pre-launch overshoot the shipped header already lists for Frieza's rocks.
+// [60FPS - blast script clock] does not reach it.
+[60FPS - weapon object travel]
+description=Halve the per-tick flight of thrown-weapon objects such as Devilman's fork, so they cross the gap in real time rather than twice as fast.
+patch=1,EE,000F18F0,word,00C0282D // move $a1, $a2          a1 = the velocity
+patch=1,EE,000F18F4,word,0080302D // move $a2, $a0          a2 = the position
+patch=1,EE,000F18F8,word,3C013F00 // lui $at, 0x3f00        0.5f
+patch=1,EE,000F18FC,word,0C048974 // jal 0x1225d0           dst = a2 + a1 * $f12
+patch=1,EE,000F1900,word,44816000 // mtc1 $at, $f12         (delay slot)
+patch=1,EE,000F1904,word,08055433 // j 0x1550cc             past the original add
+patch=1,EE,000F1908,word,00000000 // nop
+patch=1,EE,001550C4,word,0803C63C // jal Vec3Add -> j 000F18F0
