@@ -24,6 +24,17 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "docs" / "findings.md"
 OUT = ROOT / "docs" / "findings"
 
+# The log lives in docs/ and every file it is split into lives in docs/findings/,
+# one level deeper, so a relative link written for the log points one directory
+# short once it is moved. Rewrite those; leave absolute URLs, anchors, and links
+# that already climb out alone, so a re-run cannot double-prefix them.
+RELATIVE_LINK = re.compile(r"\]\((?!https?:|mailto:|#|\.\./)([^)\s]+?)\.md(#[^)]*)?\)")
+RELATIVE_LINK_ANY = re.compile(r"\]\((?!https?:|mailto:|#)([^)\s]+?\.md)(#[^)]*)?\)")
+
+
+def repath(line: str) -> str:
+    return RELATIVE_LINK.sub(r"](../\1.md\2)", line)
+
 # (file, title, scope, heading patterns). First match wins is NOT used: a
 # heading must match exactly one topic.
 TOPICS = [
@@ -146,6 +157,18 @@ def build(text: str) -> dict[str, str]:
     return files
 
 
+def verify_links(files: dict[str, str]) -> None:
+    """A relative link in any written file must resolve from docs/findings/."""
+    bad = []
+    for name, content in files.items():
+        for m in RELATIVE_LINK_ANY.finditer(content):
+            target = m.group(1).split("#")[0]
+            if target and not (OUT / target).resolve().exists():
+                bad.append(f"{name} -> {m.group(0)}")
+    if bad:
+        raise SystemExit("link(s) do not resolve from docs/findings/: " + "; ".join(bad[:5]))
+
+
 def verify(text: str, files: dict[str, str]) -> None:
     _, secs = sections(text)
     want = Counter(ln for _, body in secs for ln in body if ln.strip())
@@ -171,8 +194,12 @@ def main() -> int:
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     text = SOURCE.read_text(encoding="utf-8")
+    # Every line ends up one directory deeper, so relative links are rewritten
+    # before the split, and verify() then compares against what is written.
+    text = "\n".join(repath(ln) for ln in text.split("\n"))
     files = build(text)
     verify(text, files)
+    verify_links(files)
     if args.check:
         return 0
     OUT.mkdir(parents=True, exist_ok=True)
