@@ -8,6 +8,9 @@ checkout is found from the first of these that is set:
 1. the PCSXROO_REPO environment variable,
 2. a "PCSXROO_REPO" key in this repo's local.json,
 3. a sibling checkout named pcsxroo, next to this repo.
+
+Import this before anything third-party. Until it has run, tools/ is still at
+the front of sys.path and shadows the stdlib - see the sys.path note below.
 """
 
 from __future__ import annotations
@@ -62,8 +65,37 @@ def find_pcsxroo() -> Path:
 
 PCSXROO = find_pcsxroo()
 
-# This repo's own modules first, so a name in tools/ always wins over PCSXROO's.
-for index, path in enumerate((TOOLS, PCSXROO / "pcsxroo")):
-    if str(path) in sys.path:
-        sys.path.remove(str(path))
-    sys.path.insert(index, str(path))
+# Appended, never prepended, so a tool can never shadow a stdlib module. Running
+# `python tools/<tool>.py` puts tools/ at sys.path[0], and tools/bisect.py then
+# wins over the stdlib `bisect` that `random` imports - which breaks any later
+# import of capstone, and with it ps2ee, on any interpreter that has not already
+# loaded `bisect`. Both paths go on the end, stdlib stays ahead of them.
+#
+# Order between the two is kept: tools/ before PCSXROO's, so this repo's own
+# module wins a name collision.
+#
+# Two things are needed for that to hold, and both have been got wrong here:
+#
+# - A tool must import this before anything third-party. numpy and PIL reach
+#   the stdlib on their own, and a tool that imports them first does so while
+#   tools/ is still at sys.path[0].
+# - An entry is matched by what it resolves to, not by how it is spelled. tools/
+#   can also reach sys.path as the relative "tools" a tool inserted for itself,
+#   which a comparison against the absolute path misses - and one relative entry
+#   at the front brings the shadowing straight back.
+#
+# .github/workflows/check.yml runs every tool with --help, which is what catches
+# either mistake: the shadowing is only fatal on an interpreter that has not
+# already loaded the module being shadowed.
+
+
+def _same_dir(entry: str, target: Path) -> bool:
+    try:
+        return Path(entry or ".").resolve() == target
+    except OSError:      # an unresolvable entry is not the one being moved
+        return False
+
+
+for path in (TOOLS, (PCSXROO / "pcsxroo").resolve()):
+    sys.path[:] = [entry for entry in sys.path if not _same_dir(entry, path)]
+    sys.path.append(str(path))
