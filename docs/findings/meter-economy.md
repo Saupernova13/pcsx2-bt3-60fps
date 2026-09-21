@@ -142,3 +142,23 @@ in both arms.
 
 - **Max Power Mode in play.** The drain and the charge are measured above; the
   mode's own moves (Violent Rush, Hyper Smash) were not.
+
+## 2026-09-21 - the economy also drains Momentum, which paces every charged attack
+
+`FUN_001E16C0`'s `fighter+0xD80 -= 400` is **Momentum**, SuperCombo's hidden
+value "filled up by attacking your opponent using Rush Attacks, and
+automatically drained over time", which makes "all charged melee attacks ...
+charge" faster. `FUN_001E3368` blends the smash charge rate between two
+per-character values by `fighter+0xD80 / 100000`.
+
+Rush hits add it per hit, not per tick, so only the drain was wrong. Save state 3,
+Krillin against a standing Ultimate Gohan, the same three-hit rush in every arm:
+
+| arm | Momentum added per hit | peak |
+|---|---|---|
+| 30fps | 8000, 7600, 8000 | 15600 |
+| v24 | 8000, 7600, 8000 | 8800 |
+| v24 + this group | 8000, 7600, 8000 | 16000 |
+
+So this group is a dependency of `[60FPS - smash charge]` (#17): without it a
+charge started from Momentum fills late, 22 vsyncs against 20 from half.
