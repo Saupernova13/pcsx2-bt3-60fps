@@ -145,6 +145,12 @@ PURSUIT = ["60FPS - knockback flight", "60FPS - pursuit timing"]
 # correct on its own.
 CAMERA = ["60FPS - camera pacing"]
 
+# The cinematic camera, found 2026-09-21 for issue #21. In a cinematic the render
+# camera plays a camera clip (FUN_0023D510) whose time steps a bare 2.0 a tick at
+# 0023D6A4, so transformation cameras ran their shots in half the real time while
+# the poses kept time. One word makes it 1.0.
+CINECAM = ["60FPS - cinematic camera"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -216,7 +222,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
+    # "full" without the cinematic camera, so that group has a named A/B baseline.
+    "nocinecam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
