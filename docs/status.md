@@ -273,6 +273,23 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - projectile life (#43)
+
+Adds `[60FPS - projectile life]`. A ki blast's life, `node+0x5B4`, is counted in
+ticks by the same update whose step `projectile travel` halves, so a blast that
+misses died at half its 30fps range. The decrement now nets to nothing on odd
+ticks.
+
+| Rush Ki Blast, life set to 10 ticks | flies | travels |
+|---|---|---|
+| 30fps | 18 vsyncs | 250 units |
+| v24 | 9 vsyncs | 125 units |
+| **v24 + this group** | **19 vsyncs** | **264 units** |
+
+**Not confirmed in play.** Measured on Krillin's tapped Rush Ki Blast. A blast
+that hits is unchanged. Charged ki blasts are a different class and are not
+touched.
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
