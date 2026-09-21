@@ -168,6 +168,11 @@ PROJECTILE = ["60FPS - projectile travel"]
 OBJFLIGHT = ["60FPS - blast object travel"]
 BEAMFLIGHT = ["60FPS - beam object travel"]
 
+# Projectile life, found 2026-09-21 for issue #43. The same effect-node update
+# counts each projectile's life (node+0x5B4) down once a tick, so with the step
+# halved a blast that misses died at half the range. Counted on even ticks.
+PROJLIFE = ["60FPS - projectile life"]
+
 # The fullscreen fade node, found 2026-09-09. FUN_00172810 fades a colour in,
 # holds it, and fades it out, counting all three phases one frame per tick. At
 # 60fps every fade in the game runs in half its real time - which is why the
@@ -216,7 +221,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + PROJLIFE
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +280,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + PROJLIFE),
+    # "full" without the projectile life, so that group has a named A/B baseline.
+    "noprojlife": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

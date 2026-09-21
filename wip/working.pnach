@@ -1284,3 +1284,45 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Projectile life, found 2026-09-21 for issue #43 - "ki blasts are destroyed
+// early, so they have less range". [60FPS - projectile travel] halves the step
+// of every effect-node projectile, and that is right, but the same update also
+// counts the projectile's life down once a tick and nothing compensated that:
+//
+//   00176A64  lw    $v0, 0x5B4($s1)     life, in ticks, armed from the class
+//   00176A68  addiu $v0, $v0, -1        at spawn (0017688C) - 118 for Krillin
+//   00176A6C  bgtz  $v0, alive
+//   00176A70  sw    $v0, 0x5B4($s1)
+//   00176A74  ...   flags(+0x5B0) |= 0x10   dead: it stops and is cleaned up
+//
+// At 60fps a projectile gets half the step for half the real time, so it dies
+// at half the range. The decrement is also reached from 001769BC, which skips
+// the move after a hit and lands on 00176A68 with the life loaded in its delay
+// slot, so the hook sits on the branch after the decrement, where both paths
+// meet. The helper adds back the tick's parity - the -1 nets to nothing on odd
+// ticks - re-stores the life and takes the original branch. $t0 is not used
+// anywhere in FUN_00176980.
+//
+// Measured from save state 7, Krillin 703 units from a standing Ultimate Gohan,
+// a tapped Rush Ki Blast with its life set to 10 ticks on the first step:
+//
+//   30fps              18 vsyncs, 250 units
+//   v24                 9 vsyncs, 125 units
+//   v24 + this group   19 vsyncs, 264 units
+//
+// A blast that hits is unchanged: 663 units at 30fps, 677 with this group, the
+// impact ending it before its life does.
+[60FPS - projectile life]
+description=Count a ki blast's life in real time, so a blast that misses flies as far at 60fps as at 30fps instead of vanishing at half the range.
+patch=1,EE,000F1880,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1884,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1888,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F188C,word,00481021 // addu $v0, $v0, $t0       odd tick: undo the -1
+patch=1,EE,000F1890,word,1C400003 // bgtz $v0, +3             still alive
+patch=1,EE,000F1894,word,AE2205B4 // sw $v0, 0x5B4($s1)       (delay) store the life
+patch=1,EE,000F1898,word,0805DA9D // j 0x00176A74             dead: set flag 0x10
+patch=1,EE,000F189C,word,00000000 // nop
+patch=1,EE,000F18A0,word,0805DAA0 // j 0x00176A80             alive: carry on
+patch=1,EE,000F18A4,word,00000000 // nop
+patch=1,EE,00176A6C,word,0803C620 // bgtz $v0, alive -> j 000F1880
