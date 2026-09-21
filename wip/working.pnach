@@ -3,9 +3,14 @@ gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 // 60fps patch for Budokai Tenkaichi 3 - battles.
 // See docs/findings/ for the full derivation.
 
+// The battle loop at 60fps. Every other group compensates for this one.
 [60FPS - battle]
 description=Run the battle loop at 60fps. Menus and other modes untouched.
 patch=1,EE,0012BCE4,word,24040001 // battle loop stride 2 -> 1
+
+// DEVELOPMENT ONLY - never ship. The older alternative to [60FPS - animation
+// clock]: enable one or the other, never both. Halving the rate setter only
+// catches models something explicitly calls SetAnimRate on.
 [60FPS - animation rate]
 description=Halve every animation rate written to entity+0xC80.
 patch=1,EE,001C450C,word,0803C010 // swc1 -> j 000F0040
@@ -15,6 +20,8 @@ patch=1,EE,000F0048,word,4604A102 // mul.s $f4, $f20, $f4
 patch=1,EE,000F004C,word,E4440C80 // swc1 $f4, 0xc80($v0)
 patch=1,EE,000F0050,word,08071145 // j 0x1c4514
 patch=1,EE,000F0054,word,00000000 // nop
+
+// Menu auto-repeat. Its delay and rate are counted in ticks, so both double.
 [60FPS - input repeat timing]
 description=Double the auto-repeat delay and rate so menus scroll at the right speed.
 patch=1,EE,002577F8,word,0803C020 // lui -> j 000F0080
@@ -23,6 +30,9 @@ patch=1,EE,000F0084,word,00052840 // sll $a1, $a1, 1
 patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
 patch=1,EE,000F008C,word,08095E00 // j 0x257800
 patch=1,EE,000F0090,word,00000000 // nop
+
+// The 128 per-button frame counters behind double taps, holds and combo links,
+// counted on even ticks only.
 [60FPS - input timing]
 description=Halve the rate of the 128 per-button frame counters so double taps, holds and combo links keep their real-time windows.
 patch=1,EE,000F00C0,word,80A20000 // lb $v0, ($a1)          replay displaced
@@ -37,8 +47,8 @@ patch=1,EE,000F00E0,word,08074F0E // j 0x1d3c38             return without count
 patch=1,EE,000F00E4,word,00000000 // nop
 patch=1,EE,001D3C18,word,0803C030 // lb -> j 000F00C0 (FUN_001D3C10 increment path)
 
-// --- alternative to [60FPS - animation rate]: enable one or the other, never both ---
-// The rate setter only catches models something explicitly calls SetAnimRate on.
+// The animation clock. Halving the rate setter only catches models something
+// explicitly calls SetAnimRate on.
 // FUN_0024D410 is where animation time actually advances (time += rate at
 // model+0xB40+0x138), so halving there covers every animated model in the game -
 // including effect entities that never set a rate. The two getter hooks keep the
@@ -351,17 +361,6 @@ patch=1,EE,001966B4,word,3C013F00 // 1.0 -> 0.5 per tick
 patch=1,EE,001966F0,word,3C013F00 // 1.0 -> 0.5 per tick
 patch=1,EE,0019672C,word,3C013F00 // 1.0 -> 0.5 per tick
 
-// --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
-// Movement in BT3 is 100% root motion through the skeleton. With exactly one
-// writer each way (both confirmed by write breakpoint), the per-frame cycle is
-//   model+0x950  = fighter+0x10 + fighter+0x30     FUN_001D7198, 001D71F4
-//   fighter+0x10 = model+0x970 - fighter+0x30      FUN_001D70E8, 001D7118
-// which reduces to  fighter+0x10 += (model+0x970 - model+0x950).  So the whole
-// per-frame displacement is that difference, produced by the skeleton pass.
-// Replacing model+0x970 with the midpoint of the two halves it exactly.
-// EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
-// That asymmetry is the point of the test - it proves both that this is the one
-// movement channel and that ground is already compensated while air is not.
 // The scripted-sequence clock, found 2026-09-07 - the one behind everything the
 // game stages rather than simulates. FUN_00158850 steps one node of a scripted
 // sequence per tick, and a step that is waiting counts a plain integer down by
@@ -643,6 +642,18 @@ patch=1,EE,000F130C,word,24420001 // even tick: count
 patch=1,EE,000F1310,word,0807FAD1 // j 0x1FEB44
 patch=1,EE,000F1314,word,00000000 // nop
 patch=1,EE,001FEB3C,word,0803C4BD // gate -> 000F12F4
+
+// --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
+// Movement in BT3 is 100% root motion through the skeleton. With exactly one
+// writer each way (both confirmed by write breakpoint), the per-frame cycle is
+//   model+0x950  = fighter+0x10 + fighter+0x30     FUN_001D7198, 001D71F4
+//   fighter+0x10 = model+0x970 - fighter+0x30      FUN_001D70E8, 001D7118
+// which reduces to  fighter+0x10 += (model+0x970 - model+0x950).  So the whole
+// per-frame displacement is that difference, produced by the skeleton pass.
+// Replacing model+0x970 with the midpoint of the two halves it exactly.
+// EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
+// That asymmetry is the point of the test - it proves both that this is the one
+// movement channel and that ground is already compensated while air is not.
 [60FPS - EXPERIMENT halve root motion]
 description=Test only. Halves all root motion; ground should go slow, air should become correct.
 patch=1,EE,000F0800,word,3C04000F // lui   $a0, hi(scratch)
@@ -704,6 +715,7 @@ patch=1,EE,000F0930,word,08077812 // j 0x001DE048
 patch=1,EE,000F0934,word,00000000 // nop
 patch=1,EE,001DE02C,word,0803C240 // jal 001DBFF8 -> j trampoline
 
+// The vertical channel of airborne motion, the same fix as the group above.
 [60FPS - airborne vertical]
 description=The same for the vertical channel (FUN_001DED78): rising, falling and gravity.
 patch=1,EE,000F0940,word,3C013F00 // lui $at, 0x3F00
@@ -988,6 +1000,7 @@ patch=1,EE,002FE4CC,word,3FB33333 // projection scale  7/6 * 1.2 = 1.400000
 patch=1,EE,002FE594,word,43B33333 // the same, x256    = 358.400000
 patch=1,EE,00130BF0,word,3C013F20 // lui $at, 0x3F20   = 0.6250000, for 1/1.6
 
+// The same widescreen hack, retargeted to 21:9.
 [Widescreen 21:9]
 description=Widescreen hack retargeted from 16:9 to 21:9 (64:27), for 2560x1080 and 3840x1620 panels. Turn the stock Widescreen 16:9 patch OFF.
 patch=1,EE,002FE4CC,word,4004BDA1 // projection scale  7/6 * 1.777778 = 2.074074
@@ -1034,6 +1047,8 @@ patch=1,EE,000F13D0,word,0805DA8D // j 0x176a34
 patch=1,EE,000F13D4,word,00000000 // nop
 patch=1,EE,00176A2C,word,0803C4F0 // lwc1 -> j 000F13C0
 
+// The second projectile mover: spawned objects such as Frieza's rocks. See the
+// projectile travel comment above.
 [60FPS - blast object travel]
 description=Halve the per-tick advance of spawned projectiles - the rocks of Frieza's I Might Die This Time and everything else on the same object class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F13E0,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
@@ -1045,6 +1060,7 @@ patch=1,EE,000F13F4,word,080570A5 // j 0x15c294             past the original ad
 patch=1,EE,000F13F8,word,00000000 // nop
 patch=1,EE,0015C28C,word,0803C4F8 // jal Vec3Add -> j 000F13E0
 
+// The third projectile mover: travelling beams such as Buu's Super Kamehameha.
 [60FPS - beam object travel]
 description=Halve the per-tick advance of travelling beam objects - Buu's Super Kamehameha and everything else on that class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F1400,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
