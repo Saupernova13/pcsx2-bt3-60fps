@@ -1,10 +1,10 @@
 # Tools index
 
-All 48 command-line tools, split across two repos. Every one has a real module
+All 49 command-line tools, split across two repos. Every one has a real module
 docstring - `python <tool> --help` is the reference. Setting them up is in the
-README's [Getting started](../README.md#getting-started).
+[Getting started](getting-started.md).
 
-- **This repo, `tools/`** - the 35 tools that know this game: they read BT3's
+- **This repo, `tools/`** - the 36 tools that know this game: they read BT3's
   structs, drive its pnach groups, or walk its save-state conventions. They
   import game knowledge from `tools/game/` and the generic library from a
   [PCSXROO](https://github.com/Saupernova13/pcsxroo) checkout - a sibling
@@ -19,7 +19,7 @@ emulator at all. The tools here take the game identity from `game.config`
 automatically; PCSXROO's take it from `pcsxroo/local.json` in that checkout
 (copy its `local.json.example`, which is this game).
 
-## In this repo (35)
+## In this repo (36)
 
 | Tool | Transport | What it does |
 |---|---|---|
@@ -57,6 +57,7 @@ automatically; PCSXROO's take it from `pcsxroo/local.json` in that checkout
 | `sweep.py` | PCSXROO | Change one site at a time and score it against the oracles that matter. |
 | `traj.py` | PCSXROO | Record a fighter's trajectory frame by frame, and compare two of them. |
 | `transplant.py` | PCSXROO | Carry a save state into PCSXROO from a PCSX2 build whose format it refuses. |
+| `version.py` | offline | Decide whether a merge changed what ships, and scaffold its version note. |
 | `writers.py` | PCSXROO | Enumerate every instruction that writes to an address range. |
 
 ## In pcsxroo (13)
@@ -76,3 +77,12 @@ automatically; PCSXROO's take it from `pcsxroo/local.json` in that checkout
 | `tickcount.py` | offline | Find every integer `field = field + 1` in the binary - the frame counters. |
 | `tickstep.py` | offline | Find every `field += 1.0` in the binary, including the hoisted ones. |
 | `xref.py` | offline | Find who calls a function, and where its address is stored. |
+
+## Caveats
+
+- Save states from PCSX2 2.1.178+ use zstd. `ps2ee.savestate` reads them
+  directly; Ghidra's own save state importer cannot, so use ours.
+- The ELF loads at `0x00100000` with no overlays and no self-modifying code,
+  verified against live RAM. Ghidra addresses are pnach addresses, unchanged.
+- Capstone has no R5900 mode, so `ps2ee.disasm` will not decode MMI or VU0
+  macro-mode instructions. Use `decomp.py` inside VU-heavy code.

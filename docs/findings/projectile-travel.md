@@ -371,3 +371,153 @@ vector, and doubling the tick rate doubles the distance covered per second. The
 fix is always to halve the advance at the one `Vec3Add` the update converges on,
 never to touch the stored delta - that field is read by other things and, on the
 rock class, recomputed from a step scalar.
+
+## 2026-09-16 - issue #5, Hercule's ki blast: a second projectile system
+
+`[60FPS - projectile travel]` has been confirmed in play since v16 and halves
+the effect-node stepper at `00176A2C`, which is `pos += vel * step` for every
+moving effect node. So a report that a character's ki blasts are still fast
+should have been impossible. It is not, because Hercule does not throw one.
+
+### Finding Hercule at all
+
+#5 and #8 sat blocked for a session on "Hercule has not been located in
+character select", after five of fifteen roster rows were walked one screenshot
+at a time. The grid is 7 wide and in the same order as SuperCombo's character
+list, so Hercule is index 24, row 3, column 3 - **three `Down` presses from
+Vegeta (Scouter)**, who is already in save state 3 and shares his column. The
+rule is in [`rig.md`](../rig.md).
+
+The scene is `work/state-backups/rocky-hercule-vs-standing-gohan.p2s`, also save
+slot 5: Hercule against a standing Ultimate Gohan on Rocky Area - Evening.
+
+### The stepper never runs
+
+A breakpoint on `00176A2C` fires zero times while the throw is in the air, from
+the press through the landing. Not "rarely" - never. So this is a different
+system, and the existing group could not have covered it.
+
+`FUN_00121EC0` is Vec3Add, which every mover in this game eventually calls.
+Breaking there and tallying `ra` against an idle baseline is a two-minute answer
+where a RAM scan is an afternoon:
+
+| `ra` | hits | |
+|---|---|---|
+| `00160FA8`, `00160FD0`, `00161018`, `00162EF0`, `0024A640` | 32, 32, 32, 32, 24 | idle too - auras |
+| `001373AC` | 7 | only with the blast - a bounded loop, not a mover |
+| **`00178D98`** | 1 | **only with the blast** |
+
+One hit is not weakness. That site fires once per tick per object, while the
+aura callers fire many times a tick, so a 160-stop sample is dominated by them.
+
+### Two classes, and neither is only a flight
+
+A tapped `Triangle` and a held one throw different objects. Breaking on each
+mover while pressing each tells them apart in one run:
+
+| input | update | mover |
+|---|---|---|
+| tap `Triangle` | `FUN_00178A28` | `FUN_00178D18` |
+| hold `Triangle` (charged ki blast) | `FUN_00177968` | `FUN_00177CF8` |
+
+Both movers start the same way - `pos(+0x60) += vel(+0x80)`, then
+`vel.y += gravity(+0xF0)` - and neither stops there. Read field by field at
+30fps, per tick:
+
+| field | tapped | charged |
+|---|---|---|
+| flight | 17 ticks, then lands | flies, bounces three times, rests |
+| spin angle `+0xE8` | `age(+0xF4) * spin(+0xEC)`, -34.48 degrees a tick | same, 35.6 halving at each bounce |
+| debris | 5 fragments at `+0x130`, ballistic, for 15 ticks (`+0x1D4`) | - |
+| fuse `+0xF6` | - | 300 ticks |
+| rest before exploding `+0xD4` | - | 24 ticks |
+| after-life `+0xFA` | - | 15 ticks |
+
+All of it runs twice as fast at 60fps. The first version of this fix halved the
+flight of the tapped class only.
+
+### Why the halved flight landed 7 units short
+
+It flew for exactly the right time and landed at (-108.3, -2.8, 210.4) instead
+of (-112.3, -3.0, 216.7). The first write-up blamed a launch offset. Traced per
+vsync, that is wrong: both arms spawn on the same vsync at the same point, and x
+and z match the 30fps arc to 0.01 at every matched moment. Only y differs.
+
+The game adds velocity to position **before** it adds gravity to velocity. At
+30fps gravity therefore reaches the position one whole tick late. Halving both
+terms and running two half ticks lets it reach the position after half a tick,
+so the arc sags by `g/4` more every tick:
+
+```
+30fps, n ticks:          y0 + n*v0 + g*n*(n-1)/2
+two half ticks, n times: y0 + n*v0 + g*n*(2n-1)/4     lower by n*g/4
+```
+
+With g = 0.5 over 17 ticks that is 2.1 units, measured 2.17. A lower arc meets
+the ground sooner, which is where the 7 units along the path went.
+
+Subtracting `g/8` from each half step cancels it exactly - even ticks match the
+30fps positions and odd ticks fall on the same parabola between them. That
+landed the tapped blast within 0.13 units.
+
+### Why half steps are still wrong
+
+Collision is tested at the positions the object visits, and half steps visit
+positions the 30fps game never does. The exact half-step integrator, with every
+timer above counted on even ticks, on the charged blast:
+
+| arm | first bounce | second bounce | rests at | explodes |
+|---|---|---|---|---|
+| 30fps | v59 (-286.3, -5.0, 322.0) | v81 (-349.4, -27.4, 382.7) | (-384.7, -25.5, 412.1) | v211 |
+| half steps | v59 (-285.7, -5.1, 321.7) | **v76 (-334.1, -25.6, 366.6)** | **(-356.4, -4.4, 318.5)** | **v242** |
+
+The second bounce met a rock lip that the 30fps arc steps over, bounced back
+toward Hercule, and the bomb came to rest 70 units away, 31 vsyncs late.
+Unpatched 60fps does not have this problem - it bounces where 30fps does, only
+twice as fast - because it samples the same positions.
+
+### The fix: think at 30Hz, draw at 60
+
+Both updates begin by calling the game's own freeze check, `FUN_0012CED0`, and
+skip the tick when it says so. `[60FPS - particle update rate]` already reuses
+that check. `[60FPS - thrown object rate]` wraps it so the answer is also "skip"
+on odd ticks: one 11-word helper at `000F1600` and a `jal` at each of
+`0017797C` and `00178A3C`. The object keeps drawing every frame.
+
+Verified as shipped from the pnach, save state 5:
+
+| | spawn | lands / rests | explodes | gone |
+|---|---|---|---|---|
+| tapped, 30fps | v18 | v53 (-112.28, -2.95, 216.68) | - | v85 |
+| tapped, 60fps | v19 | v37 (-112.09, -2.95, 216.52) | - | v53 |
+| tapped, this group | v19 | **v54** (-112.12, -2.95, 216.57) | - | **v86** |
+| charged, 30fps | v50 | v163 (-384.68, -25.53, 412.13) | v211 | v239 |
+| charged, 60fps | v50 | v107 (-384.2, -25.6, 412.1) | v131 | v145 |
+| charged, this group | v51 | **v164** (-384.22, -25.55, 412.09) | **v212** | **v240** |
+
+Every beat is one vsync after 30fps because the throw leaves the hand one vsync
+later. The positions differ from 30fps by the throw's aim, which unpatched 60fps
+shares. Debris directions are random, so only their lifetime compares: 30
+vsyncs in both.
+
+### What this section used to claim
+
+That 9 constructors write gravity at `+0xF0` for this mover, so halving it in
+the mover was the global fix. `+0xF0` is a common offset: the scan matched
+unrelated structures, and `00177770` belongs to the charged class, whose mover
+the old fix never touched. The rule it was illustrating still holds - patch
+where a per-object value is used unless its setter is unique - but here the real
+miss was a second mover, found only by pressing a second button.
+
+### Not established
+
+- **Damage.** From this save both throws pass over a standing Gohan, so a hit
+  was never compared. Identical positions and timings mean the hit test sees
+  the same inputs, but that is inference.
+- **Other characters' thrown objects.** Only Hercule's two classes were traced.
+  Any object with its own update and a mover like these needs the same check.
+- **How 30Hz motion looks.** The object now moves every other frame while the
+  camera moves every frame. That is how the original game looks, but next to a
+  60fps camera it may read as judder. Worth a look in play.
+- **#8, the speed lines on Present Bomb**, is a separate effect and is not
+  addressed here.

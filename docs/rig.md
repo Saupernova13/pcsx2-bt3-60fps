@@ -130,6 +130,38 @@ order: Goku (Early), Goku (Mid), Goku (End), Goku (GT), Master Roshi, Captain
 Ginyu, Frieza, Cell, Majin Buu, Bardock, Cooler, Pikkon, Demon King Piccolo,
 Kid Goku, Password Character. Map Select has the same shape, six rows.
 
+### Do not browse the roster - compute the cell
+
+The grid is **7 wide**, and it is in the same order as the character list on
+[SuperCombo's BT3 page](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3),
+which the API returns as an ordered list:
+
+    curl -s "https://wiki.supercombo.gg/api.php?action=parse      &page=Dragon%20Ball%20Z:%20Budokai%20Tenkaichi%203&prop=wikitext&format=json"
+
+Take the `link=Dragon_Ball_Z:_Budokai_Tenkaichi_3/NAME` targets under
+`=== Characters ===` in order. Index `n` is at **row `n // 7`, column `n % 7`**,
+counting from Goku Early at `r0c0`:
+
+| n | character | cell |
+|---|---|---|
+| 3 | Vegeta (Scouter) | r0c3 |
+| 16 | Ultimate Gohan | r2c2 |
+| **24** | **Hercule** | **r3c3** |
+| 28 | Master Roshi | r4c0 |
+| 56 | Majin Buu | r8c0 |
+
+Verified by landing on Hercule in three `Down` presses from Vegeta (Scouter),
+who is in the same column. A session before this one walked five rows one
+screenshot at a time and never reached him; the whole hunt is one subtraction.
+
+One screenshot at the destination is still worth taking - the mapping is a
+hypothesis about a PAL-sourced wiki page and an NTSC disc, and it costs nothing
+to confirm.
+
+A character with no transformations skips the form list: confirming Hercule goes
+straight to `Custom Select`, so it is **two** `Cross` presses to defaults, not
+three.
+
 ## Cutting a state worth keeping
 
 The battle manager pointer (`game.battle.MANAGER`, `0x002FEB14`) is null outside
