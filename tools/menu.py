@@ -28,9 +28,11 @@ from __future__ import annotations
 import argparse
 import time
 
-from PIL import Image
-
+# Before PIL: until this has run, tools/ is at the front of sys.path and
+# shadows the stdlib. See tools/_bootstrap.py.
 import _bootstrap  # noqa: F401
+
+from PIL import Image
 
 from game import config
 from ps2ee.roo import Roo
