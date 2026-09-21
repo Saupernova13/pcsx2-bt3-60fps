@@ -1284,3 +1284,47 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Scripted blast events, found 2026-09-17 for issue #29. Babidi's Demon Eye
+// paralyses a standing opponent 60 units away at 30fps and missed entirely on
+// v23.
+//
+// A blast's beam or projectile object asks a controller object whether an
+// event has fired - 0x400 ends the beam - through FUN_0014A8C0(id, mask). The
+// controller (FUN_00158980, one call per tick) gets its events from
+// FUN_00158F58 in one of two modes, chosen by controller+0x18:
+//
+//   mode 0   events are pulses from the owning fighter's animation, already
+//            paced correctly. Frieza's rocks and Buu's charged blast.
+//   mode 1   events fire when the controller's age, +0x14 and +1 a tick,
+//            EQUALS a scripted tick number. Demon Eye.
+//
+// So in mode 1 every event came at half its real time. [60FPS - beam object
+// travel] made that visible: it halves the beam's speed, the end event still
+// came after 16 ticks, and the beam died 30 units out.
+//
+// The hook replaces the age load in the mode-1 branch. On an even age it
+// compares age / 2, so each event fires once at its real time; on an odd age it
+// compares 0x40000000, which no event can hold (unset ones may be -1). Mode 0
+// never reaches this branch.
+//
+// Gating the whole object family, or only the controller, was tried first and
+// is WRONG: mode-0 pulses land on odd ticks and a gated controller never sees
+// them, so Frieza's rocks and Buu's charged blast stopped hitting at range.
+//
+// Opponent's first reaction, from the pnach:
+//
+//                                  30fps   v23     v23 + this
+//   Demon Eye, 60 units            v56     miss    v56
+//   Frieza's rocks, 125/474/628    v109/129/137   v105/125/133   v105/125/133
+//   Buu's charged blast, 86/657    v51/81  v46/77  v46/77
+[60FPS - blast script clock]
+description=Fire a blast's scripted events at their real time, so Demon Eye and every blast on the same script reach as far as at 30fps instead of ending halfway.
+patch=1,EE,000F1740,word,8C850014 // lw $a1, 0x14($a0)        the controller's age in ticks
+patch=1,EE,000F1744,word,30A80001 // andi $t0, $a1, 1
+patch=1,EE,000F1748,word,11000002 // beq $t0, $zero, +3      even age: keep age / 2
+patch=1,EE,000F174C,word,00052843 // sra $a1, $a1, 1          (delay) age / 2
+patch=1,EE,000F1750,word,3C054000 // lui $a1, 0x4000          odd age: an age no event has
+patch=1,EE,000F1754,word,03E00008 // jr $ra
+patch=1,EE,000F1758,word,00000000 // nop
+patch=1,EE,00159010,word,0C03C5D0 // lw $a1, 0x14($a0) -> jal 000F1740

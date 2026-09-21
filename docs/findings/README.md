@@ -13,7 +13,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Airborne motion, gravity and the hovering idle](airborne-and-hover.md) | Flight, gravity, the airborne idle animation and the hover bob. | 9 |
 | [Effects, the ki aura and particles](effects-aura-particles.md) | The effect-node system, the aura, effect rotation and the particle system. | 8 |
 | [Tweens, fades and staged sequences](tweens-fades-and-staging.md) | The tween service, the scripted-sequence clocks and the screen fade service. | 4 |
-| [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock. | 13 |
+| [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock. | 14 |
 | [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, and the state 157 trap. | 2 |
 | [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams. | 6 |
 | [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 1 |
