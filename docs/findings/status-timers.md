@@ -92,6 +92,24 @@ remembers what a combo has already used. Each needs a move that arms it and a
 - **Demon Eye misses entirely on v23**, because `[60FPS - beam object travel]`
   halves the beam's speed and not its life. That is #29.
 
+### Re-measured 2026-09-21, with every group the play-test could have had
+
+The 2026-09-17 play-test reported Demon Eye at ~150 frames against ~120 at
+30fps. Save state 6 again, Demon Eye (`L2` + `Circle`), reading Gohan's
+`fighter+0x0FE0` every vsync:
+
+| arm | paralysed | lasts |
+|---|---|---|
+| 30fps | from v42, armed 120 | **240 vsyncs** |
+| `60FPS - battle` + this group | from v19, armed 120 | **240 vsyncs** |
+| v24 | never - Demon Eye misses (#29) | - |
+| v24 + this group | never - Demon Eye misses (#29) | - |
+| v24 + this group + #16, #17, #31 and #35 | from v43, armed 120 | **240 vsyncs** |
+
+Nothing in the candidate set moves the countdown. The group is exact in every
+arm where the beam lands, and on v24 alone the beam does not land at all, so a
+play-test of this group needs #31 in the set, or a closer cast.
+
 ## 2026-09-17 - issue #32, Solar Flare's lock-off: half its time
 
 SuperCombo lists Solar Flare as "causes opponent to lock off, staggers
