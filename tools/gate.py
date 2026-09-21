@@ -16,15 +16,18 @@ their return value consumed - tools/bisect.call_sites already filters those.
 import argparse
 import importlib.util
 import json
-import sys
+from pathlib import Path
 
-sys.path.insert(0, "tools")
 import _bootstrap  # noqa: F401
 
 from game import config
 from ps2ee.pine import Pine, PineNotRunning
 
-spec = importlib.util.spec_from_file_location("bm", "tools/bisect.py")
+# bisect.py is loaded by path, not imported, because its name is the stdlib's -
+# see tools/_bootstrap.py. The path is taken from this file so it does not
+# depend on which directory the tool is run from.
+_BISECT = Path(__file__).resolve().parent / "bisect.py"
+spec = importlib.util.spec_from_file_location("bm", _BISECT)
 bm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bm)
 

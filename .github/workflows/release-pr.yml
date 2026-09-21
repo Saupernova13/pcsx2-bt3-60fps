@@ -1,0 +1,67 @@
+# A release PR's note must be finished before it merges.
+#
+# Merging a release PR is what publishes, and version.yml refuses to tag a note
+# that still says DRAFT. That refusal is correct, and it leaves the worst state
+# this pipeline has: the note is on main, there is no tag and no Release, and
+# patch/ already matches the tree - so no later merge sees a version owed and
+# every run after it is a quiet "nothing". The way out is to finish the note and
+# run Version by hand.
+#
+# This is the check that stops it happening, on the PR where the note can still
+# be rewritten. It runs the same `tools/version.py verify` that version.yml runs
+# at publish time, so there is one definition of a finished note.
+#
+# Make it a required check on main for it to block the merge. Without that it is
+# a red X the owner has to read - which is also what CLAUDE.md already asks for:
+# do not merge a release PR whose note is still a DRAFT.
+name: Release PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  note:
+    name: The version note is written
+    if: startsWith(github.head_ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # version.py imports export, which imports ps2ee, so the tools' own
+      # dependencies are needed even for a check that only reads a note.
+      - name: Check out PCSXROO
+        uses: actions/checkout@v5
+        with:
+          repository: Saupernova13/pcsxroo
+          path: _pcsxroo
+          ref: master
+
+      - name: Point the tools at PCSXROO
+        run: echo "PCSXROO_REPO=${GITHUB_WORKSPACE}/_pcsxroo" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the tools' dependencies
+        run: pip install --quiet keystone-engine capstone numpy zstandard
+
+      - name: The note is no longer a scaffold
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          tag="${HEAD_REF#release/}"
+          if ! python tools/version.py verify --tag "$tag"; then
+            echo "::error file=docs/versions/${tag}.md::Rewrite this note for a player before merging. Merging this PR is what publishes the release, and version.yml will refuse to tag it as it stands."
+            exit 1
+          fi
+          echo "docs/versions/${tag}.md is ready to publish"
