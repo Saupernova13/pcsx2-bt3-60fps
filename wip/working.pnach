@@ -1284,3 +1284,36 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Paralysis, found 2026-09-17 for issue #28. SuperCombo lists Babidi's Demon Eye
+// as "paralyzes opponent for 4 seconds or less", and the 30fps game gives 4.00s
+// exactly. At 60fps it gave 2.00s.
+//
+// fighter+0x0FE0 is the victim's paralysis in ticks, armed from move data at
+// 001CBC18 and in FUN_00204200 - several arming paths, one decrement:
+//
+//   001E1ED4  lw    $v0, 0xFE0($s1)
+//   001E1EE0  addiu $v0, $v0, -1         once a tick while positive
+//   001E1EE8  sw    $v0, 0xFE0($s1)
+//   001E1F10  addiu $v0, $v0, -3         and 3 more per mashed button
+//
+// The hook replaces the load with a call that adds the tick's parity, so the
+// -1 after it does nothing on odd ticks. The mash subtraction is untouched, so
+// each press still shortens the paralysis by the same real time.
+//
+// Save state 6, Babidi 60 units from a standing Ultimate Gohan, L2 + Circle.
+// Gohan's state 211, paralysed, from the pnach:
+//
+//   30fps                                        240 vsyncs  4.00s
+//   60fps, every shipped group but beam travel   120 vsyncs  2.00s
+//   60fps, the same plus this group              239 vsyncs  3.98s
+//   60fps, 60FPS - battle plus this group        240 vsyncs  4.00s
+[60FPS - paralysis]
+description=Count paralysis down in real time, so a 4-second paralysis lasts 4 seconds at 60fps instead of 2.
+patch=1,EE,000F1700,word,8E220FE0 // lw $v0, 0xFE0($s1)       paralysis ticks left
+patch=1,EE,000F1704,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1708,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F170C,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1710,word,03E00008 // jr $ra
+patch=1,EE,000F1714,word,00481021 // addu $v0, $v0, $t0       odd tick: +1, so the -1 after it does nothing
+patch=1,EE,001E1ED4,word,0C03C5C0 // lw $v0, 0xFE0($s1) -> jal 000F1700

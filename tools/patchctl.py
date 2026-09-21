@@ -188,6 +188,12 @@ THROWN = ["60FPS - thrown object rate"]
 # and steps the flash on even ticks.
 SOLARFLARE = ["60FPS - solar flare"]
 
+# Paralysis, found 2026-09-17. The victim's paralysis is fighter+0xFE0 in
+# ticks, decremented at one site in the fighter update however it was armed.
+# Demon Eye's published 4 seconds read 4.00s at 30fps and 2.00s at 60fps; this
+# decrements on even ticks only and leaves the per-press mash subtraction alone.
+PARALYSIS = ["60FPS - paralysis"]
+
 # The Rush Struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
@@ -216,7 +222,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + PARALYSIS
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + PARALYSIS),
+    # "full" without paralysis, so that group has a named A/B baseline.
+    "noparalysis": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
