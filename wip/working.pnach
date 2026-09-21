@@ -1311,6 +1311,11 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // it back to 2. Widening the 001E4804 test to accept 1 OR 2 was built and
 // measured as well and is NOT here - it makes the window 3 vsyncs, wider than
 // the real game.
+//
+// Needs [60FPS - meter economy]. The step is scaled by Momentum (fighter+0xD80,
+// which rush hits fill), and Momentum drains 400 a tick inside the economy that
+// group gates. Without it a charge started after a rush fills late: 22 vsyncs
+// against 20 from half Momentum.
 [60FPS - smash charge]
 description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
 patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick

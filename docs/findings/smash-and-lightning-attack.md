@@ -234,3 +234,37 @@ them to be found, not the only one.
 The wiki is behind an Anubis proof-of-work wall, so `WebFetch` and `curl` both
 get "Making sure you're not a bot". **`/api.php` at the root is not walled**,
 and returns the wikitext directly; `/w/api.php` is.
+
+## 2026-09-21 - the smash charge depends on Momentum, and Momentum drains in the meter economy
+
+The 2026-09-17 play-test of `[60FPS - smash charge]` found the charge now slightly
+*slow* at 60fps - the white flash later than at 30fps - where the save-state
+measurement had matched sample for sample. The save state was the difference.
+
+`FUN_001E33E0` does not add a constant. It adds `0.0444444 * FUN_001E3368()`,
+and that factor blends two per-character rates (`FUN_0020F1D8`, `FUN_0020F230`,
+from the fighter's parameter block at `+0x91C`, `+0x74`/`+0x78`) by
+`fighter+0xD80 / 100000`, floored at 0.1. SuperCombo names `fighter+0xD80`:
+**Momentum**, "filled up by attacking your opponent using Rush Attacks, and
+automatically drained over time ... the faster all charged melee attacks will
+charge". The drain is the `fighter+0xD80 -= 400` in `FUN_001E16C0`, the per-tick
+meter economy that `[60FPS - meter economy]` (#16) gates.
+
+The measurement that passed was taken with Momentum at 0, where the drain has
+nothing to act on. From a set starting Momentum (save state 3, Krillin against a
+standing Ultimate Gohan, neutral Square held, the value written before the hold):
+
+| starting Momentum | 30fps | full + smash charge | full + smash charge + meter economy |
+|---|---|---|---|
+| 0 | 44 vsyncs | 45 | 45 |
+| 50000 | **20** | 22 (Momentum at the end 35600) | **20** (43200, the 30fps value) |
+| 100000 | **12** | 12 (89600) | **12** (94800, the 30fps value) |
+
+Momentum is **gained per hit**, not per tick - a three-hit rush adds 8000, 7600
+and 8000 in every arm - so only the drain is wrong, and #16 fixes it. The peak
+after that rush is 15600 at 30fps, 8800 on v24, and 16000 with #16.
+
+So the smash charge is correct only together with the meter economy. Shipping
+it alone leaves a charge started after a rush a little late, which is what the
+play-test felt. It also means #16 fixes more than ki: every Momentum-dependent
+charge and startup the wiki describes drains at half its real time without it.

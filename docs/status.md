@@ -372,7 +372,7 @@ lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
 all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
 untouched by this.
 
-## v24 (proposed) - the smash charge
+## Proposed - the smash charge (#17)
 
 Adds `[60FPS - smash charge]`, one data word. Closes issue #6: a smash attack
 charges in half the real time at 60fps, and the Perfect Smash - releasing on the
@@ -394,6 +394,20 @@ measured by releasing on each vsync in turn with a breakpoint on the grant at
 `001E4810`.
 
 **Not confirmed in play.** Only the neutral Smash was tested, on one character.
+
+**Ship it with `[60FPS - meter economy]` (#16), never without.** The charge rate
+blends between two per-character rates by Momentum, `fighter+0xD80`, and
+Momentum drains 400 a tick inside the economy #16 gates. Without #16, Momentum
+drains twice as fast during a charge, so a charge started after a rush fills
+late - the late white flash the 2026-09-17 play-test reported. Measured
+2026-09-21, Krillin, from a set starting Momentum:
+
+| starting Momentum | 30fps | v24 + this group | v24 + this group + #16 |
+|---|---|---|---|
+| 0 | 44 vsyncs | 45 | 45 |
+| 50000 | **20** | 22 | **20** |
+| 100000 | **12** | 12 | **12** |
+
 
 ## v20 - the shipped header caught up
 
