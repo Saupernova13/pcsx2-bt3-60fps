@@ -212,11 +212,17 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# The clouds, found 2026-09-21 for issue #52. A global sky object's texture
+# scroll is advanced once a tick by FUN_001350E0, outside the stage's keyframe
+# graph, so stage animation never reached it. The rate is halved at both loads.
+SKY = ["60FPS - sky scroll"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SKY
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +280,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + SKY),
+    # "full" without the sky scroll, so that group has a named A/B baseline.
+    "nosky": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
