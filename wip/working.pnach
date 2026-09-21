@@ -1284,3 +1284,29 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The cinematic camera, found 2026-09-21 for issue #21 - the "second animation
+// clock" that ran transformation cinematics ahead of their poses. The poses were
+// never wrong: the model's animation timer (+0xC78) reads the same in both arms
+// at every vsync. The camera was. During a cinematic the render camera
+// (FUN_0023D510, the controller at gp-0x56A4) plays a camera clip instead of
+// following a fighter, and steps the clip's time by a bare 2.0 a tick:
+//
+//   0023D69C  jal   FUN_0023DB68        the clip's current time
+//   0023D6A4  lui   $at, 0x4000         2.0
+//   0023D6B0  add.s $f20, $f0, $f1      time + 2.0, clamped to the clip length
+//   0023D6E8  jal   FUN_0023DB88        store it
+//
+// Two units a tick is the 60-units-a-second authoring every BT3 clip uses, so at
+// 60fps the camera ran through its shots in half the real time: on the close-up
+// at vsync 28 where the 30fps game is still on the chest, and cut away by 98
+// before the energy ball goes up. 1.0 a tick puts it back.
+//
+// Vegeta (Scouter)'s Great Ape transformation, R3 from the Rocky Area state,
+// pixel drift against the 30fps picture: 24.72 with every shipped group, 14.29
+// with this; at vsync 300 34.1 -> 0.8. The loader wait before the Great Ape
+// appears still ends ~19 vsyncs early - the disc is polled per tick - which is
+// the residual at the tail.
+[60FPS - cinematic camera]
+description=Play cinematic camera clips at their real speed, so transformation cameras stay with the action instead of cutting ahead.
+patch=1,EE,0023D6A4,word,3C013F80 // lui $at, 0x4000 -> 0x3F80   camera clip step 2.0 -> 1.0

@@ -474,3 +474,74 @@ completion timer (`FUN_001C47A8` reads a remaining/step pair at `+0x144`/`+0x148
 off the model) and is correct; another drives the skeleton pose and the cinematic
 camera, and is not. Finding it would close #7 and #10 together, since Cell's
 transformation shows the same 22-35 point residual after the same groups.
+
+## 2026-09-21 - issue #21, the second clock: a camera clip stepping 2.0 a tick
+
+#21 recorded transformation cinematics whose poses and camera ran ahead of the
+30fps game and then waited: on the close-up at v28 where 30fps is still on the
+chest, cut to the wide shot by v98. Its photographs were taken with a capture
+that lands a few frames after it is asked for. Re-taken the way `drift.py` does
+it - a screenshot queued on a paused VM, flushed by one frame advance - the
+defect is real and exactly as described.
+
+### The pose was never wrong
+
+Vegeta (Scouter)'s Great Ape, `R3` from `rocky-vegeta-scouter-standing.p2s`:
+
+| at vsync | 14 | 28 | 42 |
+|---|---|---|---|
+| model 0 timer `+0xC78`, 30fps | 6 | 20 | 34 |
+| model 0 timer `+0xC78`, v24 | 6 | 20 | 34 |
+
+Same animation id (0x177), same clip pointer, no crossfade (`+0xC84`), no second
+layer (`+0xBD8`). The only clip-player tracks alive are the two mouth tracks
+`[60FPS - mouth clock]` already paces. The fighter's own camera
+(`FUN_001C69C8`, flag-5 builder `FUN_001C5C80`) sits parked at the same eye and
+target from v12 on, in both arms.
+
+### The camera
+
+What moves at 2x is the view frustum at `0031BE10`, rebuilt each frame by
+`FUN_00130BA8` from the render camera's matrix at `*(gp-0x56A4) + 0x40`. That
+matrix is written by `FUN_0023D510`, which in a cinematic takes neither the
+fighter nor the free-camera path: it plays a **camera clip** and steps the clip's
+time by a bare 2.0 a tick.
+
+```
+0023D69C  jal   FUN_0023DB68        the clip's current time
+0023D6A4  lui   $at, 0x4000         2.0
+0023D6A8  mtc1  $at, $f1
+0023D6B0  add.s $f20, $f0, $f1      time + 2.0, clamped to the clip's length
+0023D6E8  jal   FUN_0023DB88        store it
+```
+
+That is the 60-units-a-second authoring of every BT3 clip, uncompensated, the
+same shape as the stage keyframe graph's `2.0` at `001153C8`. `[60FPS - cinematic
+camera]` makes it `0x3F80`, 1.0.
+
+### Measured
+
+Photographed at exact vsyncs, the arm with this group matches the 30fps frame at
+v14, v28, v42, v56, v98 and v182: legs, chest, the hand coming up, the open palm,
+the energy ball, the ball raised. v24 without it is on the face, the palm, the
+wide back shot and an empty sky at those same vsyncs.
+
+`drift.py --slot 9 --press R3`:
+
+| arm | mean | v28 | v42 | v98 | v300 |
+|---|---|---|---|---|---|
+| 30fps (second run) | 0.00 | 0.0 | 0.0 | 0.0 | 0.0 |
+| every shipped group | 24.72 | 34.1 | 30.9 | 33.9 | 14.3 |
+| + `[60FPS - cinematic camera]` | **14.29** | **12.4** | **13.7** | 22.7 | **0.8** |
+
+Cell 1st Form's transformation moves by less (8.85 to 7.57): it is paced mostly
+elsewhere. Great Saiyaman 2's Ultimate heart (#44) does not move at all.
+
+### What is left
+
+- The Great Ape transformation waits in `FUN_001278B0` for the new model's data
+  (request with `FUN_002651C0`, poll `FUN_00265298`). That wait is 148 vsyncs at
+  30fps and 129 at 60fps, because the loader is polled per tick, and it releases
+  the battle manager's cinematic state (`+0x264` = 3 at `001D6354`) 19 vsyncs
+  early. Loading faster is a property of 60fps rather than a clock to halve.
+- The residual at v14 (29 in both arms) is before the camera clip starts.

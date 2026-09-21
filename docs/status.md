@@ -273,6 +273,22 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - the cinematic camera (#21)
+
+Adds `[60FPS - cinematic camera]`, one word. In a cinematic the render camera
+plays a camera clip whose time steps a bare 2.0 a tick (`0023D6A4`), so
+transformation cameras ran through their shots in half the real time while the
+poses kept time. Now 1.0.
+
+| Vegeta (Scouter)'s Great Ape, drift from 30fps | mean | v28 | v300 |
+|---|---|---|---|
+| every shipped group | 24.72 | 34.1 | 14.3 |
+| **+ this group** | **14.29** | **12.4** | **0.8** |
+
+Photographed at matched vsyncs it matches the 30fps frame from v28 on, including
+the camera holding on Vegeta as the energy ball goes up (#10). **Not confirmed in
+play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
