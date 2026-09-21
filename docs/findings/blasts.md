@@ -877,3 +877,18 @@ under v17.
   scripted blast shares this code, so it is covered by construction.
 - **The Beam Struggle.** v22's known gap blames beam travel for where a clash
   forms; this group does not touch mode-0 beams, but the clash was not re-run.
+
+### Re-measured 2026-09-21, with the whole candidate set
+
+The play-test note on PR #31 asked for this group to be re-checked with every
+other candidate applied, not `full` plus one. Save state 6, Babidi's Demon Eye
+on a standing Ultimate Gohan, the vsync Gohan's paralysis timer arms:
+
+| arm | Demon Eye lands |
+|---|---|
+| 30fps | v42 |
+| v24 | never (the beam dies short) |
+| v24 + this group + #16, #17, #30, #35 | **v43** |
+
+One vsync from the 30fps arm, and the paralysis that follows lasts 240 vsyncs
+in both. Nothing else in the candidate set moves it.
