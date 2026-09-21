@@ -372,6 +372,32 @@ lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
 all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
 untouched by this.
 
+## v24 (proposed) - the meter economy
+
+Adds `[60FPS - meter economy]`, one gate and ten lines. Closes issue #4: ki
+fills and empties twice as fast at 60fps, and so does every milestone the game
+reaches "after a second".
+
+`FUN_001E16C0` is one tick of one fighter's whole economy - ki income by two
+paths, three more gauges, a `+0xD80 -= 400` drain, and a 0..29 counter at
+`+0x132C` whose wrap fires the once-a-second blocks. **That counter is the
+game's second**, so at 60fps a per-second bonus arrives every half second on top
+of every rate being doubled. It has exactly one caller, `001E2584`, so one gate
+covers the system.
+
+| after 46 vsyncs, Cell on Rocky Area | `+099C` | `+09F0` | ki | second |
+|---|---|---|---|---|
+| unpatched 30fps | 94498 | 95520 | 259962 | 14 |
+| v23, no gate | capped | capped | 340761 | 7 |
+| **v23 + this group** | **94498** | **95520** | **259962** | **14** |
+
+Value for value, for both fighters, at every sample over 60 vsyncs. Spending ki
+on a move is untouched - that runs on the move's own path, not per tick.
+
+**Not confirmed in play.** Max Power mode, which the report names as where the
+drain is most obvious, was never entered; the drain routine is inside the gated
+function, but the mode itself was not watched.
+
 ## v20 - the shipped header caught up
 
 **No patch change.** The patch at the `v20-known-issues-refresh` tag has the
