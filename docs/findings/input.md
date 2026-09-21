@@ -225,3 +225,60 @@ input block, whose update function ends in the history recorder.
   countdown in a whole minute for exactly that reason.
 - Save raw captures. Re-analysing offline beats asking the player to replay the
   session for every new hypothesis.
+
+## 2026-09-21 - issue #18, the defensive windows: six countdowns in FUN_001DFFE0
+
+#18 predicted that every one-tick input window SuperCombo describes - Defensive
+Vanish, Z-Counter, the vanish window that shrinks with health - is half as long
+in real time at 60fps. It is, and they share one function.
+
+### A scene where the opponent attacks on demand
+
+Training's COM can stand or fight on its own schedule, neither of which a
+window sweep can use. **Duel → 1P vs 2P** can: PCSXROO drives pad 2 as well as
+pad 1 (`input.set` takes `pad: 1`), and a versus match has no health regen.
+`work/state-backups/rocky-vs2p-cell2-near-gohan.p2s` is Cell 2nd Form 12 units
+from Ultimate Gohan. Pad 2 holds Square for 20 vsyncs, a level-1 smash (state
+75), which lands on P1 at v32 (state 196). Pad 1 taps a button for 2 vsyncs, one
+vsync later each run.
+
+### Measured
+
+| defence | 30fps | v24 | v24 + `[60FPS - defence windows]` |
+|---|---|---|---|
+| Circle (vanish, state 32) | hit-10 … hit-3: **8 vsyncs** | hit-5 … hit-2: 4 | hit-9 … hit-2: **8** |
+| Up + Square (Z-Counter, states 43/45/57/139) | hit-4, hit-3: **2 vsyncs** | hit-2: 1 | hit-3, hit-2: **2** |
+
+The v24 and fixed arms carry `smash charge` and `meter economy` so the attacker
+throws the same level-1 smash; on v24 alone the same hold charges a stronger one
+(#17). The window sits one vsync later relative to the hit because a 60fps press
+registers on the next tick rather than up to one vsync after it.
+
+### The mechanism
+
+The vanish is queued in `FUN_001E12D0` by flag `0x76`, which the hit resolver
+`FUN_001C8580` raises when `defender+0x1068 > 0` at `001C863C`. `FUN_001DFFE0`,
+once a tick per fighter, owns that counter and five siblings:
+
+| counter | armed by | to | rest |
+|---|---|---|---|
+| `+0x1068` | button 0x27 (vanish) | 2, 3 or 4 by health (`FUN_001CEE90`) | -30 |
+| `+0x106C` | button 0x27 | 2, or 4 with flag 0x138 | -30 |
+| `+0x1070` | button 0x26 | 1 | -30 |
+| `+0x1074` | button 0x2B, with state bit 0x20 | 5 | -15 |
+| `+0x1078` | button 0x27 | 5 | -30 |
+| `+0x107C` | button 0x27 | 2, or 4 with flag 0x138 | -30 |
+
+Each counts `addiu v0,v0,-1; slti v1,v0,rest` every tick. A press arms a window
+only while the counter is below its rest value; a press while it is not (inside
+the window or its cooldown) sets it to -1, the game's anti-mash rule.
+
+### The fix, and the trap in it
+
+The first version made every decrement net to zero on odd ticks and produced an
+alternating window: vanish on hit-9, -7, -5, fail on hit-8, -6. At rest the
+counter sits at -30 and relies on dropping to -31 each tick to re-arm; held at
+-30 on odd ticks, a press there took the "pressed during cooldown" branch and
+killed the window. The helper therefore counts every tick when the value is at
+or below rest (`slti at, v0, rest+1; movn t0, zero, at`), and on even ticks
+only inside the window and its cooldown.

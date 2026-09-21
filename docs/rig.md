@@ -154,6 +154,7 @@ group off:
 | `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+| `rocky-vs2p-cell2-near-gohan.p2s` | **1P vs 2P** versus: Cell 2nd Form 12 units from Ultimate Gohan, no regen, no CPU | anything needing an opponent that attacks on demand (drive pad 2 with `input.set ... pad=1`), health and ki measurements |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
