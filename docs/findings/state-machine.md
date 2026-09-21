@@ -315,3 +315,96 @@ is one of several and not the one that matters.
   what the triage table already got wrong once.
 - What actually paces the cinematic. The measurement above says which groups do
   *not* fix it, which is not the same as knowing what would.
+
+## 2026-09-21 - #39 reproduced: state 93, and four phase numbers gated as clocks
+
+The user saved a state in the freeze on their EmuDeck install, running v24
+exactly (its patch lines match `patch/428113C2.pnach` line for line). PCSXROO
+refuses a v2.5.274 state, so `tools/transplant.py` carried its EE memory into a
+running battle and wrote it back out as a native state.
+
+### What the fighter is doing
+
+| | |
+|---|---|
+| Fighter | P1, Super Saiyan Goku, standing on a raised pipe (y = -338) |
+| Fighter state | **93**, handler `FUN_001E5CE8`, shared by states 90-93 |
+| Pending state | `0xFFFFFFFF` |
+| Phase `fighter+0x3D8` | **0**, never moves |
+| Sub-counter `fighter+0x3DC` | 0, 1 ... 7, 0, 1 ... every tick, forever |
+| Picture | the model is drawn on some frames and missing on others |
+
+`FUN_001E5CE8` switches on `fighter+0x3D8`, values 0 to 3. Phase 0 is an 8-tick
+loop on the sub-counter: it restarts the pose at 1, sets it again at 2, and at
+8 resets the sub-counter to 0 and leaves through `001E6060`, which adds one to
+the phase. `001E6060` was one of the 21 sites `[60FPS - state phase timers]`
+gated. If the loop ends on an odd tick, the phase is not advanced and phase 0
+runs again. The loop is 8 ticks long, so it ends on an odd tick every pass after
+that. Traced on the user's state, 40 ticks: phase 0 throughout, the sub-counter
+wrapping at frames 13109, 13117, 13125 and so on, all odd.
+
+This is the state 157 trap again, not a new mechanism. It is a phase number
+gated as if it were a clock, and the loop feeding it has an even period.
+
+### The audit that missed it
+
+The 2026-09-16 audit called 21 of the 22 sites clocks, "each compared against an
+authored count". Four are not compared against anything. Each adds one and
+branches away:
+
+| site | handler | states | what it is |
+|---|---|---|---|
+| `001E6060` | `FUN_001E5CE8` | 90-93 | phase 0 -> 1, after the 8-tick loop |
+| `001F3320` | `FUN_001F3270` | 44 | phase 0 -> 1, once |
+| `001F9D48` | `FUN_001F97F8` | 301-303, 313-315 | phase 1 -> 2, once `FUN_001D6360` reports ready |
+| `001FBBD0` | `FUN_001FBA90` | 260 | phase 0 -> 1, once `FUN_001D6360` reports ready |
+
+`001F9D48` and `001FBBD0` are the same shape as `001E6060`. Each advance is
+conditional, and on an odd tick it is simply lost. Whether the condition holds
+on the next tick decides whether that is a one-tick delay or another trap.
+`FUN_001D6360` reads a flag on a global object, and `FUN_001D63D8`, called in the
+same branch, sets that object's state to 4. Nobody has checked whether the flag
+survives, and the fix does not need to know.
+
+The test that separates the two is mechanical and needs no judgement. A clock
+is compared against its bound on the instruction straight after the add
+(`slti`/`slt` on the same register). An index is not. Run over all 28 sites
+`phasetimer.py` finds:
+
+| verdict | sites | gated |
+|---|---|---|
+| clock | 21 | 17. The other 4 (`001F1C74`, `001FCE34`, `001FF9A8`, `001FFC10`) were excluded by measurement as input windows |
+| index | 7 | none now. `001E6F40`, `001F31C0` and `001FBF28` were already out; the four above leave |
+
+The test agrees with every exclusion made by measurement that was an index,
+and with every clock that was kept. It is necessary, not sufficient: a clock
+can still be an input window that must not be slowed.
+
+### The fix, and how it was checked
+
+The four gates and their trampolines are removed, and the group now writes the
+game's own instruction back at each site. A save state cut under v24 still holds
+the old hooks in RAM, and without those four lines it would keep them until the
+next boot.
+
+| arm, from the user's own state | result |
+|---|---|
+| v24 | phase 0 for as long as it was watched; model strobing in consecutive screenshots |
+| v24, `001E6060` restored by hand | phase 1 on the next pass, 2, 3, then idle (state 11) 68 ticks later |
+| the exported fix, state loaded with no hand edits | the hook is overwritten on the first vsync; idle 69 ticks later, model drawn every frame |
+
+The exported patch differs from v24 only in this group, 557 patch lines down
+to 521.
+
+### Not established
+
+- **Which move enters states 90-93.** Offensive Vanishing (`Circle` + a
+  direction mid-rush) is states 32-35, and a Step-In, a Dragon Dash, a Z-Burst
+  Dash, a jump and a landing from flight do not enter 90-93 from Rocky Area
+  either. The four variants each pick a pose set (`0x5F`, `0x62`, `0x65`,
+  `0x68`), and phase 2 moves the fighter by a distance built up in phase 0
+  (`fighter+0x3E8`). #39's first report was SSJ2 Teen Gohan mid-combo.
+- **Phase 0 still runs at double speed.** The 8-tick sub-counter is a clock of
+  its own, `fighter+0x3DC`, and nothing compensates it, so phase 0 takes 133ms
+  instead of 267ms. That is a timing error, not a freeze, and it is not this
+  fix.
