@@ -1284,3 +1284,37 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Sprite effects, found 2026-09-21 for issue #44 - Great Saiyaman 2's Ultimate
+// heart "disappears early". The heart and the small hearts around it belong to
+// one effect class (vtable 002C3EF0, update FUN_001866C0 -> FUN_00184BD8), which
+// steps every particle's age, spin, pulse counters and position once a tick with
+// no timestep: age +0xA8 += 1.0, +0xB8 += 1.0, +0x100 / +0x10C +-1.0, position +=
+// velocity. At 60fps the heart grows, peaks and fades in half its real time.
+//
+// Like the particle system and thrown objects, the update asks the game's own
+// freeze check first (001866EC jal FUN_0012D1D0) and, when frozen, skips straight
+// to the draw at 001868E0. The hook calls the check through a wrapper that also
+// answers "frozen" on odd ticks, so the effect thinks at 30Hz and still draws
+// every frame. The branch's delay slot loads the flags the draw path reads, so
+// that path is unchanged. The class also draws a tapped ki blast's sparkles.
+//
+// Great Saiyaman 2's Justice Judgement, save state 2, photographed at exact
+// vsyncs: at v365 30fps shows the heart forming, v24 shows it already full; at
+// v380 30fps and this group show the full heart ring, v24 has lost it. The heart
+// now lasts until ~v400 against v392 at 30fps. No odd-frame flicker: heart
+// pixels on six consecutive vsyncs 306k 405k 526k 636k 727k 629k.
+[60FPS - sprite effect rate]
+description=Run sprite effects such as Great Saiyaman 2's Ultimate hearts at the game's own 30Hz, so they grow and fade in their real time while still drawing at 60fps.
+patch=1,EE,000F1970,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1974,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1978,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F197C,word,00000000 // nop
+patch=1,EE,000F1980,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1984,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1988,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F198C,word,00481025 // or $v0, $v0, $t0        odd frame: frozen too
+patch=1,EE,000F1990,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1994,word,03E00008 // jr $ra
+patch=1,EE,000F1998,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,001866EC,word,0C03C65C // jal 0012D1D0 -> jal 000F1970   sprite effect update
