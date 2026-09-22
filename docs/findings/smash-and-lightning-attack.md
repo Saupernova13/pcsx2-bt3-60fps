@@ -268,3 +268,44 @@ So the smash charge is correct only together with the meter economy. Shipping
 it alone leaves a charge started after a rush a little late, which is what the
 play-test felt. It also means #16 fixes more than ki: every Momentum-dependent
 charge and startup the wiki describes drains at half its real time without it.
+
+## 2026-09-22 - the Level 3 flash pulses at twice the speed
+
+Re-measured after the 2026-09-17 play-test, with #16 and #17 both on (Cell 1st
+Form, `rocky-cell1-near-standing-gohan.p2s`, neutral Square held):
+
+| | 30fps | #16 + #17 |
+|---|---|---|
+| charge starts | v15 | v13 |
+| Level 3 (`fighter+0xD78` reaches 1.0) | v59 | v57, 44 vsyncs in both |
+| release to the hit on Gohan | 9 vsyncs | 8 |
+| after a rush and a 30-vsync gap: Momentum, charge to Level 3 | 15200, 34 vsyncs | 15600, 35 |
+| the same without #16 | - | 0, 44 (the late flash) |
+
+So the charge, Level 3 and the release are all on time with both groups. What
+still differs is the flash itself. Measured as the mean brightness of a box on
+Cell's body at every vsync, it is a pulse: 81, 75, 69, 63 at 30fps, each held two
+vsyncs, then back to 81, so a new flash every 8 vsyncs. With every group on it
+is 83, 78, 73, 66, a new flash every 4 vsyncs.
+
+The pulse is a counter and a fade, both per tick:
+
+| routine | what it does |
+|---|---|
+| `FUN_001D1558` | while flag `0x1E` is up, cycles `fighter+0x134C` through 0-3 each tick; on 0 calls `FUN_0024E5B8(model, 1)` |
+| `FUN_001D15E0` | the same for flag `0x1F`, through `fighter+0x1350`, with `FUN_0024E5B8(model, 2)` |
+| `FUN_001D14F8` | while flag `0x1D` is up, calls `FUN_0024E5B8(model, 0)` every tick: a steady yellow glow |
+| `FUN_0024E5B8` | takes a flash slot (`FUN_0024E510`), sets its colour and its intensity `+0x10` to 0.2 (`$gp-0x5C10`) |
+| `FUN_0024E6B0` | once a tick from the model update (`FUN_0024AB70`), takes 0.0333 (`$gp-0x5C0C`) off the intensity, floored at 0 |
+
+Flag `0x1E` is the one Level 3 raises; the Special Beam Cannon's charge raises
+it too (`FUN_001CF578(fighter, 0x1E)` in `FUN_001F7860`).
+
+`[60FPS - charge flash]` makes both counters cycle 0-7 (`addiu 4 -> 8`,
+`sra`/`sll` by 3), halves the fade, and sets the start to 0.1833. The retrigger
+and the decrement happen in the same tick before the draw, so 30fps shows 0.167,
+0.133, 0.1, 0.067; with the group, 60fps shows 0.167, 0.15, 0.133 ... 0.05, the
+30fps values at the matching vsyncs and halfway values between. The steady glow
+of `0x1D`, re-fired every tick, shows 0.167 in both. Both constants have exactly
+one reader, and these three routines are the only callers of `FUN_0024E5B8`.
+

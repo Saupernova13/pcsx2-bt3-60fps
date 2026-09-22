@@ -408,6 +408,17 @@ late - the late white flash the 2026-09-17 play-test reported. Measured
 | 50000 | **20** | 22 | **20** |
 | 100000 | **12** | 12 | **12** |
 
+**Adds `[60FPS - charge flash]` (2026-09-22).** The white flash that marks
+Level 3, the Perfect Smash's cue, is a pulse re-fired every 4 ticks and faded a
+fixed step per tick, so at 60fps it pulsed twice as fast even with the charge
+right. Both pulse counters now cycle 0-7, the fade is halved, and the start
+intensity drops by half a step:
+
+| Cell, Square held, Cell's body brightness | 30fps | #16 + #17 | + charge flash |
+|---|---|---|---|
+| flash repeats every | 8 vsyncs | 4 | 8 |
+| one pulse | 81 81 75 75 69 69 63 63 | 83 78 73 66 | 83 81 78 75 73 70 67 65 |
+
 
 ## v20 - the shipped header caught up
 
