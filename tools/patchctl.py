@@ -216,7 +216,9 @@ STAGE = ["60FPS - stage animation"]
 # FUN_001E33E0 adds gp-0x6D80 (0.0444444) to the charge every tick, for all
 # eleven charge states, so at 60fps a smash charges in half the real time - and
 # with it the Perfect Smash release window, which is one tick of timing.
-SMASH = ["60FPS - smash charge"]
+# The Level 3 flash that cues it pulses on a per-tick counter and fade, so
+# "charge flash" (2026-09-22) puts that pulse back on its 30fps rate.
+SMASH = ["60FPS - smash charge", "60FPS - charge flash"]
 
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
