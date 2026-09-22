@@ -212,11 +212,18 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# The beam charge hold, found 2026-09-22 for issue #72. State 272 leaves a
+# beam's charge hold on the tick after the release. At 60fps that test ran on
+# odd ticks too, so a quickly released beam left one count of charge short and
+# fired early. It now leaves only on an even tick, after at least two counts.
+BEAMCHARGE = ["60FPS - beam charge"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + BEAMCHARGE
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + BEAMCHARGE),
+    # "full" without the beam charge hold, so that group has a named baseline.
+    "nobeamcharge": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
