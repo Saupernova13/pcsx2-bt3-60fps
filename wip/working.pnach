@@ -1284,3 +1284,31 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The knockdown tumble, found 2026-09-22 for issue #42. A fighter knocked flat by
+// a throw or a finishing blow lands in state 216 (FUN_001E9EC8) and tumbles along
+// the ground. Two of its tests are authored in 30Hz units.
+//
+// FUN_001E7F38 swaps the tumble animation (0xD2/0xD3) for the slowing one
+// (0xD5/0xD6) once |fighter+0x50| <= 2.7777774, the word at $gp-0x6B80. That
+// vector is the position change since the last tick, which the airborne groups
+// halve at 60fps, so the test tripped at twice the real speed. The slowing
+// animation ends the slide, and the CPU gets up the moment it starts: its AI
+// rule 0x2A waits for a category-2 animation (FUN_001BF6F8). So a thrown opponent
+// stopped short and recovered early. The word has one reader, 001E7F88, so it is
+// halved in data.
+//
+// 001EA1B4 gets a fighter who presses nothing back up once the ticks-in-state
+// counter fighter+0x964 reaches 91: 182 vsyncs at 30fps, 91 at 60. Now 182.
+// Halving the threshold alone lets the full-length slide run into that 91-tick
+// get-up, which is why the two words are one group.
+//
+// Drain Life Cell's ending, 1P vs 2P from rocky-vs2p-cell2-near-gohan.p2s: the
+// victim slides 22.9 units and lies 182 vsyncs at 30fps, 6.2 and 91 on v24, 23.0
+// and 182 with this group. Cell 1st Form's Giant Throw on a CPU, strafed right
+// 30 vsyncs first so the tumble misses the rocks: 392 units over 96 vsyncs at
+// 30fps, 356 over 71 on v24, 411 over 103 with this group.
+[60FPS - knockdown tumble]
+description=Slow a knocked-down fighter's tumble at its real speed and keep them down for their real time, so a thrown opponent slides as far as at 30fps and the CPU does not get up early.
+patch=1,EE,002FD6F0,word,3FB1C71B // tumble slowing test 2.7777774 -> 1.3888887 per tick ($gp-0x6B80, one reader 001E7F88)
+patch=1,EE,001EA1B4,word,284200B6 // slti $v0, $v0, 91 -> 182   state 216 lie-down get-up, fighter+0x964

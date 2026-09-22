@@ -24,6 +24,7 @@ from SuperCombo's names to this repo's old terms.
 | frame-perfect smash release | Perfect Smash: release at the exact moment Level 3 is reached | issue #6, PR #17 |
 | guard broken | Guard Crush; the exhausted state after it is Fatigue | not measured |
 | sending them flying | Hard Knockback | `knockback flight` |
+| a throw or grab landing floaty, not sent far | The knockdown tumble after a throw (state 216), and the CPU getting up | `knockdown tumble` (#42); rock ledges #69 |
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |

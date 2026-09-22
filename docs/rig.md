@@ -188,6 +188,14 @@ If the off arm ticks 180, the A/B is fiction - usually a group name missing from
 the rig's `[Cheats] Enable` list, which applies nothing and reports nothing.
 `patchctl` warns about this; do not ignore the warning.
 
+**Rocky Area's rocks decide any test that slides a fighter.** A tumble that
+meets a rock face climbs it at 30fps and stops against it at 60fps (#69), so a
+throw or knockdown A/B there can measure the ledge instead of the fix. Check the
+victim's height against the 30fps arm. To aim the throw somewhere clear,
+strafe first: from `rocky-cell1-near-standing-gohan.p2s`, holding right on the
+left stick for 30 vsyncs before Heavy Finish sends Giant Throw clear of the
+rocks.
+
 Presets take `preset+extra,groups`, so a single group can be added to the
 shipped set without editing anything:
 

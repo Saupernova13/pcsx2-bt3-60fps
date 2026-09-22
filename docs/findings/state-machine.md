@@ -315,3 +315,101 @@ is one of several and not the one that matters.
   what the triage table already got wrong once.
 - What actually paces the cinematic. The measurement above says which groups do
   *not* fix it, which is not the same as knowing what would.
+
+## 2026-09-22 - the knockdown tumble (#42), and how the CPU decides to get up
+
+Issue #42: Cell (1st Form)'s grab throws the opponent "floaty instead of far".
+The throw is Giant Throw (`Up` + `Triangle` on a stunned opponent). Its flight
+phases already matched 30fps: state 221 is 44 vsyncs in both arms, and 219 is
+28 against 27. What differed was the tumble along the ground afterwards, state
+216 (`FUN_001E9EC8`). It lasted 136 vsyncs at 30fps and 41 on v24.
+
+### What ends the tumble
+
+State 216 has two ways out, and both were authored in 30Hz units.
+
+| exit | site | 30fps | v24 |
+|---|---|---|---|
+| the victim presses a direction to get up (`FUN_00204748`) | - | whenever | whenever |
+| an idle victim gets up once `fighter+0x964` reaches 91 | `001EA1B4` `slti $v0, $v0, 91` | 182 vsyncs | 91 vsyncs |
+
+`fighter+0x964` is the generic ticks-in-state counter, so the second exit came
+in half the time.
+
+The first exit is how the CPU leaves. Each tick `FUN_001E7F38` picks the state's
+animation: tumbling (`0xD2`/`0xD3`) while `|fighter+0x50| > 2.7777774`
+(`$gp-0x6B80`), slowing (`0xD5`/`0xD6`) once it is at or below. `fighter+0x50` is
+not a stored velocity. `FUN_001D82E0` writes it each tick from `FUN_001C2570` as
+the position minus last tick's position, after collision. The airborne groups
+halve that step at 60fps, so the test tripped at twice the real speed. The
+slowing animation ends the slide, and the CPU gets up on the next tick.
+
+From Drain Life Cell's ending, where the victim is a human who presses nothing
+and the ground is flat (`rocky-vs2p-cell2-near-gohan.p2s`, `L2`+`Up`+`Triangle`):
+
+| | 30fps | v24 | v24, threshold halved | v24, both fixed |
+|---|---|---|---|---|
+| animations in 216 | `D2`, then `D5` at v14 | `D5` from the start | `D2`, then `D5` at v12 | `D2`, then `D5` at v12 |
+| slide | 22.9 units | 6.2 | 23.0 | 23.0 |
+| time lying | 182 vsyncs | 91 | 91 | 182 |
+
+The threshold fix alone lets a full-length slide run into the 91-tick get-up
+(the Giant Throw below ended in state 225 at exactly 91 vsyncs), so the two are
+one group, `[60FPS - knockdown tumble]`.
+
+### How the CPU decides to get up
+
+This had not been traced before, and it is the path any CPU reaction timing
+will go through.
+
+- `FUN_001D4370` branches on `fighter+0x1278`, the human/AI flag. For the CPU it
+  reads buttons from `fighter+0x127C` instead of the pad.
+- `FUN_00208198` writes `+0x127C`. Its only caller is `FUN_001B6CD8`, which is
+  step four of the AI update `FUN_001BB620`, run once a tick from the battle
+  loop. The AI objects sit at `*(0x002FEB10) + 0x10`, `0x520` apart. The CPU's is
+  `0x01873990` in these scenes. Its buttons are at `+0x268`.
+- `FUN_001BFF70` clears and rebuilds a 64-bit situation mask at `AI+0x2C0` every
+  tick.
+- `FUN_001BA760` walks a rule list of `0x1C`-byte rules: an id, up to eight
+  condition opcodes dispatched through `0x002C4768` via `0x002EDA70`, their
+  arguments, then an action. A rule is only considered while bit *id* of the
+  mask is set. Eight random rolls at `AI+0x2FC`..`+0x334` are redrawn as the
+  rules are walked, so every tick.
+- Getting up is rule id `0x2A`. `FUN_001BF6F8` sets mask bit 42 when the
+  fighter's current animation has category 2 in a per-animation byte table at
+  `*(*(*0x002FEB10) + 0xA4) + 0x388 + fighter+0x974`, and
+  bit 44 while it is 1 to 6. `D3` reads category 1 and `D6` category 2.
+
+So in the tumble the CPU does not count anything. It waits for the animation,
+which is why the fix belongs in the animation test and not in the AI.
+
+### Measured on the throw itself
+
+Rocky Area is uneven, and a tumble that meets a rock face diverges for another
+reason, filed as #69: 30fps's 13.5-unit step climbs a ledge that v24's
+6.8-unit step slides along. Strafing Cell right for 30 vsyncs before the combo
+sends the throw clear of the rocks:
+
+| Giant Throw on a CPU | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| state 216 | 96 vsyncs, 392 units | 71, 356 | 103, 411 |
+
+### The other readers of the ticks-in-state counter
+
+`fighter+0x964` has 59 readers. These compare it to a constant or a register and
+are not yet measured, so each is a candidate for the same defect. The state is
+the nearest handler below the site, which can be wrong for a shared helper.
+Compares against zero, a state's first tick, are left out.
+
+| site | state | test |
+|---|---|---|
+| `001E720C` | 103-105 | `< 10` |
+| `001E8CFC` | 206 | `< 9` |
+| `001E9990` | 213, 214, 223 | `< 9` |
+| `001F46F8`, `001F470C` | 53 | `< 13` |
+| `001F477C` | 53 | `< 7` |
+| `001FFE6C` | 246 | `< 2` |
+| `001E6E84` | 112-173 | `< $v0` |
+| `001F6678`, `001FAFB4`, `001FBB1C`, `001FE060`, `001FE6C0`, `001FEA08`, `001FEEC0`, `001FF340`, `001FF8C4` | 262-264, 298-300, 260, 236, 238-243 | equal to a register: an event on one tick |
+
+`001FB9A4` (`< 16`, the Beam Struggle) is already handled by `beam clash`.
