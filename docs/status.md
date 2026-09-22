@@ -273,6 +273,22 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - the beam charge (#72)
+
+Adds `[60FPS - beam charge]`. A beam Blast 2 counts its charge on even ticks,
+but left the charge hold on any tick, so a quickly released beam stored one
+count less and fired early. It now leaves on an even tick, after at least two
+counts. Charge and damage (lowest HP reached):
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Special Beam Cannon, tapped | 0.067, 7860 | 0.033, 7660 | 0.067, 7860 |
+| Kamehameha, tapped | 0.067, 7020 | 0.033, 6900 | 0.067, 7020 |
+| Kamehameha, held 62 vsyncs | 0.867, 9720 | 0.833, 9600 | 0.867, 9720 |
+| full charge | 1.000, 13430 | 1.000, 13430 | 1.000, 13430 |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and

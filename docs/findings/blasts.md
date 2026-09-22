@@ -1,6 +1,6 @@
 # Blasts: hit cadence, effects, sequences and Flame Shower Breath
 
-Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock.
+Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock, the beam charge hold.
 
 ## 2026-09-05 - ki blasts are cut short: four hypotheses, all wrong
 
@@ -805,3 +805,84 @@ move is to find the node that *owns* a live blast and walk its fields, rather
 than scanning RAM blind again.
 
 **No fix. Nothing shipped from this session's blast work.**
+
+## 2026-09-22 - issue #72, a quickly released beam charges one count short
+
+Found measuring #13, Imperfect Cell's Special Beam Cannon. Every beam Blast 2
+runs state 272, `FUN_001F7860`, and holds its charge in animation `0x106`,
+`0x128` or `0x14A`, one per Blast 2 slot.
+
+### The charge hold
+
+| site | what it does |
+|---|---|
+| `001F7A00` | counts `fighter+0x3D8`; gated to even ticks by `[60FPS - state phase timers]` |
+| `001F7A44` | charge `fighter+0xE44 = 2 * count / max`, capped at 1.0 |
+| `001F7ACC`-`001F7AD4` | leaves the hold when `fighter+0x3D0` bit 1 is set, by the release (input condition `0x6F`) or by full charge |
+
+A breakpoint on the handler shows each tick runs the input phase (`a1 = 2`)
+before the per-tick phase (`a1 = 1`). At 30fps a release seen at a tick also
+counts that tick before leaving, and a tap leaves after two counts, since the
+first input phase runs under the previous animation. The exit test is not
+gated: at 60fps a release seen on an odd tick left before the next count, and a
+tap left after one.
+
+Training refills health, so damage here is the lowest HP reached.
+
+| | 30fps | v24 |
+|---|---|---|
+| Special Beam Cannon, tapped: charge, damage | 0.067, 7860 | 0.033, 7660 |
+| Kamehameha (Goku (Early), save state 0), tapped | 0.067, 7020 | 0.033, 6900 |
+| full charge | 1.000, 13430 | 1.000, 13430 |
+
+### The fix, and which variant
+
+`[60FPS - beam charge]` replaces the exit branch with a jump to a helper that
+leaves only on an even tick and only once the count is at least 2. Full charge
+lands on an even tick, so it still leaves at once.
+
+A second variant, which left only if the release had already been seen on the
+odd tick before, was tried against it over eleven holds of 40-70 vsyncs:
+
+| scene | 30fps ticks against the gate's even ticks | this group | the odd-tick variant | v24 |
+|---|---|---|---|---|
+| Goku, 6 holds | the same vsyncs | 6 of 6 exact | 3 of 6 | 3 of 6 |
+| Special Beam Cannon, 5 holds | one vsync apart | 2 of 5 | 5 of 5 | 0 of 5 |
+
+In the Special Beam Cannon's save state the 30fps arm ticks one vsync off from
+the 60fps gate, so no rule can match it on every hold. Where the two line up,
+this group is exact; the other variant only adds a vsync of latency.
+
+From the pnach:
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Special Beam Cannon, tapped | 0.067, 7860, fires v62 | 0.033, 7660, v60 | 0.067, 7860, v62 |
+| Kamehameha, tapped | 0.067, 7020 | 0.033, 6900 | 0.067, 7020 |
+| Kamehameha, held 61 vsyncs | 0.833, 9600 | 0.800, 9540 | 0.833, 9600 |
+| Kamehameha, held 62 vsyncs | 0.867, 9720 | 0.833, 9600 | 0.867, 9720 |
+| Special Beam Cannon, full | 1.000, 13430 | 1.000, 13430 | 1.000, 13430 |
+
+With every group on, the nine smoke scenes end in idle.
+
+### What else the Special Beam Cannon trace established (#13)
+
+- **The charge and firing animations run at real speed.** `0x127` and `0x129`
+  last the same vsyncs in both arms, and the firing loop `0x12A` advances one
+  animation frame a vsync at 60fps against two a tick at 30fps.
+- **The beam phase ends when the beam object dies.** Its destructor, `00155C10`
+  in class `002C38E0`, sets flag `0xA8` on Cell, and case `0x12A` leaves on that
+  flag (or after 150 ticks). The beam is ended by its collision callback,
+  `FUN_001561F8`, setting bits `0x21` 43 vsyncs into firing at 30fps and 42 on
+  v24. So the beam's life is right.
+- **The rest of the lead is per-tick pipeline latency.** From the beam's end
+  bits to Cell's next animation takes 9 vsyncs at 30fps and 4 at 60fps: about
+  four one-tick hand-offs (end bit, destroy flag, the object sweep, the
+  animation change). The beam's start is the same, two ticks from the fire cue
+  to the first hit. None of these is a counter; each is a tick of delay, so
+  60fps halves them.
+- **The `0x400` event on animation `0x129` is the fire cue**, not the beam's
+  end: it fires once, before the beam object exists.
+- With this group the tapped Special Beam Cannon fires on the 30fps vsync, hits
+  2 vsyncs early and ends 6 early; photographed, the beam's own effects run at
+  the 30fps pace, a few vsyncs ahead.
