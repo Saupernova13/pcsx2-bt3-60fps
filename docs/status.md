@@ -273,6 +273,26 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - the combat timers (#34)
+
+Adds `[60FPS - combat timers]`. The fighter update counts seven timers down
+once a tick, so each ran out in half its real time: the combo timer, the
+move-repetition memory, the windows after hitstun, a Ground Slash and a Blast 2
+cinematic, the shake of a hit shrugged off under False Courage, and the hurt
+face after drain damage. Each now counts on even ticks only.
+
+| timer, vsyncs | 30fps | shipped | shipped + this group |
+|---|---|---|---|
+| combo `+0x0D48`, Heavy Finish | 204 | 167 | 198 |
+| after hitstun `+0x0FF0` | 28 | 14 | 28 |
+| repetition byte back to 100 | 198 | 99 | 199 |
+| `+0x0DE4`, Ground Slash | 68 | 39 | 69 |
+| `+0x0E40`, after a Blast 2 cinematic | 118 | 59 | 119 |
+| `+0x0FE8`, False Courage shake | 6 | 3 | 6 |
+| `+0x0FE4`, after Drain Life's last step | 60 | 30 | 60 |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
