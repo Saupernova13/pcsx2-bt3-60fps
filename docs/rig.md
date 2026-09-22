@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Eight traps, each of which cost an hour or more
+## Ten traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -78,6 +78,18 @@ to flush it. Two runs of the same arm then match pixel for pixel.
 **8. The first menu press after a state load is often dropped.** Load, resume,
 then press `Start` twice if the pause menu has to open, and look before pressing
 anything that selects.
+
+**9. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
+with no pad, which lets go of every pad. A pad-2 guard held with
+`roo.cmd("input.set", buttons=["Circle"], pad=1)` drops on the frame pad 1 is
+released that way, and the victim takes a rush it was meant to block. Release
+pad 1 alone with `roo.input_set()`, no buttons.
+
+**10. A breakpoint on a branch delay slot never fires.** The same script
+stopped 0 times with a breakpoint on `001C9F1C`, the delay slot of a `beq` that
+runs on every pass, and 4 times with it on `001C9F14`, two instructions earlier.
+Put the breakpoint on an instruction that is not in a delay slot and read the
+registers there.
 
 ## Getting to any scene
 
