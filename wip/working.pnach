@@ -1284,3 +1284,67 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The smash charge. SuperCombo's BT3 wiki names the mechanic: a Smash Attack
+// is Square held with a direction, level 3 is "indicated by your character
+// flashing white", and a Perfect Smash is "releasing the attack button at the
+// exact moment your character reaches level three of charge". The same page
+// states BT3's frame as a 30th of a second, which is this whole project in one
+// line.
+//
+// FUN_001E33E0 is the charge step: it reads gp-0x6D80 (002FD4F0, 0.0444444 =
+// 1/22.5), scales it, adds it to the raw charge at fighter+0xD7C and stores the
+// normalised 0..1 copy at fighter+0xD78. The constant has exactly one reader,
+// so it is halved in data the way the gravity group's acceleration is, and one
+// word covers all eleven charge states: 71-76, the six Smash directions
+// (FUN_001E4330), and 83-87 (FUN_001E4D80) both call it.
+//
+// The charge then takes 44 vsyncs to fill instead of 22, which is the same real
+// time as 30fps and the same sequence sample for sample: 0.04 0.09 0.13 ...
+// 0.98 1.00.
+//
+// It also restores the Perfect Smash window, which is the part of the report
+// that matters in play. fighter+0xD84 counts TICKS since the charge hit
+// maximum and 001E4804 grants the Perfect Smash on a single tick's worth of
+// release timing. Releasing on each vsync in turn and breakpointing the grant
+// at 001E4810: 30fps accepts 2 vsyncs, the patch alone accepts 1, and this puts
+// it back to 2. Widening the 001E4804 test to accept 1 OR 2 was built and
+// measured as well and is NOT here - it makes the window 3 vsyncs, wider than
+// the real game.
+//
+// Needs [60FPS - meter economy]. The step is scaled by Momentum (fighter+0xD80,
+// which rush hits fill), and Momentum drains 400 a tick inside the economy that
+// group gates. Without it a charge started after a rush fills late: 22 vsyncs
+// against 20 from half Momentum.
+[60FPS - smash charge]
+description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
+patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick
+
+// The charge flash, found 2026-09-22 for issue #6. Level 3 is "indicated by your
+// character flashing white", and the flash is a pulse. While the fighter holds
+// flag 0x1E, FUN_001D1558 cycles fighter+0x134C through 0-3 once a tick and, each
+// time it wraps to 0, calls FUN_0024E5B8 to set a model flash slot's intensity
+// to 0.2 ($gp-0x5C10); FUN_0024E6B0 takes 0.0333 ($gp-0x5C0C) off it every tick.
+// So the flash fires every 4 ticks and fades 0.167 / 0.133 / 0.1 / 0.067, and at
+// 60fps it pulsed twice as fast. FUN_001D15E0 runs the same pulse for flag 0x1F
+// through +0x1350, and FUN_001D14F8 re-fires a steady glow every tick for 0x1D.
+//
+// Both counters now cycle 0-7, the decay is halved, and the start intensity is
+// 0.1833 so the first frame shows 0.167 as at 30fps. Every 30fps sample of the
+// pulse is then reproduced at the matching vsync, the in-between frames are the
+// halfway values, and the steady glow stays at 0.167. Both constants have one
+// reader, and only these three routines trigger a model flash.
+//
+// Cell 1st Form, Square held from rocky-cell1-near-standing-gohan.p2s, mean
+// brightness of Cell's body: the pulse repeats every 8 vsyncs at 30fps, every 4
+// with every group on, and every 8 with this group.
+[60FPS - charge flash]
+description=Pulse the white flash that marks a Level 3 charge at its real-time rate, so the Perfect Smash cue flashes as fast as it does at 30fps instead of twice as fast.
+patch=1,EE,001D15A8,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1E pulse: count 0-7
+patch=1,EE,001D15B8,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D15BC,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,001D1630,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1F pulse: count 0-7
+patch=1,EE,001D1640,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D1644,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,002FE664,word,3C888888 // flash fade 0.0333 -> 0.0167 per tick ($gp-0x5C0C, one reader 0024E6D4)
+patch=1,EE,002FE660,word,3E3BBBBC // flash start 0.2 -> 0.1833 ($gp-0x5C10, one reader 0024E5D8)
