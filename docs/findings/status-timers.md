@@ -115,10 +115,57 @@ re-armed per hit, and the stun before it is 116 vsyncs at 30fps and 114 at 60fps
 
 ### Not established
 
-- **`+0x0FE8` and `+0x0FE4`.** Same countdown shape, armed from hit-reaction
-  helpers (`001C9B50`, `001CF220`), and nothing tried here arms them. Guard
-  crush and fatigue are candidates; the COM on Stand does not guard.
 - **`+0x0D88`**, +1 a tick in states 0x89-0x8C, and **`+0x1580`**, state 4 in one
   game mode, were not investigated.
 - **In play.** Whether a combo that drops or connects at 30fps now does the same
   at 60fps was not scripted.
+
+## 2026-09-22 - issue #34, the last two: a shrugged-off hit and the hurt face
+
+`+0x0FE8` and `+0x0FE4` were left out above because nothing tried armed them.
+Every load and store of either offset in the ELF sits in four functions, and
+both timers turn out to be cosmetic.
+
+| field | armed by | read by | what it does |
+|---|---|---|---|
+| `+0x0FE8` | `001C9FF4`, 3, in the hit resolver `FUN_001C9B50` on hit result 2 | `FUN_001DFE30` | the victim shakes sideways by 0.25 units, the sign flipping with the timer's low bit |
+| `+0x0FE4` | `FUN_001CF220`, 30, on the victim at every step of damage dealt over time | the countdown itself | sets flag `0x96` each tick; `FUN_001D1808` puts the face (`model+0x1664`) in mode 5 while it is set |
+
+**Hit result 2 is a hit shrugged off, not a guard.** A pad-2 guard blocked a
+five-hit rush, a Rush Ki Blast, a held smash and a rush ending in `Triangle`
+without any of them reaching the result. Result 2 is forced for ordinary hits
+while the victim's `+0x0E18` is positive, and `+0x0E18` is a Blast 1 buff:
+`FUN_002004C8` arms it from skill flag `0x400`. That is False Courage,
+"cannot be stunned by Ki Blasts & Melee Attacks": Hercule's (`L2`+`Circle`,
+state 253) armed it to 224 ticks against SuperCombo's 7.5 seconds. The same result also comes from a resistance
+check (`+0x0E14`, a second buff, and state flags on both sides) that was not
+exercised.
+
+Flag `0x96` is one of the three flags Solar Flare's lock-off sets, and the
+states after Drain Life's launch set it too. Through Drain Life the face was in
+mode 5 on every tick the flag was set and never otherwise. The camera frames
+Cell during the drain, so the face was not seen in a capture.
+
+Both countdowns decrement shortly before a call, so the hook replaces the
+decrement with a `jal` whose delay slot is the `move $a0, $s1` that follows.
+The helper returns the decremented value with the odd tick added back and the
+original store runs.
+
+Save state 7, Cell (2nd Form) against a pad-2 Ultimate Gohan
+(`rocky-vs2p-cell2-near-gohan.p2s`), from the pnach. The shake with `+0x0E18`
+written on Gohan and one `Square`; the face after Drain Life's last drain step
+(the move re-arms it five times at 30fps):
+
+| | 30fps | v24 | v24 + `[60FPS - combat timers]` |
+|---|---|---|---|
+| `+0x0FE8` per vsync after the hit | 3, 3, 2, 2, 1, 1 | 3, 2, 1 | 3, 3, 2, 2, 1, 1 |
+| `+0x0FE4` after Drain Life's last step | 60 vsyncs | 30 | 60 |
+
+The victim stays in idle, state 11, through the shrugged-off hit in every arm.
+
+### A rig trap found on the way
+
+`Roo.input_release()` releases pad 2 as well. A script that holds a pad-2
+guard with `input.set ... pad=1` and then releases pad 1 with `input_release()`
+drops the guard on the same frame; `input_set()` with no buttons releases pad 1
+alone.
