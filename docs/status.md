@@ -273,6 +273,21 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - the Rush Struggle's length (#56)
+
+Extends `[60FPS - rush struggle]`. The contest itself was counted in ticks: 76
+of them, plus a short finish, so at 60fps it ran in 116 vsyncs against 196. Its
+length and its introduction cue are doubled, and so are the five hit cadences,
+so the longer contest does not double the automatic hits.
+
+| Cell v Devilman, no input | 30fps | v24 | v24 + this |
+|---|---|---|---|
+| struggle | 196 vsyncs | 116 | 192 |
+| hits, player / CPU | 26 / 52 | 26 / 36 | 26 / 49 |
+
+**Not confirmed in play**, and not yet confirmed to be the story-mode clash #56
+describes.
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and

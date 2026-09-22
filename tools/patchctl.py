@@ -193,6 +193,8 @@ SOLARFLARE = ["60FPS - solar flare"]
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
 # AI rotates twice as fast in real time while a human's hands do not - measured
 # at a true 5 rotations a second, the winner flips. This gates only the AI side.
+# Since 2026-09-22 (#56) it also doubles the contest's length in FUN_001D9330 and
+# the five hit cadences, so the struggle lasts its 30fps real time.
 STRUGGLE = ["60FPS - rush struggle"]
 
 # The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter state

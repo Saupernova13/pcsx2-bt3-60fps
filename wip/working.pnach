@@ -1086,8 +1086,20 @@ patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 fr
 // 60fps ends 53-47 to the CPU. The outcome flips.
 // This gates ONLY the AI's rotation, on the state's own tick counter, using the
 // game's own human/AI flag. The player's input is untouched.
+//
+// The length, found 2026-09-22 for issue #56. The contest is run by the event
+// manager's modes 6-8 (FUN_001D9330): mode 7 counts [m+0x70] once a tick, cues
+// each fighter's introduction at 0 and 15, and hands over to mode 8, which picks
+// the winner, after 76 ticks. So the whole struggle took 116 vsyncs at 60fps
+// against 196 at 30. The three literals are doubled, as the Beam Struggle's are.
+// Twice as many ticks would then double the automatic hits, which land when the
+// state's tick counter fighter+0x964 is a multiple of 28, 8, 5, 4 or 15 (by
+// character attribute); those five literals are doubled too.
+// From the Cell v Devilman struggle, no input: 196 vsyncs, player 26 hits, CPU 52
+// at 30fps; 116, 26 and 36 on v24; 192, 26 and 49 with this. The CPU's 3-hit gap
+// is the AI gate above - its every-4 stream fires on fewer of the even ticks.
 [60FPS - rush struggle]
-description=Honour the CPU's synthetic stick rotation every other tick in a Rush Struggle, so the AI cannot out-rotate the player twice as fast at 60fps as it does at 30.
+description=Pace the Rush Struggle in real time at 60fps - its length, its automatic hits, and the CPU's stick rotation, which is honoured every other tick - so the clash lasts as long as at 30fps and the AI cannot out-rotate the player.
 patch=1,EE,000F1500,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
 patch=1,EE,000F1504,word,10600005 // beqz $v1, 0x000F151C   human: unchanged
 patch=1,EE,000F1508,word,00000000 // nop
@@ -1100,6 +1112,14 @@ patch=1,EE,000F1520,word,00000000 // nop
 patch=1,EE,000F1524,word,03E00008 // jr $ra
 patch=1,EE,000F1528,word,0000102D // move $v0, $zero        (delay slot)
 patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
+patch=1,EE,001D93D8,word,2402001E // li $v0, 15 -> 30          second fighter's cue
+patch=1,EE,001D93EC,word,2402001E // li $v0, 15 -> 30          (the same compare, reloaded)
+patch=1,EE,001D940C,word,28430098 // slti $v1, $v0, 76 -> 152  the contest's length in ticks
+patch=1,EE,001F4958,word,24020038 // li $v0, 28 -> 56          hit cadence, attribute 0x6A
+patch=1,EE,001F4980,word,3042000F // andi $v0, 7 -> 15         hit cadence, attribute 0x69
+patch=1,EE,001F49A4,word,2402000A // li $v0, 5 -> 10           hit cadence, attribute 0x68
+patch=1,EE,001F49DC,word,30420007 // andi $v0, 3 -> 7          hit cadence, default
+patch=1,EE,001F49FC,word,2402001E // li $v0, 15 -> 30          extra hit, fighter+0x3D0 bit 0
 
 // The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter
 // state 304 (FUN_001FB660) and rotate their sticks. Rotations are counted into
