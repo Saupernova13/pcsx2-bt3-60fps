@@ -13,7 +13,7 @@ from SuperCombo's names to this repo's old terms.
 | max power, the blue bars | Max Power Mode | `meter economy`, `max power charge` (PR #16) |
 | blast stock, the gold number | Blast Stock: pays for Blast 1s and transformations | regen not measured |
 | buffs | Timed Blast 1s: stat boosts, After Image Strike | `buff duration` (PR #25) |
-| blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration` |
+| blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration`; a beam's charge, `beam charge` (#72) |
 | ult, ultimate attack | Ultimate Blast (`L2`+`Down`+`Triangle`, in Max Power Mode) | same, plus `camera pacing` |
 | regular ki blast, tap Triangle | Rush Ki Blast; held Triangle is a Smash Ki Blast | `projectile travel` |
 | Hercule's rocks, grenades | Grenade: Hercule's Rush and Smash Ki Blasts | `thrown object rate` (PR #26) |

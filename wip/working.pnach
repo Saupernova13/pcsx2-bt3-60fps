@@ -1284,3 +1284,51 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The beam charge hold, found 2026-09-22 for issue #72 while measuring #13.
+// State 272's handler, FUN_001F7860, holds a beam Blast 2's charge in animation
+// 0x106, 0x128 or 0x14A (one per Blast 2 slot). Each tick it counts
+// fighter+0x3D8 at 001F7A00 - gated to even ticks by [60FPS - state phase
+// timers] - and sets the charge +0xE44 to 2 * count / max. The release (input
+// condition 0x6F) or full charge sets +0x3D0 bit 1, and 001F7ACC-001F7AD4 leaves
+// the hold on that bit.
+//
+// Each tick runs the input phase before the per-tick phase, so at 30fps a
+// release seen at a tick also counts that tick before leaving, and a tap leaves
+// after two counts. The exit test is not gated: at 60fps a release seen on an
+// odd tick left before the next count, and a tap left after one.
+//
+// The hook replaces the exit branch with a jump to a helper that leaves only
+// on an even tick and only once the count is at least 2. Full charge lands on
+// an even tick, so it still leaves at once. The jump's delay slot is the
+// original move $a0, $s1, which both destinations expect.
+//
+// Charge at the end of the hold, and damage (lowest HP reached, since training
+// refills health), from the pnach. Cell (1st Form)'s Special Beam Cannon from
+// save state 1, Goku (Early)'s Kamehameha from save state 0
+// (rocky-goku-early-vs-standing-gohan.p2s):
+//
+//                                  30fps          v24            v24 + this
+//   Special Beam Cannon, tapped    0.067  7860    0.033  7660    0.067  7860
+//   Kamehameha, tapped             0.067  7020    0.033  6900    0.067  7020
+//   Kamehameha, held 61 vsyncs     0.833  9600    0.800  9540    0.833  9600
+//   Kamehameha, held 62 vsyncs     0.867  9720    0.833  9600    0.867  9720
+//   Special Beam Cannon, full      1.000 13430    1.000 13430    1.000 13430
+//
+// The tapped Special Beam Cannon fires (animation 0x12A) at v62 / v60 / v62.
+[60FPS - beam charge]
+description=End a beam's charge on the tick the 30fps game would, so a quickly released Kamehameha or Special Beam Cannon charges and hits as hard as at 30fps and fires on time.
+patch=1,EE,000F1A00,word,1040000A // beq $v0, $zero, HOLD      release bit clear
+patch=1,EE,000F1A04,word,8E080000 // lw $t0, 0($s0)            (delay) the hold's count, fighter+0x3D8
+patch=1,EE,000F1A08,word,29080002 // slti $t0, $t0, 2
+patch=1,EE,000F1A0C,word,15000007 // bnez $t0, HOLD            fewer than 2 counts
+patch=1,EE,000F1A10,word,3C080033 // lui $t0, 0x0033           (delay)
+patch=1,EE,000F1A14,word,8D081D64 // lw $t0, 0x1D64($t0)       frame counter
+patch=1,EE,000F1A18,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1A1C,word,15000003 // bnez $t0, HOLD            odd tick
+patch=1,EE,000F1A20,word,00000000 // nop
+patch=1,EE,000F1A24,word,0807DEB7 // j 0x001F7ADC              leave the hold
+patch=1,EE,000F1A28,word,00000000 // nop
+patch=1,EE,000F1A2C,word,0807DF08 // HOLD: j 0x001F7C20
+patch=1,EE,000F1A30,word,00000000 // nop
+patch=1,EE,001F7AD4,word,0803C680 // beq $v0, $zero, 0x001F7C20 -> j 000F1A00   leave the charge hold
