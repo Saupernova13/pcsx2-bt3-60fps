@@ -154,6 +154,7 @@ group off:
 | `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+| `rocky-goten-trunks-team-vs-gohan.p2s` | Team Battle: Goten + Kid Trunks against a COM Ultimate Gohan (the COM fights) | transformations (`R3` is Super Saiyan), fusion set-up |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
