@@ -1284,3 +1284,31 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The transformation loader, found 2026-09-22 for issue #67. A transformation
+// streams the new form's data while the power-up animation plays, and reveals it
+// when the battle loader FUN_001278B0 sees the load finish. Its poll, 00127A70
+// jal FUN_00265298, is a state machine that advances at most one stage per call
+// - open, read, wait, close - and it is called once a tick, so at 60fps the load
+// ends early and so does everything after it. Load time fits a fixed disc time
+// plus N polls: Goten 114 vsyncs + 10, Vegeta (Scouter)'s Great Ape 110 + 19.
+//
+// The wrapper answers "not ready" on odd ticks and otherwise tail-calls the poll,
+// so the loader is polled at the game's 30Hz. Only this call site is hooked:
+// FUN_00265298 has 13 callers, menus among them.
+//
+// Goten's Super Saiyan, R3 from rocky-goten-trunks-team-vs-gohan.p2s: the reveal
+// (animation 0x179) starts at v148 at 30fps, v135 on v24, v145 with this group.
+// Pixel drift against 30fps 67.6 -> 50.3; at v200 38.4 -> 4.8.
+[60FPS - transformation load]
+description=Poll the transformation loader at the game's own 30Hz, so a transformation reveals the new form at its real time instead of early.
+patch=1,EE,000F19A0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19A4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19A8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19AC,word,15000003 // bnez $t0, +3             odd tick: not ready
+patch=1,EE,000F19B0,word,00000000 // nop
+patch=1,EE,000F19B4,word,080994A6 // j 0x00265298             even tick: the real poll
+patch=1,EE,000F19B8,word,00000000 // nop
+patch=1,EE,000F19BC,word,03E00008 // jr $ra
+patch=1,EE,000F19C0,word,0000102D // dmove $v0, $zero          (delay) "not ready"
+patch=1,EE,00127A70,word,0C03C668 // jal 00265298 -> jal 000F19A0   transformation loader poll
