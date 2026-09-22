@@ -191,7 +191,8 @@ SOLARFLARE = ["60FPS - solar flare"]
 # Combat timers, found 2026-09-17. The fighter update counts the combo timer,
 # the 50-byte move-repetition memory, and short windows after hitstun, Ground
 # Slash and a Blast 2 cinematic once a tick, so each ran out in half its real
-# time. Each now counts on even ticks only.
+# time. Each now counts on even ticks only. Since 2026-09-22 also the shake of
+# a hit shrugged off under False Courage and the hurt face after drain damage.
 COMBAT = ["60FPS - combat timers"]
 
 # The Rush Struggle, found 2026-09-10. Two rush attacks collide and both players

@@ -1298,14 +1298,23 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 //   001E2008  +0x0FF0   14-tick window after hitstun or stun ends
 //   001E1FD4  +0x0DE4   30-tick timer on the attacker after a Ground Slash
 //   001E1FF8  +0x0E40   59-tick timer on the attacker after a Blast 2 cinematic
+//   001E1F88  +0x0FE8   3-tick sideways shake when a hit is shrugged off: armed
+//                       at 001C9FF4 on hit result 2, which +0x0E18 (False
+//                       Courage, "cannot be stunned") forces
+//   001E1FAC  +0x0FE4   30-tick hurt face (flag 0x96, face mode 5) after each
+//                       step of damage dealt over time, armed in FUN_001CF220 -
+//                       Cell's Drain Life
 //
 // Each decrement nets to nothing on odd ticks, and the repetition loop returns
 // past itself on odd ticks. Where the original stored in a jal's delay slot the
 // helper does the store and the slot becomes a nop. +0x0DE4 is reached through
 // two delay slots, so 001E1FC4-001E1FD8 is replayed in a trampoline.
 //
-// Left alone: +0x0FE8 (001E1F88) and +0x0FE4 (001E1FAC), same shape, armed by
-// nothing tried; and +0x0964, the ticks-in-state counter the phase timers read.
+// For +0x0FE8 and +0x0FE4 the jal replaces the decrement itself, and its delay
+// slot is the move $a0, $s1 that follows; the helper returns the decremented
+// value with the odd tick added back, and the original store runs.
+//
+// Left alone: +0x0964, the ticks-in-state counter the phase timers read.
 //
 // Save state 4, Goku (Early) dashed to close range on a standing Ultimate
 // Gohan; Frieza's rocks from save state 7. Vsyncs each timer is non-zero, from
@@ -1318,9 +1327,16 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 //   +0x0DE4, Ground Slash                 68      39        69
 //   +0x0E40, after the rock cinematic    118      59       119
 //
+// The last two from save state 7, Cell (2nd Form) against a pad-2 Ultimate
+// Gohan. The shake with +0x0E18 written on Gohan and one Square; the face after
+// Drain Life's last drain step:
+//
+//   +0x0FE8, shake per vsync       3,3,2,2,1,1   3,2,1   3,3,2,2,1,1
+//   +0x0FE4, after the last step        60        30        60
+//
 // The Heavy Finish stun itself, state 203, is 116 / 114 / 114.
 [60FPS - combat timers]
-description=Count the combo timer, the move-repetition memory and the short windows after hitstun, Ground Slash and Blast 2 cinematics in real time, so combos keep their 30fps rules at 60fps.
+description=Count the combo timer, the move-repetition memory and the short windows after hitstun, Ground Slash and Blast 2 cinematics in real time, so combos keep their 30fps rules at 60fps. Also the shake of a hit shrugged off under False Courage and the hurt face after Drain Life.
 patch=1,EE,000F17C0,word,3C080033 // lui $t0, 0x0033
 patch=1,EE,000F17C4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
 patch=1,EE,000F17C8,word,31080001 // andi $t0, $t0, 1
@@ -1365,6 +1381,18 @@ patch=1,EE,000F1868,word,080787F7 // L0: j 0x001E1FDC
 patch=1,EE,000F186C,word,AE200DE0 // sw $zero, 0xDE0($s1)     (delay) replay 001E1FC8
 patch=1,EE,000F1870,word,080787F7 // OUT: j 0x001E1FDC
 patch=1,EE,000F1874,word,00000000 // nop
+patch=1,EE,000F19D0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19D4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19D8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19DC,word,2462FFFF // addiu $v0, $v1, -1
+patch=1,EE,000F19E0,word,03E00008 // jr $ra
+patch=1,EE,000F19E4,word,00481021 // addu $v0, $v0, $t0       (delay) odd tick: undone
+patch=1,EE,000F19E8,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19EC,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19F0,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19F4,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F19F8,word,03E00008 // jr $ra
+patch=1,EE,000F19FC,word,00481021 // addu $v0, $v0, $t0       (delay) odd tick: undone
 patch=1,EE,001E1E3C,word,0C03C5F0 // addiu $v0, -1 -> jal 000F17C0   combo timer
 patch=1,EE,001E1E40,word,00000000 // sw $v0, 0xD48($s1) -> nop   (stored by the helper)
 patch=1,EE,001E1E80,word,0C03C5F8 // li $a1, 0x31 -> jal 000F17E0   repetition memory
@@ -1374,3 +1402,5 @@ patch=1,EE,001E1FF8,word,0C03C609 // addiu $v0, -1 -> jal 000F1824   post-cinema
 patch=1,EE,001E1FFC,word,00000000 // sw $v0, 0xE40($s1) -> nop   (stored by the helper)
 patch=1,EE,001E1FC4,word,0803C610 // blezl $v1 -> j 000F1840   attacker's move timer
 patch=1,EE,001E1FC8,word,00000000 // sw $zero, 0xDE0($s1) -> nop   (replayed at L0)
+patch=1,EE,001E1F88,word,0C03C674 // addiu $v0, $v1, -1 -> jal 000F19D0   shrugged-off hit shake
+patch=1,EE,001E1FAC,word,0C03C67A // addiu $v0, $v0, -1 -> jal 000F19E8   hurt face after drain damage
