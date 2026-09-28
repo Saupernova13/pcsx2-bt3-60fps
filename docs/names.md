@@ -33,6 +33,7 @@ from SuperCombo's names to this repo's old terms.
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
+| voice lines, grunts and shouts repeating | Voice categories and their cooldowns | `voice cooldown`, issue #86 |
 | speed lines (Hercule's Present Bomb) | Speed-line effect | issue #8 |
 | World Tournament helicopter, blimp | Stage props | issue #9, PR #19 |
 | desert wind | Rocky Area stage wind | issue #11 |
