@@ -276,16 +276,20 @@ group wants a play test before a release carries it.
 ## Proposed - sprite effects (#44)
 
 Adds `[60FPS - sprite effect rate]`. The effect class behind Great Saiyaman 2's
-Ultimate hearts (`FUN_001866C0`) steps every particle channel once a tick; its
-freeze check now answers "frozen" on odd ticks, so it thinks at 30Hz and still
-draws at 60.
+Ultimate hearts (`FUN_001866C0`) steps every particle once a tick in
+`FUN_00184BD8`; that one call is skipped on odd ticks, so the particles think at
+30Hz and still draw at 60. The class's six timers are left to
+`[60FPS - blast effect duration]`, which already halves them.
 
-| Justice Judgement, vsync | 30fps | v24 | v24 + this group |
+| Justice Judgement | 30fps | v24 | v24 + this group |
 |---|---|---|---|
-| 365 | heart forming | already full | forming |
-| 380 | full heart | gone | full heart |
+| v365 | heart forming | already full | forming |
+| heart ring peaks | v384 | v368 | v384 |
+| heart ring gone | v390 | v374 | v388 |
 
-The heart fades ~8 vsyncs later than at 30fps. **Not confirmed in play.**
+The same class draws Goten's transformation bursts and a Kamehameha's core. The
+first version of this group gated the whole update, which ran those six timers
+at half speed too; this one leaves them alone. **Not confirmed in play.**
 
 ## v24 (proposed) - the state phase timers, reinstated
 
