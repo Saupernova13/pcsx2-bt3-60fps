@@ -29,6 +29,7 @@ from SuperCombo's names to this repo's old terms.
 | beam clash | Beam Struggle | `beam clash` |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
+| the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
