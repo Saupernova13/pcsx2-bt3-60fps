@@ -1325,7 +1325,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // The same gate paces the Blast 1 buffs. FUN_00200AA0 counts every buff timer
 // down, and its only caller is inside FUN_001E16C0: After Image Strike lasts
 // 14.88s against 14.88s at 30fps and 7.40s without the gate. Do not also double
-// the buff durations (the old [60FPS - buff duration], #25) - that makes 29.88s.
+// the buff durations (the old buff duration group, #25) - that makes 29.88s.
 [60FPS - meter economy]
 description=Run the fighter's ki and gauge economy every other frame so ki fills and drains at its real-time speed and the game's one-second milestones still take a second.
 patch=1,EE,000F1580,word,3C080033 // lui $t0, 0x0033
