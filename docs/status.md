@@ -388,6 +388,22 @@ pacing, and the never-re-checked camera on a body-erasing death.
 Cut as its own version rather than rewriting v19 in place - a release is a
 record, and v19's file stays as it shipped.
 
+## Proposed - camera shake and controller rumble (#80)
+
+Adds `[60FPS - camera shake]` (one data word) and `[60FPS - controller rumble]`
+(four words). The shake counted its time left down by 1/30 s a tick; the
+rumble timed its motors in seconds * 30.0 ticks and pulsed on a per-tick phase.
+
+| Present Bomb's first hit, every open fix on | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| shake slots reach 0 | v117, v123 | v111, v114 | v117, v123 |
+| vsyncs rumble reaches the pad | 10 | 5 | 11 |
+
+Not covered: the shake's random offsets are drawn once a tick, so the camera
+jitters twice as often as at 30fps. All 13 smoke-test moves return to idle.
+
+**Not confirmed in play.**
+
 ## v21 - the Rush Struggle
 
 Two rush attacks collide, both fighters enter state 250, the game counts hits
