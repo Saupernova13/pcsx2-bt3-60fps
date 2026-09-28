@@ -1292,29 +1292,35 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // no timestep: age +0xA8 += 1.0, +0xB8 += 1.0, +0x100 / +0x10C +-1.0, position +=
 // velocity. At 60fps the heart grows, peaks and fades in half its real time.
 //
-// Like the particle system and thrown objects, the update asks the game's own
-// freeze check first (001866EC jal FUN_0012D1D0) and, when frozen, skips straight
-// to the draw at 001868E0. The hook calls the check through a wrapper that also
-// answers "frozen" on odd ticks, so the effect thinks at 30Hz and still draws
-// every frame. The branch's delay slot loads the flags the draw path reads, so
-// that path is unchanged. The class also draws a tapped ki blast's sparkles.
+// FUN_001866C0 does two jobs a tick, and only one of them is uncompensated. Its
+// six timers (+0x1F4, +0x1F8, +0x1FC, +0x200, +0x204 and the emitter's +0x20C)
+// step by 1.0, and [60FPS - blast effect duration] already halves all six. The
+// particles are stepped by FUN_00184BD8, called at 001867D8, and nothing touches
+// them. So only that call is gated: a wrapper returns at once on odd ticks and
+// tail-calls FUN_00184BD8 on even ones. The six timers keep running every tick.
 //
-// Great Saiyaman 2's Justice Judgement, save state 2, photographed at exact
-// vsyncs: at v365 30fps shows the heart forming, v24 shows it already full; at
-// v380 30fps and this group show the full heart ring, v24 has lost it. The heart
-// now lasts until ~v400 against v392 at 30fps. No odd-frame flicker: heart
-// pixels on six consecutive vsyncs 306k 405k 526k 636k 727k 629k.
+// The first version of this group gated the whole update through its freeze
+// check at 001866EC, which also ran the six halved timers at half speed: the
+// heart ring grew too slowly and hung on ~8 vsyncs, and the same class's bursts
+// in Goten's transformation and a Kamehameha's core drifted from 30fps. The last
+// line writes 001866EC's own jal back, so a state saved under that version drops
+// the old hook instead of calling the new wrapper with the check's arguments.
+//
+// Pink pixels of the heart ring, v356-v400 every 2 vsyncs, summed distance from
+// 30fps: this group 8488, the first version 31013, neither 24070. The ring peaks
+// on v384 as at 30fps and is gone by v388 against v390. Goten's Super Saiyan,
+// mean pixel drift: v24 67.7, first version 55.5, this group 44.6. No odd-frame
+// flicker: the ring's pixels come in equal pairs, 1421/1424, 1603/1605, 2740/2794.
 [60FPS - sprite effect rate]
 description=Run sprite effects such as Great Saiyaman 2's Ultimate hearts at the game's own 30Hz, so they grow and fade in their real time while still drawing at 60fps.
-patch=1,EE,000F1970,word,27BDFFF0 // addiu $sp, $sp, -16
-patch=1,EE,000F1974,word,AFBF0000 // sw $ra, 0($sp)
-patch=1,EE,000F1978,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
-patch=1,EE,000F197C,word,00000000 // nop
-patch=1,EE,000F1980,word,3C080033 // lui $t0, 0x0033
-patch=1,EE,000F1984,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
-patch=1,EE,000F1988,word,31080001 // andi $t0, $t0, 1
-patch=1,EE,000F198C,word,00481025 // or $v0, $v0, $t0        odd frame: frozen too
-patch=1,EE,000F1990,word,8FBF0000 // lw $ra, 0($sp)
-patch=1,EE,000F1994,word,03E00008 // jr $ra
-patch=1,EE,000F1998,word,27BD0010 // addiu $sp, $sp, 16
-patch=1,EE,001866EC,word,0C03C65C // jal 0012D1D0 -> jal 000F1970   sprite effect update
+patch=1,EE,000F1970,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1974,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1978,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F197C,word,15000003 // bnez $t0, 000F198C      odd tick: skip the particles
+patch=1,EE,000F1980,word,00000000 // nop
+patch=1,EE,000F1984,word,080612F6 // j 0x00184BD8            even tick: step them
+patch=1,EE,000F1988,word,00000000 // nop
+patch=1,EE,000F198C,word,03E00008 // jr $ra
+patch=1,EE,000F1990,word,00000000 // nop
+patch=1,EE,001867D8,word,0C03C65C // jal 00184BD8 -> jal 000F1970   the particle stepper
+patch=1,EE,001866EC,word,0C04B474 // jal 0x0012D1D0          the original freeze check, restored

@@ -184,7 +184,8 @@ THROWN = ["60FPS - thrown object rate"]
 
 # Sprite effects, found 2026-09-21 for issue #44. The effect class behind Great
 # Saiyaman 2's Ultimate hearts (FUN_001866C0) steps every particle channel once a
-# tick. Its freeze check is answered "frozen" on odd ticks, so it thinks at 30Hz.
+# tick in FUN_00184BD8; that one call is skipped on odd ticks, so the particles
+# think at 30Hz. The class's six timers are already halved by BLASTDUR.
 SPRITEFX = ["60FPS - sprite effect rate"]
 
 # Solar Flare, found 2026-09-17. The victim's blind timer, fighter+0xFF8, holds
