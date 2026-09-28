@@ -200,6 +200,18 @@ A state cut past the `Fight!` banner is what action tests need, and it is one
 whatever that slot held, and look at the result before measuring anything from
 it. See trap 3.
 
+**The match-start state cannot time a match's opening seconds.** An A/B from
+it shows the fight starting about 40 vsyncs early at 60fps; a match reached
+through the menus with the arm already on shows no lead at all - input goes
+live at v169 against v170 and the idle taunt comes at v349 against v351,
+counted from the battle manager's first frame. The state is cut on that first
+frame, so whatever the game set up while loading was set up by unpatched code:
+a tween at `0x0031C6B0` is one, taking the same steps per tick in every arm. For
+anything in the first seconds of a match, drive the menus into a fresh one:
+from the pause menu `Return to Character Select`, `Up` then `Cross` at `EXIT?`,
+`Cross` through both fighters' defaults and the map, and start counting when
+the battle manager goes non-null.
+
 ## Running the A/B
 
 The order is not negotiable, and getting it wrong produces a confident wrong

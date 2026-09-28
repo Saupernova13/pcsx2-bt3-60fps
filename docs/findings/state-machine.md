@@ -125,6 +125,14 @@ against 198. That is a separate defect in whatever the pre-fight sequence does
 between the manager coming alive and the fighter reaching idle, and it is the
 whole of the residue in the last row. It is not the taunt timer.
 
+**Correction, 2026-09-28:** the early start is not in the game. It comes from
+`rocky-cell-match-start.p2s`, which is cut on the battle's first frame, after
+the game has set up the match with unpatched code (a tween at `0x0031C6B0`
+takes the same steps per tick in every arm). In a match reached through the menus
+with every open fix on, counted from the battle manager's first frame, input
+goes live at v169 at 30fps and v170 at 60fps, and the fighter taunts at v349
+and v351. See `docs/rig.md`, "Cutting a state worth keeping".
+
 ### The state 157 trap: an index gated as if it were a clock
 
 The group was withdrawn because the user was trapped in state 157 with no
