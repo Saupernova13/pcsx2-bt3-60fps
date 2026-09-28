@@ -212,11 +212,18 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# The effect-command ramps, found 2026-09-28 for issue #8. FUN_0014FF90 runs a
+# move's scripted effects once a tick and animates each command's scale by a rate
+# per tick, or by a timer against seconds * 30.0, so at 60fps hit flashes grew
+# twice as fast - Present Bomb's filled the screen. Rate and timer step halved.
+FXRAMP = ["60FPS - effect command ramp"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + FXRAMP
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + FXRAMP),
+    # "full" without the effect-command ramps, so that group has a named baseline.
+    "noramp": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
