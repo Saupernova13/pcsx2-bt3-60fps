@@ -1326,7 +1326,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // What is left is before the flight: the throw animation starts about 3 vsyncs
 // early and the fork waits 2 vsyncs at its spawn point where 30fps waits 4 - the
 // same pre-launch overshoot the shipped header already lists for Frieza's rocks.
-// [60FPS - blast script clock] does not reach it.
+// The blast script clock group (PR #31) does not reach it.
 [60FPS - weapon object travel]
 description=Halve the per-tick flight of thrown-weapon objects such as Devilman's fork, so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F18F0,word,00C0282D // move $a1, $a2          a1 = the velocity
