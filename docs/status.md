@@ -289,7 +289,9 @@ Measured from a match-start state, timing the counter itself:
 | v23 + this group | vsync 158 | 338 | **180 vsyncs** |
 
 The timer is exact. The counter still *starts* 40 vsyncs early, which is a
-separate defect in the pre-fight sequence, not in this group.
+separate defect in the pre-fight sequence, not in this group. (2026-09-28: it
+is not a defect - it comes from the match-start save state, and a match
+started through the menus shows no lead; see `docs/rig.md`.)
 
 **Not confirmed in play.** Two things are open: the state 157 trap above, and
 whether this also fixes issue #6, the perfect smash cue, which is a window
