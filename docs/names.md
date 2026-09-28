@@ -28,6 +28,7 @@ from SuperCombo's names to this repo's old terms.
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
+| capes flapping (Great Saiyaman, Piccolo) | Cloth flutter | `cape flutter`, issue #92 |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |

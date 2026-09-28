@@ -466,3 +466,17 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - cape flutter (#92)
+
+Adds `[60FPS - cape flutter]` (a wrapper at `000F1B30` and one hook). The cloth
+update `FUN_00250DE8` has 60Hz settings of its own behind a model flag no battle
+model sets; it now takes them whenever a battle exists.
+
+| Save state 2, Great Saiyaman 2's first cape phase | v100 | v116 |
+|---|---|---|
+| 30fps | -1.05 | -0.247 |
+| 60fps before | -2.23 | -0.63 |
+| 60fps with the group | -1.05 | -0.247 |
+
+**Not confirmed in play.**
