@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Ten traps, most of which cost an hour or more
+## Eleven traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -90,6 +90,14 @@ stopped 0 times with a breakpoint on `001C9F1C`, the delay slot of a `beq` that
 runs on every pass, and 4 times with it on `001C9F14`, two instructions earlier.
 Put the breakpoint on an instruction that is not in a delay slot and read the
 registers there.
+
+**11. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
+that advances `mark - at - 1` frames and then grabs, which advances one more,
+takes every mark that follows the previous one a frame late: `drift.py --marks
+13,14` scored v14 as 18.2, the v15 value, against 28.6 for `--marks 14` alone. A
+"consecutive vsyncs" series built that way samples every other vsync, which is
+exactly the series that cannot see an odd-frame flicker. Skip the advance when
+it would be zero; #75 does that for `drift.py`.
 
 ## Getting to any scene
 
