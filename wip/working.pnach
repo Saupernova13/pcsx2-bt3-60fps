@@ -1285,7 +1285,7 @@ patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 
-// The effect-command ramps, found 2026-09-28 for issue #8. A move's scripted
+// The effect-command ramps, found 2026-09-28 for issue #77. A move's scripted
 // effects - the flashes on Hercule's Present Bomb, the fireball on a hit in
 // Great Saiyaman 2's Ultimate - are spawned and steered by an effect-command
 // runner, FUN_0014FF90, once a tick. A command can animate a parameter at
@@ -1301,8 +1301,9 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // the rate's load; the addu in its delay slot still runs first, and $f0, used
 // as scratch, is reloaded at 00150AA0.
 //
-// Present Bomb, L2 + Triangle from rocky-hercule-vs-standing-gohan.p2s: the
-// flash's scale steps -0.258 a vsync, -0.516 a 30Hz tick as at 30fps, and ends
+// Present Bomb, L2 + Triangle from rocky-hercule-vs-standing-gohan.p2s, with
+// every open fix on: the flash's scale steps -0.258 a vsync, -0.516 a 30Hz tick
+// as at 30fps, and ends
 // at -2.64 (-2.12 at 30fps, -5.73 without). The ramp starts two game ticks after
 // its effect in both arms, so at 60fps it runs one 30Hz step longer. Best-match
 // pixel difference against 30fps at the hits: v112 37.9 -> 21.6, v116 68.0 ->

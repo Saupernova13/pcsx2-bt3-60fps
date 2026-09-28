@@ -212,7 +212,7 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
-# The effect-command ramps, found 2026-09-28 for issue #8. FUN_0014FF90 runs a
+# The effect-command ramps, found 2026-09-28 for issue #77. FUN_0014FF90 runs a
 # move's scripted effects once a tick and animates each command's scale by a rate
 # per tick, or by a timer against seconds * 30.0, so at 60fps hit flashes grew
 # twice as fast - Present Bomb's filled the screen. Rate and timer step halved.
