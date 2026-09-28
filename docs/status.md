@@ -273,6 +273,31 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
 
+## Proposed - scripted effects and the transformation flash (#10)
+
+Adds two groups. `[60FPS - effect track clock]`: the effect class behind
+Vegeta (Scouter)'s energy ball, Goten's transformation burst and a hit spark in
+Great Saiyaman 2's Ultimate stepped its track clock, jitter, spin and four
+countdowns once a tick. The tracks now advance on even ticks and the countdowns
+by 0.5. `[60FPS - transformation flash]`: the white that covers every
+transformation's model swap held for 11 ticks counted per tick; its timers now
+step 0.5, and its strict limit is 10.5 so the hold is exactly 22 vsyncs.
+
+| Vegeta (Scouter)'s Great Ape | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| energy ball, big flash | v89 | v77 | v88 |
+| white before the Great Ape | v405-v426 | v403-v413 | v403-v424 |
+| cut to the Great Ape | v427 | v414 | v425 |
+| frames v70-v130, best match against 30fps within 3 vsyncs | 0 | 8.4-61.2 | 1.0-2.3, one vsync later |
+
+Goten's Super Saiyan: the white holds 22 vsyncs in both (v149-v171 at 30fps,
+v146-v168 here). The 3-vsync lead comes before the hold starts, the same lead
+#68 leaves on the reveal. GS2's hit spark matches 30fps value for value on even vsyncs and ends
+on the same one. No change to Cell's transformation or GS2's heart ring; all 13
+smoke-test moves return to idle.
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and

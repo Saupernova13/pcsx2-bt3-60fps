@@ -1309,7 +1309,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // Vegeta (Scouter)'s Great Ape, R3 from rocky-vegeta-scouter-standing.p2s: the
 // big flash comes at v88 (v89 at 30fps, v77 without), and every frame from v70 to
 // v130 matches the 30fps frame one vsync later at 1.0-2.3 mean pixel difference
-// (8.4-61.2 without). A spark in GS2's Ultimate traced tick by tick: lifetime,
+// (without: 8.4-61.2 at the best offset within 3 vsyncs). A spark in GS2's Ultimate traced tick by tick: lifetime,
 // fade and track clock equal the 30fps values on every even vsync, and it ends
 // on the same vsync, v146.
 [60FPS - effect track clock]
@@ -1346,7 +1346,8 @@ patch=1,EE,0019DC94,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      fade +0xA8
 // Vegeta (Scouter)'s Great Ape: white v405-v426 and the cut at v427 at 30fps,
 // v403-v413 and v414 without this group, v403-v424 and v425 with it. Goten's
 // Super Saiyan: the hold runs v149-v171 at 30fps, v146-v168 with it - 22 vsyncs
-// each. The 3-vsync lead is the transformation loader's, before the hold starts.
+// each. The 3-vsync lead comes before the hold starts, the same lead the
+// transformation loader fix (PR #68) leaves on the reveal.
 [60FPS - transformation flash]
 description=Hold a transformation's white flash for its real time, so the camera stays on it as long as at 30fps instead of cutting to the new form early.
 patch=1,EE,001A06B8,word,3C014128 // lui $at, 0x4120 -> 0x4128   hold limit 10.0 -> 10.5
