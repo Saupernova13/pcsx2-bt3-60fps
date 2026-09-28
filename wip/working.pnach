@@ -1300,3 +1300,43 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Eye blinks, found 2026-09-28 for issue #90. FUN_0024F428 runs each model's
+// face (model+0x1664) once a tick and calls FUN_0024EB70 for the eyes. Unless
+// the model's flags (model+0xA40) hand the eyes to an animation (0x04000000) or
+// shut them (0x08000000), that counts face+0x08 down a tick; below 0 it re-arms
+// it to rand() % 90 + 90 ticks and sets face+0x0C to rand() % 3 + 3, and while
+// +0x0C counts down the blink flag face+0x10 - the eye image - is 1. So at 60fps
+// a fighter blinked twice as often, each blink half as long.
+//
+// Only that random branch runs on even ticks: the wrapper is entered in place of
+// the bnez at 0024EBD0 (its delay slot's v0 = 1 still runs), takes the shut-eyes
+// path every tick as before, and on odd ticks returns without writing +0x10, so
+// the eye image holds for 2 vsyncs a tick and rand() is called as often as at
+// 30fps.
+//
+// Save state 6, Devilman against a standing Ultimate Gohan, 30 seconds of idle,
+// every open fix on, per face:
+//
+//                       blinks   blink length        gap between blinks
+//   30fps               6-7      6, 8 or 10 vsyncs   220-342 vsyncs
+//   60fps, before       13       3, 4 or 5           92-178
+//   60fps, this group   7        6, 8 or 10          204-324
+[60FPS - eye blink]
+description=Blink at the real rate, so fighters' eyes do not flicker shut twice as often.
+patch=1,EE,000F1AF0,word,3C080800 // lui $t0, 0x0800
+patch=1,EE,000F1AF4,word,00684024 // and $t0, $v1, $t0          $v1 = model+0xA40
+patch=1,EE,000F1AF8,word,15000008 // bnez $t0, 000F1B1C         eyes shut: as before
+patch=1,EE,000F1AFC,word,00000000 // nop
+patch=1,EE,000F1B00,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1B04,word,8D081D64 // lw $t0, 0x1D64($t0)        frame counter
+patch=1,EE,000F1B08,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1B0C,word,15000005 // bnez $t0, 000F1B24         odd tick: skip
+patch=1,EE,000F1B10,word,00000000 // nop
+patch=1,EE,000F1B14,word,08093AF6 // j 0x24EBD8                 even tick: the blink timer
+patch=1,EE,000F1B18,word,00000000 // nop
+patch=1,EE,000F1B1C,word,08093B17 // j 0x24EC5C                 store +0x10 = 1
+patch=1,EE,000F1B20,word,00000000 // nop
+patch=1,EE,000F1B24,word,08093B1B // j 0x24EC6C                 return, +0x10 untouched
+patch=1,EE,000F1B28,word,00000000 // nop
+patch=1,EE,0024EBD0,word,0803C6BC // bnez $v0, 0x24EC5C -> j 000F1AF0
