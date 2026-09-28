@@ -1284,3 +1284,39 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The camera shake, found 2026-09-28 for issue #80. A hit or an explosion puts
+// a shake into one of four slots per camera: a time left in seconds and a size.
+// FUN_0023F438 counts every slot down by gp-0x5D2C, 1/30 s, once a tick, and
+// FUN_0023F478 shakes the camera by (time left * size), so at 60fps a shake
+// ended in half its time. Three camera updates call the countdown (001C6B60,
+// 0023D63C, 0023D7C4) and it is the constant's only reader, so the constant
+// itself becomes 1/60.
+//
+// Present Bomb's first hit, every open fix on: the two slots it fills reach 0
+// at v117 and v123 at 30fps, v111 and v114 without this, v117 and v123 with it.
+// Not covered: the shake's random offsets are drawn once a tick, so at 60fps
+// the camera jitters twice as often; matching that would mean caching the
+// draws of all three cameras.
+[60FPS - camera shake]
+description=Count the camera shake down in real time, so the screen shakes on a hit for as long as at 30fps.
+patch=1,EE,002FE544,word,3C888888 // 1/30 -> 1/60 s a tick   the shake's countdown step
+
+// Controller rumble, found 2026-09-28 for issue #80. FUN_001DC5E0 runs each
+// fighter's rumble (fighter+0x15D0) once a tick:
+//     +0x08, +0x0C  large and small motor, seconds * 30.0, counted down a tick
+//     +0x10         the large motor pulses on sin(+0x10 * k / 30.0), +1 a tick
+//     +0x14         the small motor is on when bit 0 of this tick count is 0
+// so at 60fps rumble lasted half as long and pulsed twice as fast. The three
+// 30.0s become 60.0 and the small motor toggles on bit 1. The update is not
+// gated: FUN_00122F10 sends the pad's accumulated rumble and zeroes it on every
+// call, so a skipped tick would switch the motors off for a frame.
+//
+// Present Bomb's first hit: rumble reaches the pad for 10 vsyncs at 30fps, 5
+// without this, 11 with it, over the same pulse curve (191, 250 ... 131).
+[60FPS - controller rumble]
+description=Run the controller's rumble in real time, so hits rumble for as long as at 30fps and pulse at the same rate.
+patch=1,EE,001DC554,word,3C014270 // lui $at, 0x41f0 -> 0x4270   large motor time, seconds * 30 -> * 60
+patch=1,EE,001DC578,word,3C014270 // lui $at, 0x41f0 -> 0x4270   small motor time
+patch=1,EE,001DC654,word,3C014270 // lui $at, 0x41f0 -> 0x4270   large motor pulse, phase / 30 -> / 60
+patch=1,EE,001DC6C0,word,30420002 // andi $v0, $v0, 1 -> 2       small motor toggles every 2 ticks
