@@ -183,7 +183,7 @@ group off:
 
 | file | scene | good for |
 |---|---|---|
-| `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
+| `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | the stage and both fighters at the bell - but not the opening's timing, see below |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
 | `rocky-super17-vs-standing-gohan.p2s` | Super 17 225 units from a standing Ultimate Gohan, full Ki | Hell's Storm (#40) |
