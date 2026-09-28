@@ -1284,3 +1284,71 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The scripted effect tracks, found 2026-09-28 for issue #10. Vegeta (Scouter)'s
+// energy ball, Goten's transformation burst and a hit spark in Great Saiyaman 2's
+// Ultimate are all one effect class: vtable 002C4278, update FUN_0019DB90, draw
+// FUN_0019DD38 (vtable+0x14). An effect carries up to eight tracks of 0x60 bytes,
+// and FUN_001AAB40 advances every one of them once a tick:
+//     track+0x04 += 2 * track+0x18      the track clock: 60Hz frames per 30Hz tick
+//     track+0x20, +0x24 = rand()        jitter, two draws per track
+//     track+0x30 += track+0x40          spin
+//     track+0x14 -= 1.0                 the fade, once the track has run out
+// The class update then counts four more down by 1.0 a tick, all 30Hz ticks:
+// +0x9C the start delay, +0xA0 a hold and +0xA8 the fade (byte counts from the
+// effect command, 0014EDA0-0014EDC8), and +0xAC the lifetime (seconds * 30.0,
+// 0019DAFC). None of it was compensated, so every such effect ran at double
+// speed: Vegeta's big flash comes 10 ticks after the small one in both arms,
+// v89 at 30fps and v77 at 60.
+//
+// FUN_001AAB40 has one caller, 0019DBD4, and the draw is a separate method, so
+// that call goes through a wrapper that runs it on even ticks only: clock,
+// jitter, spin and fade at their authored 30Hz. The four countdowns step 0.5.
+// Each countdown's test is <= 0, so half steps take exactly twice the ticks.
+//
+// Vegeta (Scouter)'s Great Ape, R3 from rocky-vegeta-scouter-standing.p2s: the
+// big flash comes at v88 (v89 at 30fps, v77 without), and every frame from v70 to
+// v130 matches the 30fps frame one vsync later at 1.0-2.3 mean pixel difference
+// (8.4-61.2 without). A spark in GS2's Ultimate traced tick by tick: lifetime,
+// fade and track clock equal the 30fps values on every even vsync, and it ends
+// on the same vsync, v146.
+[60FPS - effect track clock]
+description=Run scripted effects - Vegeta's energy ball, transformation bursts, hit sparks - on the game's own 30Hz schedule, so each flash starts, lasts and fades at its real time while still drawing at 60fps.
+patch=1,EE,000F1A40,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1A44,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1A48,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1A4C,word,15000003 // bnez $t0, 000F1A5C       odd tick: leave the tracks
+patch=1,EE,000F1A50,word,00000000 // nop
+patch=1,EE,000F1A54,word,0806AAD0 // j 0x001AAB40             even tick: advance them
+patch=1,EE,000F1A58,word,00000000 // nop
+patch=1,EE,000F1A5C,word,03E00008 // jr $ra
+patch=1,EE,000F1A60,word,00000000 // nop
+patch=1,EE,0019DBD4,word,0C03C690 // jal 001AAB40 -> jal 000F1A40   the track update
+patch=1,EE,0019DBF4,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      lifetime +0xAC, 1.0 -> 0.5 a tick
+patch=1,EE,0019DC40,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      start delay +0x9C
+patch=1,EE,0019DC74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      hold +0xA0
+patch=1,EE,0019DC94,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      fade +0xA8
+
+// The transformation flash, found 2026-09-28 for issue #10. The white that
+// covers a transformation's model swap is its own effect class: vtable 002C42D8,
+// update FUN_001A0850, created by FUN_001CF890 for every transformation type
+// (fighter+0x12DC). Once the swap starts it holds the white while
+//     obj+0x564 += 1.0 a tick     until it passes obj+0x568 = 10.0 (001A06B8)
+// and a second timer, obj+0x55C += 1.0 a tick, ends the effect at a byte count
+// from its data (obj+0x560). Both count 30Hz ticks, so at 60fps the white held
+// 11 vsyncs instead of 22 and the camera cut to the new form early.
+//
+// Both steps become 0.5. The hold's test is strict (count > limit), so half
+// steps would trip it at 10.5, one step early; the limit becomes 10.5 and the
+// hold ends at 11.0, after 22 ticks - the 30fps 11 exactly. The end timer's
+// test is <=, so halving its step alone is exact.
+//
+// Vegeta (Scouter)'s Great Ape: white v405-v426 and the cut at v427 at 30fps,
+// v403-v413 and v414 without this group, v403-v424 and v425 with it. Goten's
+// Super Saiyan: the hold runs v149-v171 at 30fps, v146-v168 with it - 22 vsyncs
+// each. The 3-vsync lead is the transformation loader's, before the hold starts.
+[60FPS - transformation flash]
+description=Hold a transformation's white flash for its real time, so the camera stays on it as long as at 30fps instead of cutting to the new form early.
+patch=1,EE,001A06B8,word,3C014128 // lui $at, 0x4120 -> 0x4128   hold limit 10.0 -> 10.5
+patch=1,EE,001A0930,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   hold +0x564, 1.0 -> 0.5 a tick
+patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55C

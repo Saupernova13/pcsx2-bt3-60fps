@@ -212,11 +212,21 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# Two effect classes that count 30Hz ticks, found 2026-09-28 for issue #10. The
+# scripted effect tracks (vtable 002C4278) step a track clock by 2 * rate, jitter,
+# spin and four countdowns once a tick, so Vegeta's energy ball flashed early; the
+# tracks now advance on even ticks and the countdowns by 0.5. The transformation
+# flash (vtable 002C42D8) held its white for 11 ticks counted per tick, so the
+# camera cut to the new form early; its two timers now step 0.5.
+FXTRACK = ["60FPS - effect track clock"]
+TRANSFLASH = ["60FPS - transformation flash"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN
+                  + FXTRACK + TRANSFLASH + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +284,13 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + FXTRACK
+             + TRANSFLASH),
+    # "full" without the two effect clocks, so those groups have a named baseline.
+    "nofxclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
