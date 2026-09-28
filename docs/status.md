@@ -285,9 +285,10 @@ poses kept time. Now 1.0.
 | every shipped group | 24.72 | 34.1 | 14.3 |
 | **+ this group** | **14.29** | **12.4** | **0.8** |
 
-Photographed at matched vsyncs it matches the 30fps frame from v28 on, including
-the camera holding on Vegeta as the energy ball goes up (#10). **Not confirmed in
-play.**
+Photographed at matched vsyncs it shows the 30fps shot from v28 on, one vsync
+ahead, including the camera holding on Vegeta as the energy ball goes up (#10).
+Not fixed by it: the first cut lands 3 vsyncs early, and the ball's flash 12
+early. **Not confirmed in play.**
 
 ## v24 (proposed) - the state phase timers, reinstated
 

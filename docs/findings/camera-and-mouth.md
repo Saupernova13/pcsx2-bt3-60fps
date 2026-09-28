@@ -521,10 +521,22 @@ camera]` makes it `0x3F80`, 1.0.
 
 ### Measured
 
-Photographed at exact vsyncs, the arm with this group matches the 30fps frame at
-v14, v28, v42, v56, v98 and v182: legs, chest, the hand coming up, the open palm,
-the energy ball, the ball raised. v24 without it is on the face, the palm, the
-wide back shot and an empty sky at those same vsyncs.
+Photographed at exact vsyncs, the arm with this group shows the 30fps shot at
+v28, v42, v56 and v182: chest, the hand coming up, the open palm, the ball raised.
+v24 without it is on the palm, the wide back shot and an empty sky at those same
+vsyncs.
+
+**Corrected 2026-09-28**, re-measured inside the combined play-test build (mean
+drift 14.32, the same group alone 14.29). v14 and v98 do not match:
+
+| vsync | 30fps | with this group |
+|---|---|---|
+| v14 | still the wide shot | already cut to the close-up: the first cut comes 2 ticks after state 238 starts, 4 vsyncs at 30fps and 2 at 60 |
+| v98 | the ball small, after its flash at v89 | the ball glowing larger: its flash came at v77, 12 vsyncs early (#10) |
+
+Everywhere else the group is one vsync ahead, the controller being read at 60Hz:
+the best-matching 30fps frame for v28, v42, v56, v182 and v300 is one vsync
+later, at a drift of 1.8 to 2.6.
 
 `drift.py --slot 9 --press R3`:
 
@@ -545,3 +557,7 @@ elsewhere. Great Saiyaman 2's Ultimate heart (#44) does not move at all.
   the battle manager's cinematic state (`+0x264` = 3 at `001D6354`) 19 vsyncs
   early. Loading faster is a property of 60fps rather than a clock to halve.
 - The residual at v14 (29 in both arms) is before the camera clip starts.
+- The energy ball's big flash comes 12 vsyncs early. A small flash peaks at v71
+  at 30fps and v68 at 60, and the big one follows 9 ticks later in both arms: an
+  uncompensated 9-tick wait, the same family as the pre-launch residual on
+  Frieza's rocks and Devilman's fork. Tracked on #10.
