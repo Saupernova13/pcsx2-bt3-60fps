@@ -466,3 +466,17 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - the smash charge camera bob (#106)
+
+Adds `[60FPS - camera bob]` (two words). While a fighter charges a smash, the
+camera's height follows a sine whose phase stepped once a tick, so at 60fps it
+rose and sank twice as fast. Both of its steps are halved.
+
+| Krillin, Square held, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| phase at v80 | 1.38 | 2.76 | 1.38 |
+| phase at v160 | 3.06 | -0.168 | 3.06 |
+| even vsyncs that differ from 30fps | - | most | 0 of 90 |
+
+**Not confirmed in play.**

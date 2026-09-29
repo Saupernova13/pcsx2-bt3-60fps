@@ -1300,3 +1300,27 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Smash charge camera bob, found 2026-09-29 for issue #106. FUN_001C4E88 returns
+// sin(phase) * 1.5, which its three callers (001C5C18, 001C6200, 001C63B0) add to
+// the battle camera's height. While motion flag 14 is set, as it is through a
+// smash charge (hold Square, state 75), the phase at fighter+0x4B0 steps pi/75
+// once a tick (002FD074, read only at 001C4EDC). Once the flag clears it moves
+// back to 0 by pi/30 a tick (002FD088, read only at 001C4F38). At 60fps the camera
+// rose and sank on a 2.5 second period instead of 5. Both steps are halved, as
+// exact float halves.
+//
+// Krillin, save state 3, Square held from v0, every open fix on:
+//
+//              30fps     60fps before     with this group
+//   v40        0.545     1.09             0.545
+//   v80        1.38      2.76             1.38
+//   v120       2.22      -1.84 (wrapped)  2.22
+//   v160       3.06      -0.168           3.06
+//
+// With the group the phase equals the 30fps value at every even vsync of the
+// charge.
+[60FPS - camera bob]
+description=Rise and sink the camera during a smash charge at its real speed.
+patch=1,EE,002FD074,word,3CAB92A5 // pi/75 -> pi/150   phase step while charging
+patch=1,EE,002FD088,word,3D56774E // pi/30 -> pi/60    return step after the charge

@@ -474,3 +474,46 @@ completion timer (`FUN_001C47A8` reads a remaining/step pair at `+0x144`/`+0x148
 off the model) and is correct; another drives the skeleton pose and the cinematic
 camera, and is not. Finding it would close #7 and #10 together, since Cell's
 transformation shows the same 22-35 point residual after the same groups.
+
+## 2026-09-29 - issue #106, the camera bob in a smash charge
+
+Found by `hunt2.py` on a held Square: while Krillin charges a smash (state 75,
+165 vsyncs in both arms), fighter+0x4B0 rose 0.0419 a tick in both arms.
+
+### What it is
+
+`FUN_001C4E88(fighter)` keeps a phase at fighter+0x4B0 and returns
+`sin(phase) * 1.5`. Its three callers (`001C5C18`, `001C6200`, `001C63B0`) add
+that to the Y of the camera they build. Multiplying the 1.5 by 32 moves the
+camera by about half the screen, so the camera is what moves.
+
+| Condition | What happens to the phase | Constant, only reader |
+|---|---|---|
+| `FUN_001D63A8()` true, or fighter+0x4B8 == 0 | set to 0 | - |
+| motion flag 14 set (fighter+0x1086 bit 6) | += pi/75, wrapped to ±pi | `002FD074`, `001C4EDC` |
+| otherwise | folded into ±pi/2, then moved to 0 by pi/30 | `002FD088`, `001C4F38` |
+
+At 30fps the phase covers a 5 second period. At 60fps it covered 2.5 seconds, so
+through a full charge the camera rose, sank below its start and came back up.
+At 30fps the camera only rose and began to come back down.
+
+### The fix
+
+`[60FPS - camera bob]` halves both steps, as exact float halves (the exponent
+drops by one). With it, the phase equals the 30fps value at every even vsync of
+the charge (0 mismatches over 180 vsyncs).
+
+### Measured and left alone
+
+- **The aim blend, `FUN_001D6580` and `FUN_001D6C08`.** Both move two weights at
+  model+0xD50/+0xD54 toward a target by 0.3 a tick (`002FD2D4`, `002FD300`).
+  That is a per-tick lerp. But no code reads either weight except these two lerps.
+  Freezing them at 1.0 or snapping them to 0 changes the frame at v80 by 0.25 and
+  0.0000005 mean pixel, against 0.0 for determinism. Not shipped.
+- **Flag 14 clears 7 vsyncs after the state at 60fps.** At 30fps, flag 14 and the
+  state change on the same vsync. At 60fps flag 15 is set 7 vsyncs after the state
+  changes, in every arm including v24. `001CD7B0` sets it from a condition in s4, not a counter. The
+  bob moves 7 more small steps. Not chased.
+- **The charge ends 3 vsyncs early** (v178 against v181; 162 ticks against 82).
+  This is the one-tick hand-off seen elsewhere. The hit on the opponent lands
+  at v137 against v139.
