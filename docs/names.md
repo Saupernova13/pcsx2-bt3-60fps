@@ -31,6 +31,7 @@ from SuperCombo's names to this repo's old terms.
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
+| poses snapping, ki blasts not chaining | Motion crossfade (no wiki name) | `motion blend`, issue #98 |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
 | speed lines (Hercule's Present Bomb) | Speed-line effect | issue #8 |
