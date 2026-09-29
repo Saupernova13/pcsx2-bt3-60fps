@@ -1313,9 +1313,9 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // Krillin's ki blast, Triangle from save state 3, every open fix on:
 //
 //                                    30fps      60fps before   with this group
-//   crossfade 0.833 -> 0             v15-v25    v15-v20        v15-v26
+//   crossfade 0.833 -> 0             v19-v29    v19-v24        v19-v30
 //   a bone rotation settles          v29        v24            v30
-//   firing state 174 ends            v29        v23            v29
+//   firing state 174 ends            v31        v25            v31
 //   three taps 20 vsyncs apart       one chain  idle between   one chain
 //
 // With the group the bone rotation passes through each 30fps value one vsync
