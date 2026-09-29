@@ -1300,3 +1300,40 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Spiral effects, found 2026-09-29 for issue #101. One effect class (vtable
+// 002C3F50) draws the blue spiral that winds round the Special Beam Cannon. Its
+// update, FUN_00187F90, runs once a tick on the object at node+0x38: a start
+// delay (+0x258) and a fade (+0x260), each -1.0 a tick; an age (+0x250), +1.0 a
+// tick against a lifetime of +0x34 seconds * 30.0; a countdown (+0x25C); the
+// spiral's counter (+0x368) and scale (+0x370); and FUN_0018A7A0, which steps
+// each segment of its chain. So at 60fps the spiral wound and grew twice as
+// fast. The update opens with the game's freeze check (00187FC0) and skips all
+// of it while frozen; the spiral is drawn by a separate method (vtable+0x14,
+// FUN_00188258). The wrapper below answers "frozen" on odd ticks, the same fix
+// [60FPS - thrown object rate] uses, so the whole update runs at 30Hz and the
+// spiral is still drawn every frame.
+//
+// Imperfect Cell, L2 + Up + Triangle from save state 1, every open fix on:
+//
+//                                 30fps    60fps before   with this group
+//   spiral counter reaches 24     v103     v80            v104
+//   spiral scale reaches 1.1      v101     v79            v102
+//
+// The beam ends the spiral from outside, 4 vsyncs early at 60fps in every arm:
+// the beam's own one-tick hand-offs. The beam's damage is the same with and
+// without the group.
+[60FPS - spiral effect rate]
+description=Wind the Special Beam Cannon's spiral at the game's own 30Hz, so it grows and turns at its real speed instead of twice as fast.
+patch=1,EE,000F1BC0,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1BC4,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1BC8,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1BCC,word,00000000 // nop
+patch=1,EE,000F1BD0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1BD4,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1BD8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1BDC,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1BE0,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1BE4,word,03E00008 // jr $ra
+patch=1,EE,000F1BE8,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,00187FC0,word,0C03C6F0 // jal 0012D1D0 -> jal 000F1BC0   spiral class update
