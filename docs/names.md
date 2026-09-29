@@ -14,6 +14,7 @@ from SuperCombo's names to this repo's old terms.
 | blast stock, the gold number | Blast Stock: pays for Blast 1s and transformations | regen not measured |
 | buffs | Timed Blast 1s: stat boosts, After Image Strike | `buff duration` (PR #25) |
 | blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration` |
+| light rays round a charging Kamehameha | Ray effect (one effect class) | `ray effect rate`, issue #103 |
 | ult, ultimate attack | Ultimate Blast (`L2`+`Down`+`Triangle`, in Max Power Mode) | same, plus `camera pacing` |
 | regular ki blast, tap Triangle | Rush Ki Blast; held Triangle is a Smash Ki Blast | `projectile travel` |
 | Hercule's rocks, grenades | Grenade: Hercule's Rush and Smash Ki Blasts | `thrown object rate` (PR #26) |
