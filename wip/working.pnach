@@ -1325,8 +1325,9 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 //   emitter 3 life, 6 -> 0    16 vsyncs   8 vsyncs       16 vsyncs
 //
 // Goten, R3 from save state 8: the swirl's tick counter and spin angle take the
-// 30fps value at every vsync from v6 to v70. Without the group they start at
-// v18, not v26, and step every vsync.
+// 30fps value at every vsync from v10 to v70 (the emitter is set up a vsync
+// early, at v9). Without the group they start at v18, not v26, and step every
+// vsync.
 [60FPS - swirl effect rate]
 description=Run the wind swirls of a ki charge or a transformation at the game's own 30Hz, so they turn and fade at their real speed instead of twice as fast.
 patch=1,EE,000F1B60,word,27BDFFF0 // addiu $sp, $sp, -16
