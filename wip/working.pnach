@@ -1300,3 +1300,27 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Motion blends, found 2026-09-29 for issue #98. When a model changes motion,
+// FUN_0024C668(model, seconds) starts a crossfade: weight model+0xC84 = 1.0 and
+// step model+0xC88 = 1 / (seconds * 30.0), the only store to that step.
+// FUN_001C47A8 counts the weight down by the step once a tick. [60FPS - animation
+// clock] halves the clip time but not this countdown, so at 60fps every blend
+// between two motions finished in half its seconds, and states that wait for
+// the blend ended early. 30.0 becomes 60.0: the step halves at its source and
+// the blend is sampled at 60Hz over its real length.
+//
+// Krillin's ki blast, Triangle from save state 3, every open fix on:
+//
+//                                    30fps      60fps before   with this group
+//   crossfade 0.833 -> 0             v15-v25    v15-v20        v15-v26
+//   a bone rotation settles          v29        v24            v30
+//   firing state 174 ends            v29        v23            v29
+//   three taps 20 vsyncs apart       one chain  idle between   one chain
+//
+// With the group the bone rotation passes through each 30fps value one vsync
+// after it. The ki charge ends at v216 as at 30fps (v212 before). The other
+// smoke-test timelines are unchanged.
+[60FPS - motion blend]
+description=Blend between a fighter's motions over their real time, so poses do not snap and moves that wait for the blend, such as chained ki blasts, keep their 30fps timing.
+patch=1,EE,0024C6A8,word,3C014270 // lui $at, 0x41F0 (30.0) -> 0x4270 (60.0)   crossfade ticks per second
