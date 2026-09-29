@@ -55,7 +55,8 @@ Smoke-test timelines, P1's state changes after the presses:
 |---|---|---|---|
 | ki blast, three taps 20 vsyncs apart | 174 from v6, idle at v78 | idle at v24, v48 and v72 between shots | 174 from v6, idle at v78 |
 | ki charge, `L2` 200 vsyncs | idle at v216 | v212 | v216 |
-| the other 11 moves | - | unchanged by the group | unchanged |
+| the other 11 moves timed | - | unchanged by the group | unchanged |
 
 The other moves' remaining leads (the fork, Hell's Storm, the Kamehameha's end)
-do not come from the blend. All 15 smoke moves return to idle.
+do not come from the blend. Vegeta's and Goten's transformations were only
+smoke-tested, not timed. All 15 smoke moves return to idle.
