@@ -212,11 +212,18 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# Ray effects, found 2026-09-29 for issue #103. One effect class draws the light
+# rays of a charging Kamehameha and counts its delay, life, hold and fade once a
+# tick. The game's own freeze check answers "frozen" on odd ticks for that
+# update, so it runs at 30Hz and still draws at 60.
+RAYS = ["60FPS - ray effect rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + RAYS
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -274,7 +281,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + RAYS),
+    # "full" without the ray effects, so that group has a named baseline.
+    "norays": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

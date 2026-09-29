@@ -1300,3 +1300,37 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Ray effects, found 2026-09-29 for issue #103. One effect class (vtable
+// 002C3AA8) draws the long light rays that burst from a charging Kamehameha.
+// Its update, FUN_00168C00, runs once a tick on the object at node+0x38 and
+// counts a start delay (+0x38), a life (+0x48), a hold (+0x3C) and a fade
+// (+0x44 over +0x40, the alpha +0x4C = fade / length) down by 1.0 each, so at
+// 60fps the rays vanished early. The update opens with the game's freeze check
+// (00168C2C) and skips all of it while frozen; the rays are drawn by a separate
+// method (vtable+0x14, FUN_00168DA0). The wrapper below answers "frozen" on odd
+// ticks, the same fix [60FPS - thrown object rate] uses, so the whole update
+// runs at 30Hz and the rays are still drawn every frame.
+//
+// Goku's Kamehameha, L2 + Triangle held 60 vsyncs from save state 0, every
+// open fix on:
+//
+//                          30fps       60fps before   with this group
+//   hold 3 -> 0            v97-v101    v97-v99        v97-v101
+//   alpha drops to 0       v103        v100           v103
+//
+// The hold and the alpha take the 30fps value at every vsync from v81 to v104.
+[60FPS - ray effect rate]
+description=Hold and fade the light rays of a charging Kamehameha at the game's own 30Hz, so they last their real time instead of vanishing early.
+patch=1,EE,000F1BF0,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1BF4,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1BF8,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1BFC,word,00000000 // nop
+patch=1,EE,000F1C00,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1C04,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1C08,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C0C,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1C10,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1C14,word,03E00008 // jr $ra
+patch=1,EE,000F1C18,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,00168C2C,word,0C03C6FC // jal 0012D1D0 -> jal 000F1BF0   ray class update
