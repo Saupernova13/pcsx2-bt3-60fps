@@ -37,6 +37,7 @@ from SuperCombo's names to this repo's old terms.
 | World Tournament helicopter, blimp | Stage props | issue #9, PR #19 |
 | desert wind | Rocky Area stage wind | issue #11 |
 | transformations (Cell, Vegeta (Scouter)'s Great Ape) | Transformation (`R3`, costs Blast Stock) | issues #7, #10 |
+| white wind swirling round a fighter charging ki or transforming | Swirl effect (one effect class) | `swirl effect rate`, issue #94 |
 
 `effect rotation` is the spin of aura and effect swirls. It is not the aura's
 playback speed; that is `aura update rate`.
