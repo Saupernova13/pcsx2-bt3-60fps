@@ -479,3 +479,17 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - eye blinks (#90)
+
+Adds `[60FPS - eye blink]` (a wrapper at `000F1AF0` and one hook).
+`FUN_0024EB70` re-arms a random 90-179 tick blink timer and holds the blink
+image for 3-5 ticks, counted once a tick; its random branch now runs on even
+ticks only.
+
+| Save state 6, 30 seconds of idle, per face | 30fps | 60fps before | 60fps with the group |
+|---|---|---|---|
+| blinks | 6-7 | 13 | 7 |
+| blink length | 6, 8 or 10 vsyncs | 3, 4 or 5 | 6, 8 or 10 |
+
+**Not confirmed in play.**
