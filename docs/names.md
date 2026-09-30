@@ -38,5 +38,6 @@ from SuperCombo's names to this repo's old terms.
 | desert wind | Rocky Area stage wind | issue #11 |
 | transformations (Cell, Vegeta (Scouter)'s Great Ape) | Transformation (`R3`, costs Blast Stock) | issues #7, #10 |
 
-`effect rotation` is the spin of aura and effect swirls. It is not the aura's
-playback speed; that is `aura update rate`.
+`effect rotation` is the sway of a model's dangling pieces, such as a hair
+lock (issue #113; it was first taken for the spin of aura swirls). It is not
+the aura's playback speed; that is `aura update rate`.

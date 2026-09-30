@@ -479,3 +479,17 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - effect rotation's fourth word (#113)
+
+Removes one word from the shipped `[60FPS - effect rotation]`. `002FE738`
+(0.90) is the phase lag a chained dangling piece keeps behind its parent, not a
+per-tick rate, and halving it put the second link of every chain 0.45 rad
+behind the first instead of 0.90. The three real rates stay halved.
+
+| Ultimate Gohan's forehead lock, idle | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| second link's phase behind the first | 0.90 | 0.45 | 0.90 |
+| 30Hz ticks of v1-v121 where it equals 30fps | - | 0 of 61 | 61 of 61 |
+
+**Not confirmed in play.**
