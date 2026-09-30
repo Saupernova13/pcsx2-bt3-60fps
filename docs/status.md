@@ -1,9 +1,9 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v23**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v25**.
 
-What every version changed and discovered, v01 through v23, is in
+What every version changed and discovered, v01 through v25, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
@@ -32,6 +32,8 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
+| `v25-state-phase-timers` | 33 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
+| `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21. Fixed in v25 |
 | `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
@@ -245,21 +247,68 @@ also confirms **Buu's breath attack** is fixed by this group - a move that was
 never measured, and evidence the hook sits on the class rather than on the one
 blast it was found through. **Inherits v12's input-timing flag.**
 
-## The state 157 trap
+## The state 157 trap - explained 2026-09-16
 
-Goku parks in fighter state 157 (`FUN_001E6DC8`), an airborne dash/flight state,
-with pending state `0xFFFFFFFF` - no queued transition - and no button held. The
-game keeps ticking normally; only that fighter is trapped. A save-state reload
-clears it.
+Goku parks in fighter state 157 (`FUN_001E6DC8`) with pending state
+`0xFFFFFFFF` - no queued transition - and no button held. The game keeps ticking
+normally; only that fighter is trapped. A save-state reload clears it.
 
-Seen on v9 (17 groups). Not seen on v11 (15) or so far on v12 (16). The group
-that differs and is out of both is `[60FPS - state phase timers]`, which is the
-only group that gates counters **inside the fighter state machine** and whose 28
-sites were all validated against two **grounded** oracles - a held charge and a
-mashed rush. No airborne state was ever tested, and the trap is airborne.
+Seen on v9 (17 groups). Not seen on v11 (15) or v12 (16). The group that differs
+and is out of both is `[60FPS - state phase timers]`, which is the only group
+that gates counters **inside the fighter state machine** and whose 28 sites were
+all validated against two **grounded** oracles - a held charge and a mashed rush.
 
-That is a strong circumstantial case, not a proof. It was never reproduced under
-controlled conditions.
+**The cause has since been found by reading the binary rather than by
+reproducing it.** `FUN_001E6DC8` is state 157's own handler, and one of the 22
+gated sites - `001E6F40` - is inside it. That counter is **an index into a table,
+not a count of frames**: the bound is the entry count `lb [s2+8]`, the exit test
+is `i >= N-1`, and the body does `sll i,1` / `addu s2` / `lh [+6]`. Gating an
+index makes the state walk its table at half rate, and since the advance is
+conditional on `FUN_001C48B8`, an entry finishing on an odd tick advances it by
+nothing. A state that cannot reach `i >= N-1` cannot leave.
+
+An audit of all 22 sites classified 21 as clocks - each compared against an
+authored frame count - and `001E6F40` as the only index. It is out of the group,
+which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
+
+**Still not reproduced.** The mechanism is a reading of the code, and a strong
+one, but the trap itself has never been triggered on demand, so the reinstated
+group wants a play test before a release carries it.
+
+**2026-09-21: the audit was wrong four times, and v24 shipped a trap (#39).**
+The user saved a state in the freeze on v24: Goku in state 93
+(`FUN_001E5CE8`), phase `fighter+0x3D8` stuck at 0, and an 8-tick loop in
+phase 0 that leaves through the gated site `001E6060`. When the loop ends on an
+odd tick the phase is not advanced, and since 8 is even, every later pass ends
+on an odd tick too. `001E6060`, `001F3320`, `001F9D48` and `001FBBD0` all add one
+and branch away with no compare. They are phase numbers, not clocks, and the
+fix takes all four out and writes the game's own instruction back. Loading
+the user's frozen state under the fix frees the fighter within 69 ticks. See
+[`findings/state-machine.md`](findings/state-machine.md).
+
+## v24 (proposed) - the state phase timers, reinstated
+
+Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
+210 lines. Closes issue #12: `FUN_001EE968`, the idle handler, counts to
+`0x5B` - 91 frames authored at 30Hz - at `001EEBAC` and then hands over to state
+67, the taunt, so at 60fps an idle fighter taunts in half the real time.
+
+Measured from a match-start state, timing the counter itself:
+
+| arm | counter starts | taunts | counting took |
+|---|---|---|---|
+| unpatched 30fps | vsync 198 | 378 | **180 vsyncs** |
+| v23 | - | 248 | ~90 |
+| v23 + this group | vsync 158 | 338 | **180 vsyncs** |
+
+The timer is exact. The counter still *starts* 40 vsyncs early, which is a
+separate defect in the pre-fight sequence, not in this group. (2026-09-28: it
+is not a defect - it comes from the match-start save state, and a match
+started through the menus shows no lead; see `docs/rig.md`.)
+
+**Not confirmed in play.** Two things are open: the state 157 trap above, and
+whether this also fixes issue #6, the perfect smash cue, which is a window
+inside a held charge and was not isolated.
 
 ## v19 - screen fade
 
@@ -317,6 +366,26 @@ overshoot.
 Recorded as fixed because the user played it. **Recorded as unattributed
 because it is: an unattributed fix can regress without anyone knowing why.** If
 a transformation ever runs long again, this is the note to come back to.
+
+## v24 (proposed) - the stage's own animation
+
+Adds `[60FPS - stage animation]`, one data word. Closes issue #9: the World
+Tournament stage's moving scenery runs at double speed.
+
+A stage's animated props are a scene graph with keyframe tracks, walked by
+`FUN_00115478` and evaluated by `FUN_00123890`. The time that indexes the track
+lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
+60 units of track a second at 30Hz, 120 at 60Hz.
+
+| World Tournament - Noon, 80 vsyncs | stage time |
+|---|---|
+| unpatched 30fps | 94 -> 172, **+78** |
+| v23 | 122 -> 280, +158 |
+| **v23 + this group** | 92 -> 171, **+79** |
+
+**Not confirmed in play.** Measured on one map. The evaluator does not run at
+all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
+untouched by this.
 
 ## v20 - the shipped header caught up
 

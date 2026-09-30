@@ -26,10 +26,12 @@ from __future__ import annotations
 import argparse
 import time
 
+# Before numpy and PIL: until this has run, tools/ is at the front of
+# sys.path and shadows the stdlib. See tools/_bootstrap.py.
+import _bootstrap  # noqa: F401
+
 import numpy as np
 from PIL import Image
-
-import _bootstrap  # noqa: F401
 
 import patchctl
 from game import config
@@ -80,6 +82,9 @@ def main() -> int:
     args = parser.parse_args()
 
     marks = [int(m) for m in args.marks.split(",")]
+    if any(m <= prev for prev, m in zip([0] + marks, marks)):
+        raise SystemExit("--marks must be increasing and above 0: every capture "
+                         "advances one frame, so a mark cannot be repeated")
     band = tuple(float(v) for v in args.band.split(",")) if args.band else None
     snaps = config.roo_snaps_dir()
     snaps.mkdir(parents=True, exist_ok=True)
@@ -96,7 +101,10 @@ def main() -> int:
             roo.input_press(args.press, frames=args.frames)
         shots, at = [], 0
         for mark in marks:
-            roo.frame_advance(max(0, mark - at - 1))
+            # frame_advance(0) is not a no-op: it advances one frame. Sent
+            # between consecutive marks, it made the second capture a frame late.
+            if mark - at > 1:
+                roo.frame_advance(mark - at - 1)
             shots.append(grab(roo, raw, band))
             at = mark
         roo.flush_input()

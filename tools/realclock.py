@@ -23,10 +23,13 @@ from __future__ import annotations
 import argparse
 import time
 
+# Before numpy and PIL: until this has run, tools/ is at the front of
+# sys.path and shadows the stdlib. See tools/_bootstrap.py.
+import _bootstrap  # noqa: F401
+
 import numpy as np
 from PIL import Image, ImageDraw
 
-import _bootstrap  # noqa: F401
 import patchctl
 
 from game import config

@@ -39,9 +39,21 @@ A group is not shipped because it measures correct. It ships when it has been
 build is measured but unplayed. Do not cut a release for a group that has only
 been measured; say it is ready for a play test and let the owner decide.
 
+**A merge that changes the shipped patch becomes a version.** The owner's rule:
+merges to `main` only happen once something has been played, so the merge is the
+play-test gate. `.github/workflows/version.yml` enforces the rest - it compares
+the exported `patch=` lines against `patch/428113C2.pnach` and, when they differ,
+scaffolds a DRAFT `docs/versions/vNN-*.md` and opens a release PR. Edit the note
+and merge that PR; its merge tags the version and publishes the Release. Docs,
+tooling and comment-only edits to `wip/working.pnach` owe no version.
+
+Do not tag a version by hand, and do not merge a release PR whose note is still
+a DRAFT. `tools/version.py` is the reference for all of it;
+[`docs/releases.md`](docs/releases.md) has the prose.
+
 `patch/428113C2.pnach` is the released file and only `tools/export.py --release`
-writes it. Never deploy `wip/working.pnach` to a real install: it carries groups
-that must never be enabled.
+writes it (the release workflow calls it). Never deploy `wip/working.pnach` to a
+real install: it carries groups that must never be enabled.
 
 ## Names
 
