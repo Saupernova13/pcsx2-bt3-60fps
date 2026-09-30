@@ -1279,3 +1279,25 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Voice cooldowns, found 2026-09-28 for issue #86. FUN_001DC738(fighter,
+// category) plays a voice clip - a random variant of one of 57 categories - and
+// then blocks that category for a cooldown at fighter+0x1454 + 4*category:
+//     cooldown = table seconds * 30.0      001DC85C, the table at
+//                                          *(*(gp-0x575C)+0x28), 8 bytes each
+// FUN_001DC918 counts all 57 down by 1 once a tick (from the fighter update at
+// 001C1C24), and a category plays again only at 0, so at 60fps a grunt or shout
+// could repeat after half its time. Those two are the only code that writes or
+// reads the cooldowns, and the 30.0 is an immediate this multiply alone uses, so
+// it becomes 60.0: a 0.5 s cooldown is 30 ticks at 60Hz.
+//
+// Save state 3, Krillin 66 units from a standing Ultimate Gohan, rush and ki
+// blast strings, every open fix on:
+//
+//                       0.5 s cooldown   0.4 s cooldown   clips over a 7-hit rush
+//   30fps               30 vsyncs        24 vsyncs        4
+//   60fps, before       15               12               5
+//   60fps, this group   30               24               4, on the same vsyncs
+[60FPS - voice cooldown]
+description=Keep each voice line's cooldown for its real time, so grunts and shouts do not repeat twice as often.
+patch=1,EE,001DC85C,word,3C014270 // lui $at, 0x41f0 -> 0x4270   seconds * 30 -> * 60

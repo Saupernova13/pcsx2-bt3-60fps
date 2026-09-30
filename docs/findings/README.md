@@ -22,6 +22,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Widescreen](widescreen.md) | The widescreen model and every aspect group. | 2 |
 | [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 1 |
 | [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 1 |
+| [Sound: voice line cooldowns](sound.md) | Each fighter's 57 voice categories and the per-tick cooldown between clips. | 1 |
 
 ## The original introduction
 

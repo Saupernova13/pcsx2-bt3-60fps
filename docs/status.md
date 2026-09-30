@@ -479,3 +479,16 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - voice cooldowns (#86)
+
+Adds `[60FPS - voice cooldown]` (one word). A fighter's voice category stays
+quiet for table seconds * 30.0 ticks after a clip, counted down once a tick;
+the 30.0 becomes 60.0.
+
+| Save state 3, every open fix on | 30fps | 60fps before | 60fps with the group |
+|---|---|---|---|
+| a 0.5 s cooldown | 30 vsyncs | 15 | 30 |
+| clips over a 7-hit rush | 4 | 5 | 4, on the same vsyncs |
+
+**Not confirmed in play.**
