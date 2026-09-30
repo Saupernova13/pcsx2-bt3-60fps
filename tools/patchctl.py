@@ -214,11 +214,18 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# Swirl effects, found 2026-09-29 for issue #94. One effect class draws the wind
+# swirls of a ki charge and of Goten's transformation, and ages its particles and
+# counts its emitter timers once a tick. The game's own freeze check answers
+# "frozen" on odd ticks for that update, so it runs at 30Hz and still draws at 60.
+SWIRL = ["60FPS - swirl effect rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SWIRL
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -276,7 +283,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + SWIRL),
+    # "full" without the swirl effects, so that group has a named baseline.
+    "noswirl": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

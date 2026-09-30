@@ -1279,3 +1279,45 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Swirl effects, found 2026-09-29 for issue #94. One effect class (vtable
+// 002C40C0) draws the white wind swirls round a fighter charging ki and round
+// Goten as he transforms. Its update, FUN_00190FE8, runs once a tick on the
+// emitter at node+0x38:
+//     +0x68         start delay, -1.0 a tick; nothing else runs while it is above 0
+//     +0x64         tick counter, +1.0 a tick; +0x3B8 particles spawn whenever it
+//                   is a multiple of +0x3B4, each turning the emitter a step
+//     +0x60, +0x6C  life and a countdown, -1.0 a tick
+//     FUN_00191D28  ages every particle +1.0 a tick (+0x118) and moves it
+// so at 60fps the swirls started early, turned twice as fast and lived half as
+// long. The update opens with the game's freeze check (0019101C) and skips all
+// of it while frozen; the swirl is drawn by a separate method (vtable+0x14,
+// FUN_00191348). The wrapper below answers "frozen" on odd ticks, the same fix
+// [60FPS - thrown object rate] uses, so the whole update runs at 30Hz and the
+// swirl is still drawn every frame. Nothing it calls is paced by another group.
+//
+// Every open fix on. Krillin charging ki, L2 held from save state 3:
+//
+//                             30fps       60fps before   with this group
+//   emitter 1 tick counter    64 steps    122 steps      64 steps
+//   emitter 2 tick counter    69 steps    125 steps      69 steps
+//   emitter 3 life, 6 -> 0    16 vsyncs   8 vsyncs       16 vsyncs
+//
+// Goten, R3 from save state 8: the swirl's tick counter and spin angle take the
+// 30fps value at every vsync from v10 to v70 (the emitter is set up a vsync
+// early, at v9). Without the group they start at v18, not v26, and step every
+// vsync.
+[60FPS - swirl effect rate]
+description=Run the wind swirls of a ki charge or a transformation at the game's own 30Hz, so they turn and fade at their real speed instead of twice as fast.
+patch=1,EE,000F1B60,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1B64,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1B68,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1B6C,word,00000000 // nop
+patch=1,EE,000F1B70,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1B74,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1B78,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1B7C,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1B80,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1B84,word,03E00008 // jr $ra
+patch=1,EE,000F1B88,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0019101C,word,0C03C6D8 // jal 0012D1D0 -> jal 000F1B60   swirl emitter update

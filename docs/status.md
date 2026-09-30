@@ -479,3 +479,19 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - swirl effects (#94)
+
+Adds `[60FPS - swirl effect rate]` (a wrapper at `000F1B60` and one hook). One
+effect class draws the white wind swirls round a fighter charging ki and round
+Goten as he transforms, and counts its timers and ages its particles once a
+tick. The game's own freeze check now answers "frozen" on odd ticks for that
+update, so it runs at 30Hz and is still drawn every frame.
+
+| every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| Krillin's ki charge, emitter 1 | 64 steps | 122 | 64 |
+| Krillin's ki charge, emitter 3's life | 16 vsyncs | 8 | 16 |
+| Goten's swirl starts turning | v26 | v18 | v26 |
+
+**Not confirmed in play.**
