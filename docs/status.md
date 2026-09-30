@@ -1,9 +1,9 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v23**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v24**.
 
-What every version changed and discovered, v01 through v23, is in
+What every version changed and discovered, v01 through v24, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
@@ -32,6 +32,7 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
+| `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21, and fixed by taking those four gates out. Fall back to v23 until the fix ships |
 | `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
@@ -272,6 +273,17 @@ which now gates 21 sites. Full derivation in [`findings.md`](findings.md).
 **Still not reproduced.** The mechanism is a reading of the code, and a strong
 one, but the trap itself has never been triggered on demand, so the reinstated
 group wants a play test before a release carries it.
+
+**2026-09-21: the audit was wrong four times, and v24 shipped a trap (#39).**
+The user saved a state in the freeze on v24: Goku in state 93
+(`FUN_001E5CE8`), phase `fighter+0x3D8` stuck at 0, and an 8-tick loop in
+phase 0 that leaves through the gated site `001E6060`. When the loop ends on an
+odd tick the phase is not advanced, and since 8 is even, every later pass ends
+on an odd tick too. `001E6060`, `001F3320`, `001F9D48` and `001FBBD0` all add one
+and branch away with no compare. They are phase numbers, not clocks, and the
+fix takes all four out and writes the game's own instruction back. Loading
+the user's frozen state under the fix frees the fighter within 69 ticks. See
+[`findings/state-machine.md`](findings/state-machine.md).
 
 ## v24 (proposed) - the state phase timers, reinstated
 
