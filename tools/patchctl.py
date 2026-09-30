@@ -190,6 +190,13 @@ THROWN = ["60FPS - thrown object rate"]
 # and steps the flash on even ticks.
 SOLARFLARE = ["60FPS - solar flare"]
 
+# Blast 1 buff durations, found 2026-09-16. One register carries the duration
+# through all 54 cases of FUN_00200408's jump table, and it is set in exactly
+# one place, so one word doubles every buff timer. SuperCombo publishes these
+# in seconds, which is the oracle - Saiyan Soul's 20s reads 20.00s at 30fps,
+# 10.00s at 60fps, and 20.00s with this on.
+BUFFDUR = ["60FPS - buff duration"]
+
 # The Rush Struggle, found 2026-09-10. Two rush attacks collide and both players
 # rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
 # has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
@@ -218,7 +225,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + BUFFDUR
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -276,7 +284,13 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN
+             + BUFFDUR),
+    # "full" without the buff durations, so that group has a named A/B baseline.
+    "nobuff": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
