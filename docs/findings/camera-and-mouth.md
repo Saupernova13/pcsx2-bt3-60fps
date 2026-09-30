@@ -474,3 +474,32 @@ completion timer (`FUN_001C47A8` reads a remaining/step pair at `+0x144`/`+0x148
 off the model) and is correct; another drives the skeleton pose and the cinematic
 camera, and is not. Finding it would close #7 and #10 together, since Cell's
 transformation shows the same 22-35 point residual after the same groups.
+
+## 2026-09-22 - issue #67, the transformation loader is polled per tick
+
+Every transformation plays a power-up animation (`0x177`), a wait (`0x178`) and
+a reveal (`0x179`) in `FUN_001FDFA8` (state 236) or its siblings. The wait ends
+when the battle manager's cinematic state reaches ready (`+0x264` = 3/4,
+`+0x268` = 1), which the loader `FUN_001278B0` sets once the new form's data is
+in. Its poll, `00127A70 jal FUN_00265298`, is a state machine that advances at
+most one stage per call.
+
+| load, ld1 → ld2 | 30fps | v24 |
+|---|---|---|
+| Goten's Super Saiyan | 134 vsyncs | 124 |
+| Vegeta (Scouter)'s Great Ape | 148 | 129 |
+| Cell 1st Form | 32 | 29 |
+
+Each fits a fixed disc time plus N polls (Goten 114 + 10, Vegeta 110 + 19,
+Cell 26 + 3). `[60FPS - transformation load]` answers the battle loader's call
+"not ready" on odd ticks, so it polls at 30Hz; only that call site is hooked,
+because `FUN_00265298` has 13 callers including the menus.
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Goten's reveal starts | v148 | v135 | v145 |
+| Vegeta's load ends | v161 | v139 | v161 |
+| Goten, drift from 30fps (mean / v200) | 0 / 0 | 67.6 / 38.4 | 50.3 / 4.8 |
+
+Vegeta's picture does not change: his cinematic waits for a later signal
+(`+0x264` = 4 at v397/398 in every arm), so his early load was invisible.

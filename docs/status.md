@@ -286,6 +286,20 @@ fix takes all four out and writes the game's own instruction back. Loading
 the user's frozen state under the fix frees the fighter within 69 ticks. See
 [`findings/state-machine.md`](findings/state-machine.md).
 
+## Proposed - the transformation loader (#67)
+
+Adds `[60FPS - transformation load]`. The battle loader polls a load state
+machine that advances one stage per call, once a tick, so transformations
+revealed their new form early. The poll is now answered "not ready" on odd
+ticks.
+
+| Goten's Super Saiyan | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| reveal starts | v148 | v135 | v145 |
+| drift from 30fps (mean) | 0 | 67.6 | 50.3 |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
