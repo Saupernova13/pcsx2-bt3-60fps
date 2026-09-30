@@ -1279,3 +1279,57 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The health bar, found 2026-09-28 for issue #84. FUN_0021CD20 updates it once
+// a tick (HUD = *(gp-0x5728), HUD+0x24 the side it updates) and does two jobs:
+//     drain   the displayed health (HUD+0x28 + 4*side, the red section) falls
+//             toward the real one (HUD+0x30 + 4*side) by a speed a tick
+//             (HUD+0x248 + 4*side): at least 200 / 150 / 120 while the gap is
+//             over 20000 / 10000 / 5000, reset to 100 once it has caught up
+//     shake   three slots per side, a tick count and an amplitude (halfwords
+//             at HUD+0x0C + 12*side + 4*slot), set on a hit by FUN_0021FA38 and
+//             FUN_0021FA88 (15, 10 or 5 by damage, or 8); each tick a slot
+//             counts down and re-rolls its sprite's x/y offset
+// so at 60fps the red section drained, and the bar shook, in half the time.
+// The drain keeps its 60 steps a second at half the size; the shake loop runs
+// on even ticks, so its offsets change every 2 vsyncs as at 30fps.
+//
+// Present Bomb against Ultimate Gohan (rocky-hercule-vs-standing-gohan.p2s),
+// every open fix on:
+//
+//                          drain 6360    shake, count 10       shake, count 5
+//   30fps                  104 vsyncs    20, new offset / 2    10
+//   60fps, before          52            10, new offset / 1    5
+//   60fps, both groups     105           20, new offset / 2    10
+//
+// The function is not gated as a whole: it also steps the bar-break tween at
+// HUD+0x1B8 (jal 0x267B00 at 0021CE58), which [60FPS - tween duration] already
+// times in 60Hz frames.
+[60FPS - health bar drain]
+description=Drain the red part of the health bar at its real speed after a hit.
+patch=1,EE,0021CE9C,word,24050064 // addiu $a1, $zero, 200 -> 100   gap over 20000
+patch=1,EE,0021CEAC,word,28430064 // slti $v1, $v0, 200 -> 100
+patch=1,EE,0021CEC0,word,2405004B // addiu $a1, $zero, 150 -> 75    gap over 10000
+patch=1,EE,0021CED0,word,2843004B // slti $v1, $v0, 150 -> 75
+patch=1,EE,0021CEE8,word,2405003C // addiu $a1, $zero, 120 -> 60    gap over 5000
+patch=1,EE,0021CEF4,word,2843003C // slti $v1, $v0, 120 -> 60
+patch=1,EE,0021CFD0,word,24030032 // addiu $v1, $zero, 100 -> 50    the reset speed
+
+// The shake loop (0021CD4C-0021CE24) on even ticks only. The wrapper is entered
+// from 0021CD44 in place of its lw, replays that lw and the sll after it (which
+// ran in the jump's delay slot on the old $s3), and on odd ticks continues after
+// the loop.
+[60FPS - health bar shake]
+description=Shake the health bar on a hit for as long as at 30fps.
+patch=1,EE,000F1AC0,word,8CB30024 // lw $s3, 0x24($a1)        replayed: the side
+patch=1,EE,000F1AC4,word,0013A040 // sll $s4, $s3, 1          replayed
+patch=1,EE,000F1AC8,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1ACC,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1AD0,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1AD4,word,15000003 // bnez $t0, 000F1AE4
+patch=1,EE,000F1AD8,word,00000000 // nop
+patch=1,EE,000F1ADC,word,08087353 // j 0x21CD4C               even tick: the shake loop
+patch=1,EE,000F1AE0,word,00000000 // nop
+patch=1,EE,000F1AE4,word,0808738B // j 0x21CE2C               odd tick: after it
+patch=1,EE,000F1AE8,word,00000000 // nop
+patch=1,EE,0021CD44,word,0803C6B0 // lw $s3, 0x24($a1) -> j 000F1AC0

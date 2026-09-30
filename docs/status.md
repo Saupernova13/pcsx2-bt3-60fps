@@ -479,3 +479,18 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - the health bar (#84)
+
+Adds `[60FPS - health bar drain]` (seven words) and `[60FPS - health bar shake]`
+(a wrapper at `000F1AC0` and one hook). `FUN_0021CD20` drains the red section
+by a speed a tick and counts the bar's shake down a tick; the speeds are halved
+and the shake loop runs on even ticks.
+
+| Present Bomb against Ultimate Gohan, every open fix on | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| red section drains 6360 health | 104 vsyncs | 52 | 105 |
+| shake on that hit | 20 vsyncs | 10 | 20 |
+| shake on a small hit | 10 vsyncs | 5 | 10 |
+
+**Not confirmed in play.**

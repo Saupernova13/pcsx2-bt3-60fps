@@ -214,11 +214,19 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# The health bar, found 2026-09-28 for issue #84. FUN_0021CD20 drains the red
+# section toward the real health by a speed a tick and counts the bar's shake
+# down a tick, so at 60fps both ran in half their time. The drain speeds are
+# halved and the shake loop runs on even ticks; the function is not gated whole,
+# because it also steps a tween [60FPS - tween duration] already times.
+HUD = ["60FPS - health bar drain", "60FPS - health bar shake"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + HUD
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -276,7 +284,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + HUD),
+    # "full" without the health bar, so those groups have a named baseline.
+    "nohud": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
