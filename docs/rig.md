@@ -183,7 +183,7 @@ group off:
 
 | file | scene | good for |
 |---|---|---|
-| `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | anything that starts at the bell |
+| `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | the stage and both fighters at the bell - but not the opening's timing, see below |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
 | `rocky-goten-trunks-team-vs-gohan.p2s` | Team Battle: Goten + Kid Trunks against a COM Ultimate Gohan (the COM fights) | transformations (`R3` is Super Saiyan), fusion set-up |
@@ -200,6 +200,18 @@ A state cut past the `Fight!` banner is what action tests need, and it is one
 `frame_advance` away from the above - but cut it into a real slot, back up
 whatever that slot held, and look at the result before measuring anything from
 it. See trap 3.
+
+**The match-start state cannot time a match's opening seconds.** An A/B from
+it shows the fight starting about 40 vsyncs early at 60fps; a match reached
+through the menus with the arm already on shows no lead at all - input goes
+live at v169 against v170 and the idle taunt comes at v349 against v351,
+counted from the battle manager's first frame. The state is cut on that first
+frame, so whatever the game set up while loading was set up by unpatched code:
+a tween at `0x0031C6B0` is one, taking the same steps per tick in every arm. For
+anything in the first seconds of a match, drive the menus into a fresh one:
+from the pause menu `Return to Character Select`, `Up` then `Cross` at `EXIT?`,
+`Cross` through both fighters' defaults and the map, and start counting when
+the battle manager goes non-null.
 
 ## Running the A/B
 
