@@ -479,3 +479,24 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - blast speed and size ramps (#109)
+
+Adds `[60FPS - blast ramp clock]` (two words). A blast can ramp its speed and
+the size of its hit volume over a time in seconds, which the game turned into
+ticks with `* 30.0`. At 60fps both ramps finished in half the time. Both
+constants are now 60.0.
+
+| every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| Devilman's Kaikosen: top speed reached | v53 | v38 | v53 |
+| Kaikosen: Gohan, 227 units away, paralysed | v61 | v54 | v58 |
+| Vegeta (Scouter)'s Explosive Wave: full size | v41 | v26 | v41 |
+| Explosive Wave: first damage at 39.7 units | v35 | v23 | v34 |
+| Explosive Wave: first damage at 54.5 units | v41 | v27 | v42 |
+| Super 17's Android Barrier: full size | v70 | v41 | v71 |
+
+Kaikosen's remaining 3 vsyncs are single ticks around the flight, not the ramp;
+see `docs/findings/blasts.md`.
+
+**Not confirmed in play.**
