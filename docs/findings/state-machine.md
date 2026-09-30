@@ -416,3 +416,72 @@ to 521.
   its own, `fighter+0x3DC`, and nothing compensates it, so phase 0 takes 133ms
   instead of 267ms. That is a timing error, not a freeze, and it is not this
   fix.
+
+## 2026-09-30 - issue #115: a rushing Blast 2's time limit is seconds * 30
+
+An audit of the 145 `lui $at, 0x41F0` sites: 71 of them run somewhere in the
+rig's scenes, and each of those was read. Most sit in effect classes that a
+group already runs at 30Hz, or inside the meter economy, which is gated whole.
+`001F9260` is neither.
+
+### The limit
+
+`FUN_001F8C00` is the handler of fighter states 284-289 (the state table has it
+at `002C4DEC`-`002C4E00`): the rush of a rushing Blast 2. For the animations in
+which the fighter is closing on the opponent it runs, once a tick:
+
+    001F9240  lw    $v0, 0($s6)          fighter+0x3DC
+    001F924C  addiu $v0, $v0, 1
+    001F9258  jal   FUN_00210E28         params+0x1C of this blast: seconds
+    001F925C  sw    $v0, 0($s6)
+    001F9260  lui   $at, 0x41F0          * 30.0
+    001F926C  c.olt.s $f0, $f20          limit < counter: the rush is over
+
+`fighter+0x3D8`, next to it, counts 16 ticks of being in range and is one of
+the clocks `[60FPS - state phase timers]` gates. `+0x3DC` is not gated, and
+gating it would be wrong for the same reason #39 was: other states use the word
+for other things.
+
+### Measured
+
+Cell 2nd Form's Drain Life has a limit of 1.5 s. Save state 7 is a 1P vs 2P
+match against Ultimate Gohan; the scene backs Cell away with `Down` under the
+30fps words until the two are a set distance apart, waits 60 vsyncs, applies the
+arm under test and fires `L2 + Up + Triangle`. The stage wall stops him at 780
+units.
+
+| start distance | 30fps | 60fps before | with `001F9260` at 60.0 |
+|---|---|---|---|
+| 309 | grab v110, counter 10 | grab v109, counter 20 | grab v109, counter 20 |
+| 510 | grab v130, counter 20 | grab v130, counter 41 | grab v130, counter 41 |
+| 609 | grab v142, counter 26 | gives up v140 at 46, 72 units short | grab v141, counter 52 |
+| 701 | grab v152, counter 31 | gives up v140, 164 short | grab v151, counter 62 |
+| 780 | grab v160, counter 35 | gives up v140, 243 short | grab v159, counter 70 |
+
+`[60FPS - rush blast time limit]` is that one word.
+
+### Left alone
+
+- **`FUN_001F7DE8`, states 275-277.** The same comparison at `001F8398`, against
+  `fighter+0x3D8` and with the limit less one. None of the seven blast inputs
+  from any of the ten save states enters those states, so there is nothing to
+  measure a change against.
+- **The limit itself.** 30fps would run out at about 940 units by the counter's
+  pace; the wall is at 780.
+
+### The rest of the audit
+
+Read and found already covered: the meter functions that divide by 30
+(`FUN_001C3A20` and its three siblings, `FUN_0020F070`, `001E1AF8`) are all
+called from the economy `[60FPS - meter economy]` gates; the combo record's
+display timer (`001CE920`, `001CE994`, victim+0xD48) counts down every second
+vsync in both arms; the camera shot length at `001C7944` feeds the countdown
+`[60FPS - camera pacing]` gates; `001C4550` sets the animation step that
+`[60FPS - animation clock]` halves when it is read.
+
+Found and fixed under their own issues: the blast ramps (#109), the arc effect
+class (#111), and the fourth word of `[60FPS - effect rotation]` (#113).
+
+Not read yet: the 64 sites that never ran in a rig scene, and `FUN_001DC4C0`,
+which adds seconds * 30 to a battle counter (`battle+0x1C`) only in game modes
+4 and 0x1B.
