@@ -1279,3 +1279,54 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Speed lines, found 2026-09-29 for issue #8. The sprite effect class (vtable
+// 002C3EF0, update FUN_001866C0) spawns the radial speed lines round a hit - the
+// pink and yellow streaks of Hercule's Present Bomb - through FUN_001853C8 ->
+// FUN_001840A0. Each tick the update either spawns, when the countdown +0x1F8 is
+// at or below 0 (the spawner reloads it with the emitter's interval), or counts
+// +0x1F8 down. [blast effect duration] halves that step and five others in this
+// update, which keeps each timer's length but not its order: the spawn tick does
+// not count down, so a cycle took 1 + interval/0.5 ticks at 60fps against
+// 2 * (1 + interval/1.0) vsyncs at 30fps - 3 vsyncs against 4 in Present Bomb -
+// and a window that closed on an odd tick let one more burst through.
+//
+// This group runs the whole update at 30Hz, as the game does: after the freeze
+// check (001866F4), odd ticks take the frozen path too; and each of the six
+// halved steps loads a full 1.0 instead of the 0.5 in $at - the static pair
+// (1.0, 0.0) at 002FEAD8 = $gp-0x5798, read-only (no store reaches it, and a
+// write watch over eight scenes saw none). With this group those six
+// blast effect duration words have no effect, and PR #66's gate on the particle
+// stepper, if present, always passes: it too runs on even ticks.
+// The draw is a separate method, so the lines are still drawn every frame.
+//
+// Present Bomb, L2 + Triangle from save state 5, every open fix on, v100-v300:
+//
+//                          30fps       60fps before   with this group
+//   lines spawned          47          78             47
+//   spawn spacing          4 vsyncs    3 vsyncs       4 vsyncs
+//
+// Each of the three emitters spawns the same number of times at the same
+// spacing as at 30fps, one vsync earlier. Damage and both fighters' states are
+// the same with and without the group; GS2's Ultimate hearts update 24 times
+// (30fps 24, before 51).
+[60FPS - sprite effect clock]
+description=Run sprite effects such as the speed lines of Hercule's Present Bomb at the game's own 30Hz, so new lines appear as often as on a PS2 instead of about twice as often.
+patch=1,EE,000F1C20,word,14400008 // bnez $v0, 000F1C44        the game's own freeze check
+patch=1,EE,000F1C24,word,00000000 // nop
+patch=1,EE,000F1C28,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1C2C,word,8D081D64 // lw $t0, 0x1D64($t0)       frame counter
+patch=1,EE,000F1C30,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C34,word,15000003 // bnez $t0, 000F1C44        odd tick: frozen too
+patch=1,EE,000F1C38,word,00000000 // nop
+patch=1,EE,000F1C3C,word,080619BF // j 0x001866FC              even tick: the update
+patch=1,EE,000F1C40,word,00000000 // nop
+patch=1,EE,000F1C44,word,08061A38 // j 0x001868E0              the frozen path
+patch=1,EE,000F1C48,word,00000000 // nop
+patch=1,EE,001866F4,word,0803C708 // bnez $v0, 0x1868E0 -> j 000F1C20   (delay slot lw $v1 still runs)
+patch=1,EE,00186730,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x204 step 1.0
+patch=1,EE,001867CC,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x1F8 spawn countdown
+patch=1,EE,00186814,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x20C
+patch=1,EE,00186854,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x1F4 life
+patch=1,EE,00186894,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x1FC
+patch=1,EE,001868D0,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x200 window
