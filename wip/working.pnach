@@ -1279,3 +1279,43 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Sprite effects, found 2026-09-21 for issue #44 - Great Saiyaman 2's Ultimate
+// heart "disappears early". The heart and the small hearts around it belong to
+// one effect class (vtable 002C3EF0, update FUN_001866C0 -> FUN_00184BD8), which
+// steps every particle's age, spin, pulse counters and position once a tick with
+// no timestep: age +0xA8 += 1.0, +0xB8 += 1.0, +0x100 / +0x10C +-1.0, position +=
+// velocity. At 60fps the heart grows, peaks and fades in half its real time.
+//
+// FUN_001866C0 does two jobs a tick, and only one of them is uncompensated. Its
+// six timers (+0x1F4, +0x1F8, +0x1FC, +0x200, +0x204 and the emitter's +0x20C)
+// step by 1.0, and [60FPS - blast effect duration] already halves all six. The
+// particles are stepped by FUN_00184BD8, called at 001867D8, and nothing touches
+// them. So only that call is gated: a wrapper returns at once on odd ticks and
+// tail-calls FUN_00184BD8 on even ones. The six timers keep running every tick.
+//
+// The first version of this group gated the whole update through its freeze
+// check at 001866EC, which also ran the six halved timers at half speed: the
+// heart ring grew too slowly and hung on ~8 vsyncs, and the same class's bursts
+// in Goten's transformation and a Kamehameha's core drifted from 30fps. The last
+// line writes 001866EC's own jal back, so a state saved under that version drops
+// the old hook instead of calling the new wrapper with the check's arguments.
+//
+// Pink pixels of the heart ring, v356-v400 every 2 vsyncs, summed distance from
+// 30fps: this group 8488, the first version 31013, neither 24070. The ring peaks
+// on v384 as at 30fps and is gone by v388 against v390. Goten's Super Saiyan,
+// mean pixel drift: v24 67.7, first version 55.5, this group 44.6. No odd-frame
+// flicker: the ring's pixels come in equal pairs, 1421/1424, 1603/1605, 2740/2794.
+[60FPS - sprite effect rate]
+description=Run sprite effects such as Great Saiyaman 2's Ultimate hearts at the game's own 30Hz, so they grow and fade in their real time while still drawing at 60fps.
+patch=1,EE,000F1970,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1974,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1978,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F197C,word,15000003 // bnez $t0, 000F198C      odd tick: skip the particles
+patch=1,EE,000F1980,word,00000000 // nop
+patch=1,EE,000F1984,word,080612F6 // j 0x00184BD8            even tick: step them
+patch=1,EE,000F1988,word,00000000 // nop
+patch=1,EE,000F198C,word,03E00008 // jr $ra
+patch=1,EE,000F1990,word,00000000 // nop
+patch=1,EE,001867D8,word,0C03C65C // jal 00184BD8 -> jal 000F1970   the particle stepper
+patch=1,EE,001866EC,word,0C04B474 // jal 0x0012D1D0          the original freeze check, restored

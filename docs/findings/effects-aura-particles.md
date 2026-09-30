@@ -848,3 +848,126 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-09-21 - issue #44, Great Saiyaman 2's Ultimate heart: a sprite effect class at 2x
+
+The report: the heart effect of Great Saiyaman 2's Ultimate disappears early.
+Scene: `rocky-gs2-vs-standing-gohan.p2s` (save state 2). Justice Finishing Pose 2
+(`L2`+`Up`+`Circle`) turns Max Power Mode on; then Justice Judgement
+(`L2`+`Down`+`Triangle`).
+
+### What is early
+
+Photographed at exact vsyncs after the Ultimate press (paused VM, screenshot
+queued and flushed by one frame advance): at v365 the 30fps game is still
+forming the heart and v24 already shows it full; at v380 30fps has the full
+heart ring and v24 has lost it. The Ultimate's states run the same length in
+both arms (state 303, v324-v904 against v321-v901), so the move is on time and
+the effect is not.
+
+### Found by a rate scan of the growth window
+
+Scanning v352-v360 in both arms turns up objects of stride `0x130` at
+`01A10168…` with a float stepping 2.0 a tick at 30fps and 4.0 at 60fps. A write
+watchpoint lands in `FUN_00184BD8`, the update of the effect class with vtable
+`002C3EF0` (`FUN_001866C0`). Every channel in it is per tick: age `+0xA8`, a
+second age `+0xB8`, pulse counters `+0x100` and `+0x10C` stepping ±1.0, and
+position integrated from velocity with no timestep.
+
+Two things were not it. `FUN_0019DB90` (vtable `002C4278`), an effect with four
+1.0-a-tick countdowns, has an object whose life is 350-415 at 30fps and 350-380
+on v24; halving its countdowns moves nothing visible. `FUN_00190FE8` (vtable
+`002C40C0`), the other system alive in the move, gated alone changes nothing.
+
+### The fix
+
+`FUN_001866C0` asks the game's own freeze check (`001866EC jal FUN_0012D1D0`)
+and, when frozen, branches to `001868E0`, past the update and into the draw.
+`[60FPS - sprite effect rate]` calls the check through a wrapper that also
+answers "frozen" on odd ticks, the pattern `[60FPS - thrown object rate]` uses.
+The branch's delay slot loads the flags the draw path reads, so that path works
+unchanged.
+
+| vsync | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| 365 | heart forming | heart full | heart forming |
+| 380 | full heart ring | gone | full heart ring |
+| 392 | gone (camera cut) | gone | ring still showing |
+| 400 | - | - | fading out |
+
+**Corrected 2026-09-28:** there is no camera cut at v392. At 30fps the ring grows
+out of the frame and is gone by v390; the overrun was this version running the
+class's six timers at half speed. The group was reworked, see below.
+
+No odd-frame flicker: the heart's pixel count over six consecutive vsyncs is
+306k 405k 526k 636k 727k 629k.
+
+### Not established
+
+- **The fade runs ~8 vsyncs long.** At 30fps the heart is gone on the camera
+  cut at v392; with this group it fades out by v400. (Resolved 2026-09-28, below.)
+- **The class is shared.** It also draws a tapped ki blast's sparkles, and
+  `FUN_0012D1D0` has 30 callers across the effect family. Only this one is
+  gated; the others are candidates for the same treatment, one measured effect
+  at a time.
+
+## 2026-09-28 - issue #44 revisited: the first gate slowed six timers twice
+
+Re-tested inside the combined play-test build, the heart ring was bigger than at
+30fps and outlived it by ~8 vsyncs. Frame by frame, 30fps has no camera cut at
+v392: its ring grows out of the frame and is gone by v390. With the first version
+of this group the ring barely grows and hangs on to ~v398.
+
+### Why
+
+`FUN_001866C0` does two jobs a tick:
+
+| job | where | 30fps step | v24 | first version of this group |
+|---|---|---|---|---|
+| six timers: `+0x1F4`, `+0x1F8`, `+0x1FC`, `+0x200`, `+0x204`, and the emitter accumulator `+0x20C` | `0018672C` ... `001868CC` | 1.0 a tick | 0.5 a tick, from `[60FPS - blast effect duration]` - right | 0.5 every other tick - half speed |
+| every particle's age, spin, pulse counters and position | `FUN_00184BD8`, called at `001867D8` | once a tick | every tick - 2x | every other tick - right |
+
+Gating the freeze check at `001866EC` skipped both jobs, so the fix for the second
+broke the first. `FUN_00183230`, the other call in the block, only interpolates
+from the emitter accumulator, which the halved step already paces.
+
+### The rework
+
+The group now gates only the call at `001867D8`: a wrapper at `000F1970` returns at
+once on odd ticks and tail-calls `FUN_00184BD8` on even ones, with `$ra` still
+pointing back into the update. The six timers run every tick at their halved step.
+`001866EC` gets its own `jal FUN_0012D1D0` written back, so a state saved under the
+first version drops the old hook rather than calling the new wrapper.
+
+### Measured
+
+Pink pixels of the heart ring (/100), every 2 vsyncs over v356-v400, summed
+distance from 30fps, save state 2:
+
+| arm | distance | ring peaks | ring gone |
+|---|---|---|---|
+| 30fps | 0 | v384 | v390 |
+| v24 | 24348 | v368 | v374 |
+| v24 + first version | 29085 | v382 | v398 |
+| v24 + this version | 12102 | v384 | v388 |
+
+On consecutive vsyncs the ring's pixel count comes in equal pairs (1421/1424,
+1603/1605, 2740/2794): the particles think every other frame and every frame draws
+them, so no flicker. A tapped Kamehameha's core, drawn by the same class, matches
+30fps's size at v66-v84 with this version, where the first version drew it
+oversized and v24 had already lost it.
+
+Goten's Super Saiyan, mean pixel drift over v20-v200, is not a clean test of this
+group: inside the combined build it goes 50.4 without it, 55.5 with the first
+version, 44.6 with this one, but on v24 alone both versions read ~72 against 67.7,
+because the reveal timing (#67) dominates. The class also rolls a random spin
+per particle (`FUN_002A9C78`), so single frames of these bursts differ run to run
+between arms even when their timing matches.
+
+### Rig trap found on the way
+
+`Roo.frame_advance(0)` advances one frame, it is not a no-op. A capture loop that
+advances `mark - at - 1` frames before each screenshot therefore skips a frame
+whenever two marks are consecutive, and a "consecutive vsyncs" series built that
+way samples every other vsync - exactly the series that cannot see an odd-frame
+flicker. The equal pairs above come from a loop that never sends a zero advance.
