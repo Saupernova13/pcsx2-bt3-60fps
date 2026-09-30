@@ -30,6 +30,7 @@ from SuperCombo's names to this repo's old terms.
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
+| blasts that speed up or grow (Kaikosen, Explosive Wave, Android Barrier) | A blast's speed and size ramps (no wiki name) | `blast ramp clock`, issue #109 |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
