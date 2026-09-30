@@ -419,9 +419,9 @@ to 521.
 
 ## 2026-09-30 - issue #115: a rushing Blast 2's time limit is seconds * 30
 
-An audit of the 145 `lui $at, 0x41F0` sites. 81 of them run somewhere in the
-rig's scenes (10 of those already patched), found by breaking on all of them
-over 26 scenes. `001F9260` is one that no group covered.
+An audit of the 145 `lui $at, 0x41F0` sites. 80 of them run somewhere in the
+rig's scenes (9 of those patched by now), found by breaking on all of them over
+26 scenes. `001F9260` is one that no group covered.
 
 ### The limit
 
@@ -491,6 +491,6 @@ Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
 `0014D708`, `00160168`, `0016A2D4`, `001795D4`, `00179B9C`, `00192EF4`,
 `0019522C`, `00195514`, `00195F90`, `00195FB4`, `00196070`, `0019A9C4`,
 `001A11E0`, `001A1738`, `00210064`, `0021015C`, `00211584`, `002115CC`,
-`0021277C`, `00245794`; the 64 sites that never ran in a rig scene; and
+`0021277C`, `00245794`; the 64 unpatched sites that never ran in a rig scene; and
 `FUN_001DC4C0`, which adds seconds * 30 to a battle counter (`battle+0x1C`)
 only in game modes 4 and 0x1B.
