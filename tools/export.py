@@ -10,6 +10,11 @@ comment with it, and puts the list of what to enable at the top.
 The name matters: PCSX2 finds a pnach by the game's CRC, so the file has to be
 called 428113C2.pnach wherever it ends up.
 
+The working pnach has one layout rule this depends on: a group's description is
+the comment block directly above its header, with no blank line between them,
+and a blank line separates one group from the next. A description that is not
+touching its header is carried with the wrong group.
+
     python tools/export.py --release v23-something
     python tools/export.py --to build/
 
@@ -68,8 +73,11 @@ KNOWN_BROKEN: list[str] = [
 def split_groups(text: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
     """Slice into a file header and (name, lines) blocks.
 
-    Everything since the previous group ends belongs to the group whose header
-    comes next, so a group's explanatory comment travels with it.
+    A group's description is the contiguous run of comment lines directly above
+    its header, and it travels with that group. Everything before that run -
+    the blank line that separates groups included - stays with the group above,
+    or with the file header for the first group. So dropping a group drops its
+    own description and nobody else's.
     """
     header: list[str] = []
     blocks: list[tuple[str, list[str]]] = []
@@ -78,18 +86,43 @@ def split_groups(text: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
     for line in text.splitlines():
         found = re.match(r"^\[(.+)\]\s*$", line)
         if found:
+            cut = len(buf)
+            while cut and buf[cut - 1].lstrip().startswith("//"):
+                cut -= 1
+            above, buf = buf[:cut], buf[cut:]
             if name is None:
-                cut = max((i for i, l in enumerate(buf) if not l.strip()),
-                          default=len(buf))
-                header, buf = buf[:cut], buf[cut:]
+                header = above
             else:
-                blocks.append((name, buf))
-                buf = []
+                blocks.append((name, above))
             name = found.group(1)
         buf.append(line)
     if name is not None:
         blocks.append((name, buf))
     return header, blocks
+
+
+# Named in descriptions on purpose, and not ours: PCSX2's own patch database
+# ships the stock widescreen hack, which every aspect group says to turn off.
+EXTERNAL_GROUPS = {"Widescreen 16:9"}
+
+
+def stray_names(blocks: list[tuple[str, list[str]]]) -> list[str]:
+    """Groups named in a kept group's description that the output does not have.
+
+    A description that names a missing group is almost always one that has come
+    loose from its own group, which is the defect split_groups() exists to stop.
+    """
+    shipped = {name for name, _ in blocks} | EXTERNAL_GROUPS
+    problems = []
+    for name, body in blocks:
+        for line in body:
+            if not line.lstrip().startswith("//"):
+                break
+            for mentioned in re.findall(r"\[((?:60FPS - |Widescreen )[^\]]+)\]", line):
+                if mentioned not in shipped:
+                    problems.append(f"[{name}] is described as [{mentioned}], "
+                                    "which is not in the file")
+    return problems
 
 
 def banner(names: list[str]) -> list[str]:
@@ -138,6 +171,11 @@ def main() -> int:
     if missing:
         raise SystemExit("the shipping preset names groups this pnach lacks: "
                          + ", ".join(missing))
+
+    stray = stray_names(kept)
+    if stray:
+        raise SystemExit("a shipped group's description names a group the file does not "
+                         "contain:\n  " + "\n  ".join(stray))
 
     lines = header + banner([n for n, _ in kept])
     for _, body in kept:
