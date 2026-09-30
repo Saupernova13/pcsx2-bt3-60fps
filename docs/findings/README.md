@@ -9,7 +9,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [State of play and the user's reports](state-of-play.md) | The running summary, the user's defect lists and every play-test. | 5 |
 | [The engine, the frame routine and the first 60fps patch](engine.md) | How BT3 runs a frame, where 60fps comes from, and the early probes. | 13 |
 | [Tooling, the rig and the measurement method](tooling-and-method.md) | Instruments, the 30fps oracle, and how a shipped group is A/B'd. | 5 |
-| [Input timing](input.md) | The input subsystem and the combat input counters. | 2 |
+| [Input timing](input.md) | The input subsystem and the combat input counters. | 3 |
 | [Airborne motion, gravity and the hovering idle](airborne-and-hover.md) | Flight, gravity, the airborne idle animation and the hover bob. | 9 |
 | [Effects, the ki aura and particles](effects-aura-particles.md) | The effect-node system, the aura, effect rotation and the particle system. | 8 |
 | [Tweens, fades and staged sequences](tweens-fades-and-staging.md) | The tween service, the scripted-sequence clocks and the screen fade service. | 4 |

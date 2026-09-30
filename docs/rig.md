@@ -186,6 +186,7 @@ group off:
 | `rocky-cell-match-start.p2s` | Cell 1st Form, Rocky Area - Evening, frame 0 | the stage and both fighters at the bell - but not the opening's timing, see below |
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
+| `rocky-vs2p-cell2-near-gohan.p2s` | **1P vs 2P** versus: Cell 2nd Form 12 units from Ultimate Gohan, no regen, no CPU | anything needing an opponent that attacks on demand (drive pad 2 with `input.set ... pad=1`), health and ki measurements |
 | `rocky-super17-vs-standing-gohan.p2s` | Super 17 225 units from a standing Ultimate Gohan, full Ki | Hell's Storm (#40) |
 | `rocky-gs2-vs-standing-gohan.p2s` | Great Saiyaman 2 against a standing Ultimate Gohan | Justice Finishing Pose 2 turns Max Power Mode on, then her Ultimate (#44) |
 | `rocky-cell1-near-standing-gohan.p2s` | Cell 1st Form 11 units from a standing Ultimate Gohan | Giant Throw, Special Beam Cannon, Heavy Finish (#42, #13) |
