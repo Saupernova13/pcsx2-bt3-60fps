@@ -214,11 +214,18 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# Hit feedback, found 2026-09-28 for issue #80. The camera shake counts its time
+# left down by 1/30 s a tick, and the controller rumble times its motors in
+# seconds * 30.0 ticks and pulses on a per-tick phase, so at 60fps both ended in
+# half their time. One data word for the shake, four for the rumble.
+FEEDBACK = ["60FPS - camera shake", "60FPS - controller rumble"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + SPARES)
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + FEEDBACK
+                  + SPARES)
 
 PRESETS = {
     "off": [],
@@ -276,7 +283,12 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + FEEDBACK),
+    # "full" without the shake and rumble, so those groups have a named baseline.
+    "nofeedback": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
