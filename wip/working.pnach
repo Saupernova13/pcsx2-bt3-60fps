@@ -1279,3 +1279,42 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Blast speed and size ramps, found 2026-09-30 for issue #109. A blast's
+// parameters can ramp its speed (FUN_001519F8: params+0x2C -> +0x30 -> +0x34 over
+// params+0x38 seconds, the first leg taking the fraction at +0x3C) and the size
+// of its hit volume (FUN_001518D8: params+0x08 -> +0x0C -> +0x10 over params+0x14
+// seconds, fraction at +0x18). Both turn the seconds into ticks with * 30.0 and
+// step a counter by 1.0 a tick (state+0x2C4 and state+0x2B4), so at 60fps each
+// ramp finished in half its time. Both constants become 60.0. Neither
+// instruction is reached when the duration is 0, so a blast without a ramp never
+// executes them.
+//
+// Every open fix on, 30fps against 60fps:
+//
+//                                              30fps    60fps before   with this group
+//   Devilman's Kaikosen, save state 6
+//     speed at v39 (6 -> 13 -> 18 in 0.5 s)    13.33    18.00          13.33
+//     top speed reached                        v53      v38            v53
+//     launch to contact, Gohan 227 units away  34       29             33 vsyncs
+//     Gohan paralysed                          v61      v54            v58
+//   Vegeta (Scouter)'s Explosive Wave, save state 9
+//     size at v27 (20 -> 30 -> 50 in 0.5 s)    27.62    50.00          27.62
+//     first damage, opponent at 39.7 units     v35      v23            v34
+//     first damage, opponent at 54.5 units     v41      v27            v42
+//   Super 17's Android Barrier, save state 4
+//     full size (10 -> 11.8 -> 12 in 1 s)      v70      v41            v71
+//
+// Kaikosen's speed and Explosive Wave's size equal the 30fps value on all 15 of
+// the 30Hz ticks of their ramps. The 3 vsyncs Kaikosen still leads by are not the
+// ramp: the cast launches it 1 vsync early (v24 against v25), its half-size steps
+// find contact 1 vsync sooner, and the paralysis starts one tick after contact,
+// which is 1 vsync instead of 2.
+//
+// Left alone: with a duration of 0 the size ramp instead adds params+0x1C once a
+// tick (001519A8). None of 70 inputs tried across the ten rig save states has a
+// non-zero step there.
+[60FPS - blast ramp clock]
+description=Ramp a blast's speed and size over their real time, so Explosive Wave spreads and a beam that speeds up arrives when they do at 30fps.
+patch=1,EE,00151A10,word,3C014270 // lui $at, 0x41F0 -> 0x4270   speed ramp: seconds * 60
+patch=1,EE,001518F0,word,3C014270 // lui $at, 0x41F0 -> 0x4270   size ramp: seconds * 60
