@@ -1,81 +1,75 @@
-# v25-state-phase-timers - DRAFT
+# v25 - the mid-combo freeze
 
 | | |
 |---|---|
 | Tag | `v25-state-phase-timers` |
 | Date | 2026-09-30 |
-| Built on | [v24-state-phase-timers](v24-state-phase-timers.md) |
-| Groups | 1 shipped group(s) changed |
-| Confidence | **DRAFT - fill this in** |
+| Built on | [v24](v24-state-phase-timers.md) |
+| Groups | 33 (521 patch lines) |
+| Confidence | **FIXED, NOT YET PLAY-TESTED\*** - the freeze was reproduced from the user's own save state and the fix frees it; nobody has played the version |
 
-> **DRAFT.** Every other note on this page is written for a player: what this
-> version changes over the last one, and what was discovered on the way. Rewrite
-> this before the release PR merges - its merge is what publishes the release.
+## What it changed over v24
 
-## What it changed
+One group, `[60FPS - state phase timers]`, and nothing else: the released file
+goes from 557 patch lines to 521.
 
-Shipped groups this version carries that the last release did not:
+**The freeze.** On v24 a fighter could stop dead in the middle of a combo, its
+model flashing on and off, until something hit it (issues #39 and #57). The
+group gated four sites that are not clocks. They are phase numbers: the number
+of the step a state is on. One of them, `001E6060`, is the only way out of an
+8-tick loop in states 90-93, so a loop that ended on an odd tick never left.
+All four are out of the group.
 
-- `60FPS - state phase timers`
+| | v24 | v25 |
+|---|---|---|
+| Sites the group gates | 21 | 17 |
+| `001E6060` (states 90-93) | gated | the game's own instruction |
+| `001F3320` (state 44) | gated | the game's own instruction |
+| `001F9D48` (states 301-303, 313-315) | gated | the game's own instruction |
+| `001FBBD0` (state 260) | gated | the game's own instruction |
 
-The commits to `wip/working.pnach` it carries since v24-state-phase-timers:
+The group writes the game's own instruction back at each of the four sites
+rather than leaving them alone, so a save state made while frozen on v24 comes
+unstuck when it is loaded on v25.
 
-- fix(export): carry each group's description with its own group (a0baedb)
-- fix(patch): stop gating four phase numbers as if they were clocks (e4a754c)
+Measured on the user's EmuDeck save state from the freeze, Super Saiyan Goku in
+state 93:
+
+| | what happens |
+|---|---|
+| v24 | stuck for 517 vsyncs, until the CPU's attack lands |
+| v25 | back to idle after 69 ticks, the model drawn on every frame |
 
 ## What was discovered
 
-fix(patch): stop gating four phase numbers as if they were clocks
+- **A counter is a clock only if the code compares it against a limit.** Of the
+  28 per-tick counters in the fighter state machine, 21 are followed by a
+  compare (`slti`/`slt`) and count frames. The other 7 are used as a number:
+  which step, which table entry. v24 gated four of those 7. The state 157 trap
+  of v09 was the same mistake, found one site at a time; this is the rule that
+  covers all of them.
+- **The freeze came free when the fighter was hit** because a hit forces a new
+  state from outside. That is why it looked intermittent in play.
 
-This PR fixes the freeze where a fighter gets stuck in place with his model flashing on and off, which v24 shipped.
+## Known not fixed
 
-## Synopsis
+Unchanged from v24, less the freeze, plus one item this fix leaves behind:
 
-`[60FPS - state phase timers]` stops gating four sites that are phase numbers rather than frame counters. One of them, `001E6060`, is the only exit from state 93's 8-tick phase-0 loop, so a loop that ended on an odd tick repeated forever. The group now writes the game's own instruction back at each of the four sites, so a save state made under v24 comes unstuck when it is loaded.
-
-## What changed
-
-| | v24 | This PR |
-|---|---|---|
-| Sites the group gates | 21 | 17, every one compared against its bound on the next instruction |
-| `001E6060` (states 90-93) | gated | original `lw v0,(s3)` written back |
-| `001F3320` (state 44) | gated | original `lw v0,(s1)` written back |
-| `001F9D48` (states 301-303, 313-315) | gated | original `lw v0,(s4)` written back |
-| `001FBBD0` (state 260) | gated | original `lw v0,(s2)` written back |
-| Group patch lines | 210 | 174 |
-| Exported patch lines | 557 | 521; nothing else differs |
-
-The 28 counters `phasetimer.py` finds, sorted by the instruction after the add:
-
-| | sites | gated after this PR |
-|---|---|---|
-| compared (`slti`/`slt`), a clock | 21 | 17. The other 4 were already out as input windows |
-| not compared, an index | 7 | 0 |
-
-## Test results
-
-Run on the user's EmuDeck save state from the freeze (Super Saiyan Goku in state 93), carried into PCSXROO with `transplant.py`:
-
-| arm | phase `fighter+0x3D8` | outcome |
-|---|---|---|
-| v24 | 0 on every tick watched; the sub-counter wraps on odd frames 13109, 13117, 13125 and so on | frozen, model missing on alternate screenshots |
-| v24, left running | 0 | stuck in state 93 until the CPU's attack lands at v517, then hit (196) and free: the recovery #57 reports |
-| exported patch, state loaded, no hand edits | 0, then 1, 2, 3 | hook overwritten on the first vsync; idle (state 11) after 69 ticks; model drawn on every frame |
-| `export.py` | - | validated, 33 groups, 521 lines |
-| `version.py status` | - | `changed=60FPS - state phase timers`, so a merge makes it v25 |
-
-Closes #39
-Closes #57
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-> Seeded from one merge's body, which may describe only one of the changes
-> listed above: #58.
+- **The first step of states 90-93 still runs at double speed.** Its 8-tick
+  loop is a clock of its own that nothing compensates, so that step takes 133ms
+  instead of 267ms. It is a timing error, not a freeze.
+- An ultimate's beam still lands its first hit about half a second early.
+- Frieza's rocks and Buu's charged blast still have a ~5-frame pre-launch
+  overshoot.
+- Some pre-fight intro animations are paced wrong against the camera.
+- In a beam clash the CPU ends a little weaker than at 30fps at a middling
+  rotation speed.
+- Death by a body-erasing attack: the camera has never been re-checked.
 
 ## Get this version
 
 Download `428113C2.pnach` from the
-[v25-state-phase-timers release](https://github.com/Saupernova13/pcsx2-bt3-60fps/releases/tag/v25-state-phase-timers),
+[v25 release](https://github.com/Saupernova13/pcsx2-bt3-60fps/releases/tag/v25-state-phase-timers),
 or:
 
     git show v25-state-phase-timers:patch/428113C2.pnach > 428113C2.pnach
