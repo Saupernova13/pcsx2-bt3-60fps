@@ -1279,3 +1279,39 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Burst effects, found 2026-09-28 for issue #82. Two effect classes draw the
+// bursts on a beam's impact and the sparks around Vegeta (Scouter)'s energy
+// ball, and each runs its whole update once a tick:
+//     002C3E78  FUN_0017D8E0: a start delay (+0x510), a timer in seconds
+//               (+0x4E4, -1/30 a tick), a fade (+0x4E8 -= +0x4EC), a countdown
+//               (+0x490), and in modes 1-3 random pieces emitted every tick
+//     002C4308  FUN_001A2DD0: a fade driven by obj+0x114 -= 1.0 a tick, and
+//               per-tick moves in its helpers FUN_001A0FC0-FUN_001A1A40
+// so at 60fps the bursts faded in half their time and emitted twice as much.
+// Both open with the game's freeze check (0017D904, 001A2E08) and skip the whole
+// update while frozen; both draw in a separate method (vtable+0x14). The wrapper
+// below answers "frozen" on odd ticks, the same fix [60FPS - thrown object rate]
+// uses, so every channel runs at 30Hz and the burst is still drawn every frame.
+// Neither update calls anything another group compensates.
+//
+// Goku's Kamehameha, L2 + Triangle held 60 vsyncs from save state 0, every open
+// fix on: the burst's two fades (10 -> 0 and 1.0 -> 0) take 20 vsyncs as at 30fps,
+// 10 without this. Vegeta (Scouter)'s transformation: the spark effect's timer
+// steps 1/30 every two vsyncs and it lives 30 vsyncs as at 30fps (15 without).
+// Every vsync of the burst drawn, none dropped.
+[60FPS - burst effect rate]
+description=Run beam-impact bursts and transformation sparks at the game's own 30Hz, so they fade over their real time instead of twice as fast.
+patch=1,EE,000F1A90,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1A94,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1A98,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1A9C,word,00000000 // nop
+patch=1,EE,000F1AA0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1AA4,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1AA8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1AAC,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1AB0,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1AB4,word,03E00008 // jr $ra
+patch=1,EE,000F1AB8,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0017D904,word,0C03C6A4 // jal 0012D1D0 -> jal 000F1A90   spark class update
+patch=1,EE,001A2E08,word,0C03C6A4 // jal 0012D1D0 -> jal 000F1A90   burst class update

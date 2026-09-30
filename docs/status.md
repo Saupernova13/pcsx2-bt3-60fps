@@ -427,6 +427,26 @@ The struggle still runs in 1.63s rather than 2.95s, so the counts read low - the
 **Starred pending the user's own play-test.** **Inherits v12's input-timing
 flag.**
 
+## Proposed - burst effects (#82)
+
+Adds `[60FPS - burst effect rate]`. Two effect classes - the burst where a beam
+lands and the sparks round Vegeta (Scouter)'s energy ball - step delays, fades
+and random emission once a tick. The game's own freeze check now answers
+"frozen" on odd ticks for those two updates, so they run at 30Hz and are still
+drawn every frame.
+
+| every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| Kamehameha burst, both fades | 20 vsyncs | 10 | 20 |
+| Vegeta's spark effect | 30 vsyncs | 15 | 30 |
+
+The Kamehameha's picture scores barely move (within 2.5): its beam lands a few
+vsyncs early, the known flight residual, and that dominates. The random pieces
+now come at 30Hz, so they sit in different places from the ungated run. No frame
+of the burst is dropped; all 13 smoke-test moves return to idle.
+
+**Not confirmed in play.**
+
 ## v22 - the Beam Struggle
 
 Two beams collide and both players rotate their sticks. There is no counter on
