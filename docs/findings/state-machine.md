@@ -419,10 +419,9 @@ to 521.
 
 ## 2026-09-30 - issue #115: a rushing Blast 2's time limit is seconds * 30
 
-An audit of the 145 `lui $at, 0x41F0` sites: 71 of them run somewhere in the
-rig's scenes, and each of those was read. Most sit in effect classes that a
-group already runs at 30Hz, or inside the meter economy, which is gated whole.
-`001F9260` is neither.
+An audit of the 145 `lui $at, 0x41F0` sites. 81 of them run somewhere in the
+rig's scenes (10 of those already patched), found by breaking on all of them
+over 26 scenes. `001F9260` is one that no group covered.
 
 ### The limit
 
@@ -438,9 +437,7 @@ which the fighter is closing on the opponent it runs, once a tick:
     001F926C  c.olt.s $f0, $f20          limit < counter: the rush is over
 
 `fighter+0x3D8`, next to it, counts 16 ticks of being in range and is one of
-the clocks `[60FPS - state phase timers]` gates. `+0x3DC` is not gated, and
-gating it would be wrong for the same reason #39 was: other states use the word
-for other things.
+the clocks `[60FPS - state phase timers]` gates. `+0x3DC` is not gated.
 
 ### Measured
 
@@ -482,6 +479,18 @@ vsync in both arms; the camera shot length at `001C7944` feeds the countdown
 Found and fixed under their own issues: the blast ramps (#109), the arc effect
 class (#111), and the fourth word of `[60FPS - effect rotation]` (#113).
 
-Not read yet: the 64 sites that never ran in a rig scene, and `FUN_001DC4C0`,
-which adds seconds * 30 to a battle counter (`battle+0x1C`) only in game modes
-4 and 0x1B.
+Inside an effect class whose update a group already runs at 30Hz, so taken as
+covered without a measurement of their own: the sprite class (`00182F14`,
+`00183034`, `0018352C`, `00183A54`, `00186358`, `0018637C`, `001865F0`), the
+spiral (`00188128`, `0018883C`, `0018A484`, `0018BFD4`), the swirl (`00190EF8`,
+`001917B8`, `001918B4`, `00191910`), the lightning (`0017C824`), the rays
+(`001689EC`, `0016971C`), the sparks (`0017DD9C`) and the track class
+(`0019DAFC`).
+
+Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
+`0014D708`, `00160168`, `0016A2D4`, `001795D4`, `00179B9C`, `00192EF4`,
+`0019522C`, `00195514`, `00195F90`, `00195FB4`, `00196070`, `0019A9C4`,
+`001A11E0`, `001A1738`, `00210064`, `0021015C`, `00211584`, `002115CC`,
+`0021277C`, `00245794`; the 64 sites that never ran in a rig scene; and
+`FUN_001DC4C0`, which adds seconds * 30 to a battle counter (`battle+0x1C`)
+only in game modes 4 and 0x1B.
