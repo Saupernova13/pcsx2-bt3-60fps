@@ -101,3 +101,60 @@ Helicopter move faster than in the vanilla game" - and **#11 is the Rocky Area
 wind**. The user's original list said "the animation of the wind is sped up in
 desert sequence", and the desert sequence is Rocky Area, so #11 needs no
 clarifying question. Read the issue, not the memory of it.
+
+## 2026-09-21 - issue #52, the clouds: a sky scroll outside the keyframe graph
+
+The report: the clouds still move at double speed after `[60FPS - stage
+animation]` fixed the World Tournament blimp and banners.
+
+### Found by rate scan, then by watchpoint
+
+A rate scan of Rocky Area (save state 7, 30fps against v24, 120 vsyncs) leaves
+two slow floats at 2x outside the fighters: `01A9AEE0` and `01A9AF28`, stepping
+-0.0016 a tick. A write watchpoint lands in a setter (`001A77C0`) called from
+`FUN_00135200`, which copies them out of a global object - the pointer at
+`gp-0x58BC`, `01A9AC80` in both scenes tested. That object's own update is
+`FUN_001350E0`:
+
+```c
+sky->u += sky->dir_u * sky->rate;      /* +0x2A8 += +0x2A0 * +0x2B0 */
+sky->v += sky->dir_v * sky->rate;      /* +0x2AC += +0x2A4 * +0x2B0 */
+/* each wrapped into +/- sky->wrap, +0x2B4 = 4.0 */
+```
+
+once a tick, no timestep. `FUN_00135200` draws the layer from `u` and `v`. None of
+it is in the stage scene graph `FUN_00115478` walks, so halving that graph's
+time step could never reach it.
+
+On the World Tournament the rate is 0.0008, direction (0.871, 0.491).
+
+### The fix
+
+`+0x2B0` is loaded twice, at `0013511C` for `u` and `00135138` for `v`. Each load
+becomes a jump to a four-instruction helper (`000F18C0`, `000F18D8`) that loads
+it, multiplies by 0.5 and returns past the load. The next instruction, loading
+the direction, runs in the jump's delay slot as it ran before. `$f3` and `$at`
+are unused in `FUN_001350E0`, and its `ld ra` has already run.
+
+| save state 7, 240 vsyncs | ticks | u moves |
+|---|---|---|
+| 30fps | 120 | -0.19199 |
+| v24 | 240 | -0.38398 |
+| v24 + `[60FPS - sky scroll]` | 240 | **-0.19197** |
+
+Photographed on the World Tournament at vsync 400 from the same state, the sky
+right of the banners, mean pixel difference against the 30fps frame:
+
+| arm | difference |
+|---|---|
+| 30fps, a second run | 0.0 |
+| v24 | 20.3 |
+| v24 + this group | **2.3** |
+
+### A probe that misled, and why it is recorded
+
+Writing a new `u`, `v` or wrap into the object by hand and photographing two
+frames later changed **no pixel at all**, on either map, which briefly read as
+"this layer is not the clouds". The A/B above says it is. The probe was taken on
+a paused VM stepped two frames, and the layer evidently does not pick the new
+value up that soon; the arms-at-the-same-vsync comparison is the one to trust.
