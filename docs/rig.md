@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Eleven traps, most of which cost an hour or more
+## Thirteen traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -63,11 +63,33 @@ back over a slot. Back up the slot you are about to overwrite first.
 was already down when control is handed over does nothing. An action test needs a
 state cut *after* the banner, not at the match start.
 
-**6. Screenshots need the VM running, and an armed breakpoint counts as
+**6. `launch` attaches to an emulator that is ALREADY running, and a second
+one can be left behind.** A new group name only reaches the cheat engine when
+the emulator re-reads its per-game ini at start-up, so adding one means a real
+restart. `launch` does not give you that if a process is already holding port
+28110 - it reports `emulator ready on port 28110 (pid NNNNN)` for a *different*
+pid and attaches to the old one, whose ini is the one from before the edit. The
+symptom is a group that `patchctl --status` calls `[ON]`, that raises no
+warning, and whose words are simply never in memory.
+
+    Get-Process -Name pcsxroo* | Select Id,ProcessName      # expect exactly one
+
+Kill every one of them, then `launch`, then read the hook word back after a
+`frame_advance` before trusting any measurement - the cheat engine writes its
+words at a frame boundary, so a read taken immediately after `patchctl.apply`
+shows zeros whether the group applied or not.
+
+**7. `flush_input()` advances three frames.** It has to - a release issued
+while paused never lands - but it means anything that must observe the frames
+right after a release has to be armed *before* the flush. A breakpoint armed
+after it misses the event entirely and reports a clean "never happened". Use
+`input_release()` plus your own `frame_advance` when the timing matters.
+
+**8. Screenshots need the VM running, and an armed breakpoint counts as
 paused.** This one is in PCSXROO's own agent guide and is still worth repeating,
 because a stray breakpoint makes every capture silently vanish.
 
-**7. A screenshot taken by resuming the VM lands a few frames late, and not
+**9. A screenshot taken by resuming the VM lands a few frames late, and not
 always the same few.** `resume()` then `screenshot()` photographs whatever frame
 the GS presents when the write happens, so two runs of the same arm disagree
 and a fast cinematic looks early or late for no reason. #21's first photographs
@@ -75,23 +97,23 @@ were taken that way. For a frame at an exact vsync, do what `drift.py` does:
 with the VM **paused**, call `screenshot()` to queue it, then `frame_advance(1)`
 to flush it. Two runs of the same arm then match pixel for pixel.
 
-**8. The first menu press after a state load is often dropped.** Load, resume,
+**10. The first menu press after a state load is often dropped.** Load, resume,
 then press `Start` twice if the pause menu has to open, and look before pressing
 anything that selects.
 
-**9. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
+**11. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
 with no pad, which lets go of every pad. A pad-2 guard held with
 `roo.cmd("input.set", buttons=["Circle"], pad=1)` drops on the frame pad 1 is
 released that way, and the victim takes a rush it was meant to block. Release
 pad 1 alone with `roo.input_set()`, no buttons.
 
-**10. A breakpoint on a branch delay slot never fires.** The same script
+**12. A breakpoint on a branch delay slot never fires.** The same script
 stopped 0 times with a breakpoint on `001C9F1C`, the delay slot of a `beq` that
 runs on every pass, and 4 times with it on `001C9F14`, two instructions earlier.
 Put the breakpoint on an instruction that is not in a delay slot and read the
 registers there.
 
-**11. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
+**13. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
 that advances `mark - at - 1` frames and then grabs, which advances one more,
 takes every mark that follows the previous one a frame late: `drift.py --marks
 13,14` scored v14 as 18.2, the v15 value, against 28.6 for `--marks 14` alone. A
@@ -282,3 +304,21 @@ fixed. Only world quantities can be read straight off the report.
 Check what a candidate belongs to before chasing it. `game.battle.resolve(roo)`
 gives the fighter and model addresses for the current fight; anything outside
 them is the stage, an effect, or the engine.
+
+## The mechanics reference
+
+[SuperCombo's BT3 wiki](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3)
+names the mechanics the user reports in their own words, states blast costs in
+Ki Bars versus Blast Stocks, gives several Blast 1 durations in **seconds**, and
+says outright that a BT3 frame is **a 30th of a second**. Read it before hunting
+a mechanic by experiment.
+
+The normal pages are behind an Anubis proof-of-work wall, so WebFetch and curl
+both get "Making sure you're not a bot". **`/api.php` at the root is not walled**
+(`/w/api.php` is):
+
+    curl -A "Mozilla/5.0 ..." "https://wiki.supercombo.gg/api.php?action=query"
+      # ... &prop=revisions&rvprop=content&rvslots=main&format=json&titles=<page>
+
+`action=query&list=allpages&apprefix=Dragon Ball Z: Budokai Tenkaichi 3` lists
+all 168 pages. `/Offense`, `/Defense` and `/Miscellaneous` are the system ones.

@@ -145,3 +145,167 @@ approach happens at the **teleport**, not during the dive, so the number
 measured the teleport placement and was blind to everything after it. The HP
 drop was the only honest signal. A metric that does not move when the thing it
 scores obviously moves is broken, not stable.
+
+## 2026-09-16 - issue #6, the perfect smash: a charge at 2x and a one-tick window
+
+The report: *"There is a frame perfect attack you can do in the game, where if
+you hold square to do a heavy smash, your character can start flashing white.
+Let go during that and then an opponent guarding will have their guard broken."*
+
+The user pointed this session at the [SuperCombo BT3
+wiki](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3), which
+names the mechanic and settles what the code is doing:
+
+> Smash Attacks ... hold Square while pressing up/back/forward/down/neutral.
+> Level 3 is "indicated by your character flashing white". **Perfect Smash** is
+> "releasing the attack button at the exact moment your character reaches level
+> three of charge".
+
+It also states, in the stat-sheet glossary, that BT3's frame is **a 30th of a
+second**. That is the patch's whole premise, written down by someone who has
+never seen this repo.
+
+### Two separate defects, both measured
+
+**1. The charge fills in half the real time.** `FUN_001E33E0` is the charge
+step: it reads `gp-0x6D80` (`002FD4F0`, **0.0444444** = 1/22.5), scales it,
+adds it to the raw charge at `fighter+0xD7C`, and stores the normalised 0..1
+copy at `fighter+0xD78`. That constant has **exactly one reader**, so it can be
+halved in data the way the gravity group's acceleration was.
+
+| arm | charge starts | reaches 1.0 | elapsed |
+|---|---|---|---|
+| unpatched 30fps | vsync 18 | vsync 62 | **44 vsyncs** |
+| the 27 groups | vsync 16 | vsync 38 | 22 vsyncs |
+| **+ 0.0444444 -> 0.0222222** | vsync 16 | vsync 60 | **44 vsyncs** |
+
+Not just the same length - the same *sequence*: 0.04, 0.09, 0.13, 0.18 ... 0.98,
+1.00, sample for sample against the 30fps arm.
+
+**2. The Perfect Smash window is one tick wide, and a tick is half as long.**
+`fighter+0xD84` counts ticks since the charge hit maximum, and the release
+handler grants the Perfect Smash only when it reads exactly 1:
+
+```
+001E47FC  li   v0, 0x1
+001E4800  lw   a0, 0xD84(s1)
+001E4804  bne  a0, v0, 001E4820      # not 1 -> an ordinary Full Power smash
+001E4810  jal  001DA9D0
+001E4814  li   a1, 0x84              # condition 0x84: Perfect Smash
+```
+
+One tick is 1/30s at 30fps and 1/60s at 60fps, so **the window is half as long
+in real time even after the charge is corrected**. Halving a rate cannot fix
+this; the test itself has to widen. Accepting 1 **or** 2 restores the real-time
+width exactly, and is a small trampoline at `001E4804`.
+
+### The class this belongs to
+
+The wiki names several more one-input-frame mechanics:
+
+| mechanic | the wiki's words |
+|---|---|
+| Perfect Smash | "releasing ... at the exact moment" |
+| Z-Counter | "on the exact frame a melee attack" lands |
+| Defensive Vanish / Reflecting | "right before the Ki Blast hits you" |
+| the vanish window generally | "lowered health also makes the vanishing window smaller" |
+
+**Every one of them is a tick-counted input window, and every one of them is
+half as long in real time at 60fps.** No group in this patch addresses that
+class, and it is not something a rate fix reaches - a window counted in ticks
+needs its comparison widened, one mechanic at a time. Issue #6 is the first of
+them to be found, not the only one.
+
+### Also settled by the wiki, for the other open issues
+
+- **Hercule's tap-Triangle projectile is a grenade, not a rock** (#5). The wiki
+  lists only Great Ape Kid Goku and Yajirobe as rock throwers. `blast object
+  travel` was derived from Frieza's I Might Die This Time rocks and the user felt no change from it;
+  Hercule's grenade is a third mover class and is very likely uncovered.
+- **Cell's 2nd Form costs 2 Blast Stocks; Special Beam Cannon costs 4 Ki Bars**
+  (#7, #13) - the user's correction, confirmed in print.
+- **Vegeta Scouter's Great Ape costs 3 Blast Stocks** and "Fills Ki" (#10).
+  Blast Stock regenerates on a **per-second** timer, which is one of the blocks
+  the meter-economy gate corrects.
+- Several Blast 1s are documented in **seconds** - False Courage "takes 1.6
+  seconds" and "lasts 7.5 seconds", Saiyan Soul 1.9s and 20s. Those are
+  ready-made real-time oracles that need no 30fps arm at all.
+
+The wiki is behind an Anubis proof-of-work wall, so `WebFetch` and `curl` both
+get "Making sure you're not a bot". **`/api.php` at the root is not walled**,
+and returns the wikitext directly; `/w/api.php` is.
+
+## 2026-09-21 - the smash charge depends on Momentum, and Momentum drains in the meter economy
+
+The 2026-09-17 play-test of `[60FPS - smash charge]` found the charge now slightly
+*slow* at 60fps - the white flash later than at 30fps - where the save-state
+measurement had matched sample for sample. The save state was the difference.
+
+`FUN_001E33E0` does not add a constant. It adds `0.0444444 * FUN_001E3368()`,
+and that factor blends two per-character rates (`FUN_0020F1D8`, `FUN_0020F230`,
+from the fighter's parameter block at `+0x91C`, `+0x74`/`+0x78`) by
+`fighter+0xD80 / 100000`, floored at 0.1. SuperCombo names `fighter+0xD80`:
+**Momentum**, "filled up by attacking your opponent using Rush Attacks, and
+automatically drained over time ... the faster all charged melee attacks will
+charge". The drain is the `fighter+0xD80 -= 400` in `FUN_001E16C0`, the per-tick
+meter economy that `[60FPS - meter economy]` (#16) gates.
+
+The measurement that passed was taken with Momentum at 0, where the drain has
+nothing to act on. From a set starting Momentum (save state 3, Krillin against a
+standing Ultimate Gohan, neutral Square held, the value written before the hold):
+
+| starting Momentum | 30fps | full + smash charge | full + smash charge + meter economy |
+|---|---|---|---|
+| 0 | 44 vsyncs | 45 | 45 |
+| 50000 | **20** | 22 (Momentum at the end 35600) | **20** (43200, the 30fps value) |
+| 100000 | **12** | 12 (89600) | **12** (94800, the 30fps value) |
+
+Momentum is **gained per hit**, not per tick - a three-hit rush adds 8000, 7600
+and 8000 in every arm - so only the drain is wrong, and #16 fixes it. The peak
+after that rush is 15600 at 30fps, 8800 on v24, and 16000 with #16.
+
+So the smash charge is correct only together with the meter economy. Shipping
+it alone leaves a charge started after a rush a little late, which is what the
+play-test felt. It also means #16 fixes more than ki: every Momentum-dependent
+charge and startup the wiki describes drains at half its real time without it.
+
+## 2026-09-22 - the Level 3 flash pulses at twice the speed
+
+Re-measured after the 2026-09-17 play-test, with #16 and #17 both on (Cell 1st
+Form, `rocky-cell1-near-standing-gohan.p2s`, neutral Square held):
+
+| | 30fps | #16 + #17 |
+|---|---|---|
+| charge starts | v15 | v13 |
+| Level 3 (`fighter+0xD78` reaches 1.0) | v59 | v57, 44 vsyncs in both |
+| release to the hit on Gohan | 9 vsyncs | 8 |
+| after a rush and a 30-vsync gap: Momentum, charge to Level 3 | 15200, 34 vsyncs | 15600, 35 |
+| the same without #16 | - | 0, 44 (the late flash) |
+
+So the charge, Level 3 and the release are all on time with both groups. What
+still differs is the flash itself. Measured as the mean brightness of a box on
+Cell's body at every vsync, it is a pulse: 81, 75, 69, 63 at 30fps, each held two
+vsyncs, then back to 81, so a new flash every 8 vsyncs. With every group on it
+is 83, 78, 73, 66, a new flash every 4 vsyncs.
+
+The pulse is a counter and a fade, both per tick:
+
+| routine | what it does |
+|---|---|
+| `FUN_001D1558` | while flag `0x1E` is up, cycles `fighter+0x134C` through 0-3 each tick; on 0 calls `FUN_0024E5B8(model, 1)` |
+| `FUN_001D15E0` | the same for flag `0x1F`, through `fighter+0x1350`, with `FUN_0024E5B8(model, 2)` |
+| `FUN_001D14F8` | while flag `0x1D` is up, calls `FUN_0024E5B8(model, 0)` every tick: a steady yellow glow |
+| `FUN_0024E5B8` | takes a flash slot (`FUN_0024E510`), sets its colour and its intensity `+0x10` to 0.2 (`$gp-0x5C10`) |
+| `FUN_0024E6B0` | once a tick from the model update (`FUN_0024AB70`), takes 0.0333 (`$gp-0x5C0C`) off the intensity, floored at 0 |
+
+Flag `0x1E` is the one Level 3 raises; the Special Beam Cannon's charge raises
+it too (`FUN_001CF578(fighter, 0x1E)` in `FUN_001F7860`).
+
+`[60FPS - charge flash]` makes both counters cycle 0-7 (`addiu 4 -> 8`,
+`sra`/`sll` by 3), halves the fade, and sets the start to 0.1833. The retrigger
+and the decrement happen in the same tick before the draw, so 30fps shows 0.167,
+0.133, 0.1, 0.067; with the group, 60fps shows 0.167, 0.15, 0.133 ... 0.05, the
+30fps values at the matching vsyncs and halfway values between. The steady glow
+of `0x1D`, re-fired every tick, shows 0.167 in both. Both constants have exactly
+one reader, and these three routines are the only callers of `FUN_0024E5B8`.
+
