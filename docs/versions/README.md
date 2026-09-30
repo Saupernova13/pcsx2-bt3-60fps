@@ -37,6 +37,7 @@ recovers that version's file.
 | [`v22`](v22-beam-clash.md) | 2026-09-12 | 27 | the beam clash paced in real time, and the CPU's rotation gated | duration confirmed\* |
 | [`v23`](v23-known-issues-refresh.md) | 2026-09-15 | 27 | no patch change - the beam clash caveat added to the shipped header; the first GitHub Release | duration confirmed\* |
 | [`v24`](v24-state-phase-timers.md) | 2026-09-17 | 33 | the idle taunt and 21 fighter-state clocks, stage scenery, Solar Flare, Hercule's grenades, and two more widescreen aspects | taunt, stage, Solar Flare and grenades confirmed in play; phase timers carry the #39 caveat\* |
+| [`v25`](v25-state-phase-timers.md) | 2026-09-30 | 33 | the mid-combo freeze: four phase numbers the phase-timer group gated as if they were clocks | fixed on the user's frozen save state, not yet played\* |
 
 Group counts are the groups in each release file. From v16 on, one of them is the
 optional 19.5:9 widescreen group, which ships switched off.
