@@ -14,7 +14,7 @@ import _bootstrap  # noqa: F401
 
 from game import config
 from ps2ee.pine import Pine, PineNotRunning
-from ps2ee.pnach import Pnach, _set_enabled_cheats, deploy
+from ps2ee.pnach import Pnach, _set_enabled_cheats
 
 
 def emulator_running() -> bool:
@@ -117,9 +117,14 @@ def main() -> int:
         shutil.copy2(dest, backup)
         print(f"\n  previous cheat file backed up to {backup}")
 
-    written, enabled = deploy(source, enable=groups)
-    print(f"  installed  {written}")
-    print(f"  enabled    {', '.join(enabled) if enabled else '(none)'}")
+    # Not ps2ee.pnach.deploy(): it validates again without config.EXCLUSIVE, so
+    # the widescreen groups - alternatives that write the same three words -
+    # read as overlapping and every release was refused after the dry run above
+    # passed. The file was validated once, with the alternatives, at the top.
+    source.save(dest)
+    _set_enabled_cheats(config.game_ini(), groups)
+    print(f"  installed  {dest}")
+    print(f"  enabled    {', '.join(groups) if groups else '(none)'}")
     print(f"  ini        {config.game_ini()}")
 
     # PCSX2 reads the cheat file and the per-game ini once, at boot. Deploying

@@ -55,7 +55,7 @@ The list is not a straight line, and the notes say why:
 
 A \* marks a build measured correct against the 30fps game but not yet confirmed in
 play. Per-build confidence is kept current in [`status.md`](../status.md), and the
-full derivation of every group is in [`findings.md`](../findings.md).
+full derivation of every group is in [`findings/`](../findings/README.md).
 
 ## Adding a version
 
