@@ -479,3 +479,18 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - the arcs over Explosive Wave and the barriers (#111)
+
+Adds `[60FPS - arc effect rate]` (a wrapper at `000F1C50` and one hook). The
+effect class that draws the lightning arcs over Explosive Wave and the barrier
+moves counted its delay, age and fade once a tick. The game's own freeze check
+now answers "frozen" on odd ticks for that update, so it runs at 30Hz and is
+still drawn every frame.
+
+| every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| Explosive Wave's arcs last | v13-v63 | v12-v37 | v13-v63 |
+| Android Barrier's arc age when the barrier ends | 63 | 123 | 63 |
+
+**Not confirmed in play.**
