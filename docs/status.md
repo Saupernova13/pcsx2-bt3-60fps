@@ -1,9 +1,9 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v24**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v25**.
 
-What every version changed and discovered, v01 through v24, is in
+What every version changed and discovered, v01 through v25, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
@@ -32,7 +32,8 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
-| `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21, and fixed by taking those four gates out. Fall back to v23 until the fix ships |
+| `v25-state-phase-timers` | 33 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
+| `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21. Fixed in v25 |
 | `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
 | `v21-rush-struggle` | 25 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Adds `rush struggle` - the CPU's synthetic stick rotates once per tick, so at 60fps the AI out-rotated the player twice as fast and the winner of a clash flipped |
