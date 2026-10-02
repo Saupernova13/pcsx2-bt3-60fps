@@ -1279,3 +1279,23 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// Ki blast homing, found 2026-10-02 for issue #117. The ki blast launcher
+// (001D1A58) takes the blast's turn rate from the character's ki blast table in
+// degrees a second and FUN_00210050 makes it radians a tick with / 30.0
+// (00210064). The projectile update (FUN_00176980, 001769E4) turns the blast
+// toward its target by up to that much once a tick, so at 60fps it turned twice
+// as fast and curved onto an opponent who sidesteps it at 30fps. The divisor
+// becomes 60.0. FUN_00210050 has no other caller.
+//
+// Cell 2nd Form, save state 7, backed away under the 30fps words; Ultimate
+// Gohan holds Left from the Triangle tap; every open fix on:
+//
+//                                     30fps          60fps before   with this group
+//   heading change, first 12 vsyncs   9.8 deg        14.6 deg       9.8 deg
+//   from 200 units                    miss, 37.0     miss, 14.1     miss, 38.2      (closest approach)
+//   from 300 units                    miss, 28.9     hit v53        miss, 32.8
+//   from 400 units                    miss, 17.3     hit v60        miss, 19.1
+[60FPS - ki blast homing]
+description=Turn a ki blast toward its target at its real rate, so sidestepping one works at 60fps as it does at 30fps.
+patch=1,EE,00210064,word,3C014270 // lui $at, 0x41F0 -> 0x4270   turn rate: degrees a second / 60

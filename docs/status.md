@@ -479,3 +479,17 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - ki blast homing (#117)
+
+Adds `[60FPS - ki blast homing]` (one word). A ki blast turns toward its target
+by a fixed angle a tick, made from degrees a second with `/ 30`; at 60fps it
+turned twice as fast. The divisor is now 60.
+
+| Cell's ki blast at a sidestepping Gohan, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| from 300 units | misses | hits | misses |
+| from 400 units | misses | hits | misses |
+| heading change in the first 12 vsyncs | 9.8 deg | 14.6 deg | 9.8 deg |
+
+**Not confirmed in play.**
