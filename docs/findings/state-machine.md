@@ -487,10 +487,22 @@ spiral (`00188128`, `0018883C`, `0018A484`, `0018BFD4`), the swirl (`00190EF8`,
 (`001689EC`, `0016971C`), the sparks (`0017DD9C`) and the track class
 (`0019DAFC`).
 
+Checked on 2026-10-02:
+
+| site | what | verdict |
+|---|---|---|
+| `00210064` | ki blast turn rate | fixed under #117 |
+| `0021015C` | ki blast life in ticks, `node+0x5B4` | counted by `[60FPS - projectile life]` |
+| `00211584` | `fighter+0xE40`, the post-cinematic timer | counted by #35's combat timers |
+| `002115CC` | beam duration in states 272-274 (`FUN_001F7860`) | its counter's load is gated |
+| `0021277C` | a Blast 1's effect length (`params+0xA0`) | read by the paralysis and Solar Flare code, both counted in real time |
+| `001795D4`, `00179B9C` | called only from the lightning class | gated with it |
+| `00192EF4` | called only from the swirl class | gated with it |
+| `001A11E0`, `001A1738` | called from the beam-impact burst class | gated with it |
+| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Not fixed. |
+
 Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
-`0014D708`, `00160168`, `0016A2D4`, `001795D4`, `00179B9C`, `00192EF4`,
-`0019522C`, `00195514`, `00195F90`, `00195FB4`, `00196070`, `0019A9C4`,
-`001A11E0`, `001A1738`, `00210064`, `0021015C`, `00211584`, `002115CC`,
-`0021277C`, `00245794`; the 64 unpatched sites that never ran in a rig scene; and
-`FUN_001DC4C0`, which adds seconds * 30 to a battle counter (`battle+0x1C`)
-only in game modes 4 and 0x1B.
+`0014D708`, `00160168`, `0016A2D4`, `0019522C`, `00195514`, `00195F90`,
+`00195FB4`, `00196070`, `0019A9C4`; the 64 unpatched sites that never ran in a
+rig scene; and `FUN_001DC4C0`, which adds seconds * 30 to a battle counter
+(`battle+0x1C`) only in game modes 4 and 0x1B.
