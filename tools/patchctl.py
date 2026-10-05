@@ -147,6 +147,17 @@ PURSUIT = ["60FPS - knockback flight", "60FPS - pursuit timing"]
 # correct on its own.
 CAMERA = ["60FPS - camera pacing"]
 
+# The cinematic camera, found 2026-09-21 for issue #21. In a cinematic the render
+# camera plays a camera clip (FUN_0023D510) whose time steps a bare 2.0 a tick at
+# 0023D6A4, so transformation cameras ran their shots in half the real time while
+# the poses kept time. One word makes it 1.0.
+CINECAM = ["60FPS - cinematic camera"]
+
+# The transformation loader, found 2026-09-22 for issue #67. Its poll advances
+# one load stage per call, once a tick, so a transformation's reveal came early.
+# The battle loader's call is answered "not ready" on odd ticks.
+TRANSLOAD = ["60FPS - transformation load"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -214,6 +225,15 @@ BEAMCLASH = ["60FPS - beam clash"]
 # Rocky Area.
 STAGE = ["60FPS - stage animation"]
 
+# Two effect classes that count 30Hz ticks, found 2026-09-28 for issue #10. The
+# scripted effect tracks (vtable 002C4278) step a track clock by 2 * rate, jitter,
+# spin and four countdowns once a tick, so Vegeta's energy ball flashed early; the
+# tracks now advance on even ticks and the countdowns by 0.5. The transformation
+# flash (vtable 002C42D8) held its white for 11 ticks counted per tick, so the
+# camera cut to the new form early; its two timers now step 0.5.
+FXTRACK = ["60FPS - effect track clock"]
+TRANSFLASH = ["60FPS - transformation flash"]
+
 # A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
 # (states 284-289) gives up the chase once a per-tick counter passes the blast's
 # limit in seconds * 30.0. The constant becomes 60.0.
@@ -223,7 +243,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + RUSHLIMIT
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
                   + SPARES)
 
 PRESETS = {
@@ -282,12 +303,30 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + RUSHLIMIT),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                    + TRANSLOAD + FXTRACK + TRANSFLASH),
+    # "full" without the two effect clocks, so those groups have a named baseline.
+    "nofxclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + TRANSLOAD),
+    # "full" without the transformation load, so that group has a named baseline.
+    "notransload": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
+    # "full" without the cinematic camera, so that group has a named A/B baseline.
+    "nocinecam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
