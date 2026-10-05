@@ -533,3 +533,20 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## Proposed - a rushing Blast 2's time limit (#115)
+
+Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
+gives up after a number of seconds the game counted as `seconds * 30` ticks, so
+at 60fps it had half its time and stopped short of a far opponent.
+
+| Cell 2nd Form's Drain Life, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| from 510 units | grab v130 | grab v130 | grab v130 |
+| from 609 units | grab v142 | gives up, 72 units short | grab v141 |
+| from 780 units | grab v160 | gives up, 243 units short | grab v159 |
+
+The same comparison in the handler of states 275-277 is not changed: nothing in
+the rig reaches it.
+
+**Not confirmed in play.**

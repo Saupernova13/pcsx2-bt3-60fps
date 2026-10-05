@@ -1402,3 +1402,27 @@ description=Hold a transformation's white flash for its real time, so the camera
 patch=1,EE,001A06B8,word,3C014128 // lui $at, 0x4120 -> 0x4128   hold limit 10.0 -> 10.5
 patch=1,EE,001A0930,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   hold +0x564, 1.0 -> 0.5 a tick
 patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55C
+
+// A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
+// handles fighter states 284-289. While the rush closes on the opponent it
+// steps fighter+0x3DC once a tick (001F9240) and gives up once that passes the
+// blast's limit in seconds (params+0x1C, read by FUN_00210E28) * 30.0. At 60fps
+// the rush got half its time, and as the dash covers ground at its real speed it
+// stopped short of an opponent it reaches at 30fps. The constant becomes 60.0;
+// the counter is not touched.
+//
+// Cell 2nd Form's Drain Life (limit 1.5 s), save state 7, backed away under the
+// 30fps words first, then every open fix on:
+//
+//   start distance   30fps          60fps before                   with this group
+//   309              grab v110      grab v109                      grab v109
+//   510              grab v130      grab v130                      grab v130
+//   609              grab v142      gives up v140, 72 short        grab v141
+//   701              grab v152      gives up v140, 164 short       grab v151
+//   780              grab v160      gives up v140, 243 short       grab v159
+//
+// Left alone: FUN_001F7DE8 (states 275-277) has the same comparison at 001F8398
+// against fighter+0x3D8. No move in the rig's save states enters those states.
+[60FPS - rushing Blast 2 time limit]
+description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
+patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60

@@ -234,12 +234,17 @@ STAGE = ["60FPS - stage animation"]
 FXTRACK = ["60FPS - effect track clock"]
 TRANSFLASH = ["60FPS - transformation flash"]
 
+# A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
+# (states 284-289) gives up the chase once a per-tick counter passes the blast's
+# limit in seconds * 30.0. The constant becomes 60.0.
+RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
                   + SPARES)
 
 PRESETS = {
@@ -299,7 +304,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+    # "full" without the rush time limit, so that group has a named baseline.
+    "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                    + TRANSLOAD + FXTRACK + TRANSFLASH),
     # "full" without the two effect clocks, so those groups have a named baseline.
     "nofxclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
