@@ -397,7 +397,7 @@ picture.
 ### The scene
 
 Built from the menus for the first time rather than from an existing save:
-character select -> Vegeta (Scouter) -> Normal loadout -> Rocky Area - Evening,
+character select -> Vegeta (Scouter) -> Custom Select defaults -> Rocky Area - Evening,
 then `COM Settings -> Stand`, cut with every group off and confirmed by
 screenshot. `work/state-backups/rocky-vegeta-scouter-standing.p2s`, slot 3.
 `R3` transforms; Great Ape costs 3 Blast Stocks and he starts with exactly 3.

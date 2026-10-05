@@ -123,7 +123,7 @@ Leaving a battle asks `EXIT?` with **No** preselected - `Up` then `Cross`.
 
 Character select is a **grid**, not a list: `Down` moves a whole row, so a
 character is usually two or three presses away rather than twenty. Confirming a
-character opens, in order, its form list, `Custom Select` (loadout), and
+character opens, in order, its form list, `Custom Select` (Z-Items), and
 `Select Color`; `Cross` through all three takes the defaults. Then the same for
 the opponent, and then **Map Select**, which is where the stage-specific reports
 live.
