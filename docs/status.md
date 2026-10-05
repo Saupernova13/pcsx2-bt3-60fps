@@ -286,6 +286,35 @@ fix takes all four out and writes the game's own instruction back. Loading
 the user's frozen state under the fix frees the fighter within 69 ticks. See
 [`findings/state-machine.md`](findings/state-machine.md).
 
+## Proposed - the cinematic camera (#21)
+
+Adds `[60FPS - cinematic camera]`, one word. In a cinematic the render camera
+plays a camera clip whose time steps a bare 2.0 a tick (`0023D6A4`), so
+transformation cameras ran through their shots in half the real time while the
+poses kept time. Now 1.0.
+
+| Vegeta (Scouter)'s Great Ape, drift from 30fps | mean | v28 | v300 |
+|---|---|---|---|
+| every shipped group | 24.72 | 34.1 | 14.3 |
+| **+ this group** | **14.29** | **12.4** | **0.8** |
+
+Photographed at matched vsyncs it shows the 30fps shot from v28 on, one vsync
+ahead, including the camera holding on Vegeta as the energy ball goes up (#10).
+Not fixed by it: the first cut lands 3 vsyncs early, and the ball's flash 12
+early. **Not confirmed in play.**
+
+## Proposed - the transformation loader (#67)
+
+Adds `[60FPS - transformation load]`. The battle loader polls a load state
+machine that advances one stage per call, once a tick, so transformations
+revealed their new form early. The poll is now answered "not ready" on odd
+ticks.
+
+| Goten's Super Saiyan | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| reveal starts | v148 | v135 | v145 |
+| drift from 30fps (mean) | 0 | 67.6 | 50.3 |
+
 ## Proposed - scripted effects and the transformation flash (#10)
 
 Adds two groups. `[60FPS - effect track clock]`: the effect class behind

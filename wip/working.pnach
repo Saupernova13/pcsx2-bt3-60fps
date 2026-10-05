@@ -1280,6 +1280,60 @@ patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 
+// The cinematic camera, found 2026-09-21 for issue #21 - the "second animation
+// clock" that ran transformation cinematics ahead of their poses. The poses were
+// never wrong: the model's animation timer (+0xC78) reads the same in both arms
+// at every vsync. The camera was. During a cinematic the render camera
+// (FUN_0023D510, the controller at gp-0x56A4) plays a camera clip instead of
+// following a fighter, and steps the clip's time by a bare 2.0 a tick:
+//
+//   0023D69C  jal   FUN_0023DB68        the clip's current time
+//   0023D6A4  lui   $at, 0x4000         2.0
+//   0023D6B0  add.s $f20, $f0, $f1      time + 2.0, clamped to the clip length
+//   0023D6E8  jal   FUN_0023DB88        store it
+//
+// Two units a tick is the 60-units-a-second authoring every BT3 clip uses, so at
+// 60fps the camera ran through its shots in half the real time: on the close-up
+// at vsync 28 where the 30fps game is still on the chest, and cut away by 98
+// before the energy ball goes up. 1.0 a tick puts it back.
+//
+// Vegeta (Scouter)'s Great Ape transformation, R3 from the Rocky Area state,
+// pixel drift against the 30fps picture: 24.72 with every shipped group, 14.29
+// with this; at vsync 300 34.1 -> 0.8. The loader wait before the Great Ape
+// appears still ends ~19 vsyncs early - the disc is polled per tick - which is
+// the residual at the tail.
+[60FPS - cinematic camera]
+description=Play cinematic camera clips at their real speed, so transformation cameras stay with the action instead of cutting ahead.
+patch=1,EE,0023D6A4,word,3C013F80 // lui $at, 0x4000 -> 0x3F80   camera clip step 2.0 -> 1.0
+
+// The transformation loader, found 2026-09-22 for issue #67. A transformation
+// streams the new form's data while the power-up animation plays, and reveals it
+// when the battle loader FUN_001278B0 sees the load finish. Its poll, 00127A70
+// jal FUN_00265298, is a state machine that advances at most one stage per call
+// - open, read, wait, close - and it is called once a tick, so at 60fps the load
+// ends early and so does everything after it. Load time fits a fixed disc time
+// plus N polls: Goten 114 vsyncs + 10, Vegeta (Scouter)'s Great Ape 110 + 19.
+//
+// The wrapper answers "not ready" on odd ticks and otherwise tail-calls the poll,
+// so the loader is polled at the game's 30Hz. Only this call site is hooked:
+// FUN_00265298 has 13 callers, menus among them.
+//
+// Goten's Super Saiyan, R3 from rocky-goten-trunks-team-vs-gohan.p2s: the reveal
+// (animation 0x179) starts at v148 at 30fps, v135 on v24, v145 with this group.
+// Pixel drift against 30fps 67.6 -> 50.3; at v200 38.4 -> 4.8.
+[60FPS - transformation load]
+description=Poll the transformation loader at the game's own 30Hz, so a transformation reveals the new form at its real time instead of early.
+patch=1,EE,000F19A0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19A4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19A8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19AC,word,15000003 // bnez $t0, +3             odd tick: not ready
+patch=1,EE,000F19B0,word,00000000 // nop
+patch=1,EE,000F19B4,word,080994A6 // j 0x00265298             even tick: the real poll
+patch=1,EE,000F19B8,word,00000000 // nop
+patch=1,EE,000F19BC,word,03E00008 // jr $ra
+patch=1,EE,000F19C0,word,0000102D // dmove $v0, $zero          (delay) "not ready"
+patch=1,EE,00127A70,word,0C03C668 // jal 00265298 -> jal 000F19A0   transformation loader poll
+
 // The scripted effect tracks, found 2026-09-28 for issue #10. Vegeta (Scouter)'s
 // energy ball, Goten's transformation burst and a hit spark in Great Saiyaman 2's
 // Ultimate are all one effect class: vtable 002C4278, update FUN_0019DB90, draw
