@@ -400,7 +400,7 @@ game's second**, so at 60fps a per-second bonus arrives every half second on top
 of every rate being doubled. It has exactly one caller, `001E2584`, so one gate
 covers the system.
 
-| after 46 vsyncs, Cell on Rocky Area | `+099C` | `+09F0` | ki | second |
+| after 46 vsyncs, Cell on Rocky Area | `+099C` | `+09F0` | `+09F8` | second |
 |---|---|---|---|---|
 | unpatched 30fps | 94498 | 95520 | 259962 | 14 |
 | v23, no gate | capped | capped | 340761 | 7 |

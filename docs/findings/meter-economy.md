@@ -11,11 +11,19 @@ subsystem rather than a rate.
 
 ### Finding the gauge, and two false trails on the way
 
-`fighter+0x09F8` is total ki, in units of 100000 per HUD bar - Cell 1st Form
-caps at 400000, Teen Gohan at 500000, which is exactly the 4 and the 5 the HUD
-prints beside each portrait. Its meter object starts at `fighter+0x09E4` and
-carries four gauges: `+0x00/+0x04`, `+0x0C/+0x10`, `+0x14/+0x18` (ki) and
-`+0x1C`, each a current/max pair.
+`fighter+0x09F8` counts in units of 100000 - Cell 1st Form caps at 400000,
+Teen Gohan at 500000, which is exactly the 4 and the 5 the HUD prints beside
+each portrait. Its meter object starts at `fighter+0x09E4` and carries four
+gauges: `+0x00/+0x04`, `+0x0C/+0x10`, `+0x14/+0x18` (`+0x09F8`) and `+0x1C`,
+each a current/max pair.
+
+**Which gauge is which is not settled.** This section first called `+0x09F8`
+total ki. On the SuperCombo wiki the number beside the portrait is the **Blast
+Stock** count, and the Ki gauge is five bars for every character, so `+0x09F8`
+is most likely Blast Stock. `+0x09F0`, capped at 100000, is most likely the Ki
+gauge: Drain Life Cell, a 3-Ki-Bar move, takes it from 100000 to 40000 (#41).
+Neither has been re-measured. The fix below gates every gauge alike, so it does
+not depend on the labels.
 
 Two earlier attempts found nothing, and both failures are reusable:
 
@@ -40,18 +48,18 @@ That found `+0x09F8` (to 400000), `+0x099C` and `+0x09F0` (both to 100000) and
 From `work/state-backups`, slot 7, Cell on Rocky Area, both arms run the same
 60 vsyncs with no input:
 
-| arm | ticks | ki at 0 | ki at 60 vsyncs | gained |
+| arm | ticks | `+09F8` at 0 | at 60 vsyncs | gained |
 |---|---|---|---|---|
 | unpatched 30fps | 30 | 179163 | 284k | 105k |
 | v23 + the 28 groups | 60 | 179163 | 389k | **210k** |
 
 Exactly 2x, and the off arm ticked half, so the A/B is sound. Per tick both
-gain the same 3500 - the gauge is a fixed amount of ki per tick, uncompensated.
+gain the same 3500 - the gauge gains a fixed amount per tick, uncompensated.
 
 ### The mechanism, which is bigger than ki
 
 A write watchpoint on `fighter+0x09F8` lands in `FUN_001CED18`, a generic
-`Ki::add(obj, amount)`; gating that would also halve ki won from hits, so it is
+`add(obj, amount)` for the gauge; gating that would also halve what hits award, so it is
 the wrong place. A breakpoint on its entry names the callers by their amounts:
 
 ```
@@ -101,7 +109,7 @@ The trampoline is a `jal` so `ra` still points at `001E258C`, and takes the even
 branch with a `j` rather than a `jal` so the economy returns straight into the
 caller's epilogue.
 
-| after 46 vsyncs from slot 7 | `+099C` | `+09F0` | ki | second |
+| after 46 vsyncs from slot 7 | `+099C` | `+09F0` | `+09F8` | second |
 |---|---|---|---|---|
 | unpatched 30fps | 94498 | 95520 | 259962 | 14 |
 | 28 groups, no gate | 100000 (capped) | 100000 (capped) | 340761 | 7 |
