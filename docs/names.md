@@ -37,6 +37,8 @@ from SuperCombo's names to this repo's old terms.
 | World Tournament helicopter, blimp | Stage props | issue #9, PR #19 |
 | desert wind | Rocky Area stage wind | issue #11 |
 | transformations (Cell, Vegeta (Scouter)'s Great Ape) | Transformation (`R3`, costs Blast Stock) | issues #7, #10 |
+| Vegeta's energy ball, the flash before the Great Ape | A scripted effect with timed tracks (small flash, then the ball) | `effect track clock`, issue #10 |
+| the white before a transformation reveal | The transformation flash that covers the model swap | `transformation flash`, issue #10 |
 
 `effect rotation` is the spin of aura and effect swirls. It is not the aura's
 playback speed; that is `aura update rate`.
