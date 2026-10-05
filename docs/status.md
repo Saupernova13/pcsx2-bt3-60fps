@@ -1,9 +1,9 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v25**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v26**.
 
-What every version changed and discovered, v01 through v25, is in
+What every version changed and discovered, v01 through v26, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
@@ -32,7 +32,8 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
-| `v25-state-phase-timers` | 33 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
+| `v26-cinematic-camera` | 38 | **CONFIRMED IN PLAY** | correct | Adds `cinematic camera`, `transformation load`, `effect track clock`, `transformation flash` and `rushing Blast 2 time limit`. Transformation cameras, reveals and flashes keep 30fps time; Drain Life reaches a far opponent. Confirmed 2026-10-05 in the test build |
+| `v25-state-phase-timers` | 33 | **CONFIRMED IN PLAY** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
 | `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21. Fixed in v25 |
 | `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
@@ -286,7 +287,7 @@ fix takes all four out and writes the game's own instruction back. Loading
 the user's frozen state under the fix frees the fighter within 69 ticks. See
 [`findings/state-machine.md`](findings/state-machine.md).
 
-## Proposed - the cinematic camera (#21)
+## v26 - the cinematic camera (#21)
 
 Adds `[60FPS - cinematic camera]`, one word. In a cinematic the render camera
 plays a camera clip whose time steps a bare 2.0 a tick (`0023D6A4`), so
@@ -301,9 +302,10 @@ poses kept time. Now 1.0.
 Photographed at matched vsyncs it shows the 30fps shot from v28 on, one vsync
 ahead, including the camera holding on Vegeta as the energy ball goes up (#10).
 Not fixed by it: the first cut lands 3 vsyncs early, and the ball's flash 12
-early. **Not confirmed in play.**
+early. **Confirmed in play 2026-10-05**, in the test build: Vegeta (Scouter)'s
+and Cell's transformations play correctly.
 
-## Proposed - the transformation loader (#67)
+## v26 - the transformation loader (#67)
 
 Adds `[60FPS - transformation load]`. The battle loader polls a load state
 machine that advances one stage per call, once a tick, so transformations
@@ -315,7 +317,7 @@ ticks.
 | reveal starts | v148 | v135 | v145 |
 | drift from 30fps (mean) | 0 | 67.6 | 50.3 |
 
-## Proposed - scripted effects and the transformation flash (#10)
+## v26 - scripted effects and the transformation flash (#10)
 
 Adds two groups. `[60FPS - effect track clock]`: the effect class behind
 Vegeta (Scouter)'s energy ball, Goten's transformation burst and a hit spark in
@@ -338,7 +340,7 @@ v146-v168 here). The 3-vsync lead comes before the hold starts, the same lead
 on the same one. No change to Cell's transformation or GS2's heart ring; all 13
 smoke-test moves return to idle.
 
-**Not confirmed in play.**
+**Confirmed in play 2026-10-05**, in the test build.
 
 ## v24 (proposed) - the state phase timers, reinstated
 
@@ -534,7 +536,7 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
-## Proposed - a rushing Blast 2's time limit (#115)
+## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
 gives up after a number of seconds the game counted as `seconds * 30` ticks, so
@@ -549,4 +551,4 @@ at 60fps it had half its time and stopped short of a far opponent.
 The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
-**Not confirmed in play.**
+**Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
