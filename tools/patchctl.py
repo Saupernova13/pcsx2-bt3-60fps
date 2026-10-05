@@ -147,6 +147,12 @@ PURSUIT = ["60FPS - knockback flight", "60FPS - pursuit timing"]
 # correct on its own.
 CAMERA = ["60FPS - camera pacing"]
 
+# The cinematic camera, found 2026-09-21 for issue #21. In a cinematic the render
+# camera plays a camera clip (FUN_0023D510) whose time steps a bare 2.0 a tick at
+# 0023D6A4, so transformation cameras ran their shots in half the real time while
+# the poses kept time. One word makes it 1.0.
+CINECAM = ["60FPS - cinematic camera"]
+
 # The transformation loader, found 2026-09-22 for issue #67. Its poll advances
 # one load stage per call, once a tick, so a transformation's reveal came early.
 # The battle loader's call is answered "not ready" on odd ticks.
@@ -223,7 +229,8 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
-                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + TRANSLOAD
+                  + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + TRANSLOAD
                   + SPARES)
 
 PRESETS = {
@@ -282,12 +289,18 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + TRANSLOAD),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+             + TRANSLOAD),
     # "full" without the transformation load, so that group has a named baseline.
     "notransload": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
+    # "full" without the cinematic camera, so that group has a named A/B baseline.
+    "nocinecam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the thrown objects, so that group has a named A/B baseline.
     "nothrown": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
