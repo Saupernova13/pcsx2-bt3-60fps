@@ -455,7 +455,7 @@ units.
 | 701 | grab v152, counter 31 | gives up v140, 164 short | grab v151, counter 62 |
 | 780 | grab v160, counter 35 | gives up v140, 243 short | grab v159, counter 70 |
 
-`[60FPS - rush blast time limit]` is that one word.
+`[60FPS - rushing Blast 2 time limit]` is that one word.
 
 ### Left alone
 

@@ -217,7 +217,7 @@ STAGE = ["60FPS - stage animation"]
 # A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
 # (states 284-289) gives up the chase once a per-tick counter passes the blast's
 # limit in seconds * 30.0. The constant becomes 60.0.
-RUSHLIMIT = ["60FPS - rush blast time limit"]
+RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ

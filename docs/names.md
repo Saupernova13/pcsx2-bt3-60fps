@@ -30,7 +30,7 @@ from SuperCombo's names to this repo's old terms.
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
-| a rush blast (Drain Life) stopping short of a far opponent | A rushing Blast 2's time limit | `rush blast time limit`, issue #115 |
+| Drain Life stopping short of a far opponent | A rushing Blast 2's time limit (the wiki calls Drain Life a Target Rush Blast 2; a "Rush Blast" there is a tapped ki blast) | `rushing Blast 2 time limit`, issue #115 |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
