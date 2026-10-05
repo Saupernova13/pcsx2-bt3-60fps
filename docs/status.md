@@ -303,6 +303,20 @@ ahead, including the camera holding on Vegeta as the energy ball goes up (#10).
 Not fixed by it: the first cut lands 3 vsyncs early, and the ball's flash 12
 early. **Not confirmed in play.**
 
+## Proposed - the transformation loader (#67)
+
+Adds `[60FPS - transformation load]`. The battle loader polls a load state
+machine that advances one stage per call, once a tick, so transformations
+revealed their new form early. The poll is now answered "not ready" on odd
+ticks.
+
+| Goten's Super Saiyan | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| reveal starts | v148 | v135 | v145 |
+| drift from 30fps (mean) | 0 | 67.6 | 50.3 |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and

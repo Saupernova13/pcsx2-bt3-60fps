@@ -153,6 +153,11 @@ CAMERA = ["60FPS - camera pacing"]
 # the poses kept time. One word makes it 1.0.
 CINECAM = ["60FPS - cinematic camera"]
 
+# The transformation loader, found 2026-09-22 for issue #67. Its poll advances
+# one load stage per call, once a tick, so a transformation's reveal came early.
+# The battle loader's call is answered "not ready" on odd ticks.
+TRANSLOAD = ["60FPS - transformation load"]
+
 # Names for groups that do not exist yet. The ini's enabled list is only read at
 # boot, so a name that is not in it cannot be tested without restarting the
 # emulator; carrying spares means the next experiment does not cost a restart.
@@ -225,6 +230,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + TRANSLOAD
                   + SPARES)
 
 PRESETS = {
@@ -283,7 +289,13 @@ PRESETS = {
     "full": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
+             + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+             + TRANSLOAD),
+    # "full" without the transformation load, so that group has a named baseline.
+    "notransload": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
     # "full" without the cinematic camera, so that group has a named A/B baseline.
     "nocinecam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
