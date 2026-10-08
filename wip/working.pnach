@@ -1426,3 +1426,22 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// A thrown fighter's flight, found 2026-10-08 for issue #125. Ultimate Gohan's
+// Giant Throw (thrower state 132, FUN_001E6DC8) puts the victim in state 212,
+// FUN_001E9218. On entry it sets fighter+0x3D8 to (int)(fighter+0xFC8 * 15.0)
+// (001E926C, lui 0x4170); while the flight's middle animation (0xBE/0xC1) plays
+// it takes 1 off once a tick (001E93BC), and at 0 the victim moves on to land.
+// 15 is a 30Hz tick count, so at 60fps the flight ended in half its time and
+// short. 30.0 doubles the count, the same shape as [60FPS - knockback flight];
+// the counter still runs every tick, so no fighter can be left in the state.
+//
+// Save state 7 (1P vs 2P), Gohan on pad 2: Square x3, Triangle (Cell stunned,
+// 199), Up+Triangle. Cell in state 212, every open fix on:
+//
+//                  30fps        60fps before    with this group
+//   vsyncs          70             57               69
+//   distance        220            181              220
+[60FPS - throw flight]
+description=Hold a thrown fighter's flight for its real time, so Ultimate Gohan's Giant Throw and others like it send the opponent as far as at 30fps instead of dropping them short.
+patch=1,EE,001E926C,word,3C0141F0 // lui $at, 0x4170 -> 0x41F0   flight hold: scale * 15 -> scale * 30 ticks
