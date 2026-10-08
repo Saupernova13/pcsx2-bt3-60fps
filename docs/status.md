@@ -552,3 +552,16 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - a thrown fighter's flight (#125)
+
+Adds `[60FPS - throw flight]`, one word. After Ultimate Gohan's Giant Throw the
+victim's flight (state 212) is held for a number of 30Hz ticks, so at 60fps it
+ended early and short. The count is now doubled.
+
+| Cell thrown by Ultimate Gohan, state 212 | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| vsyncs | 70 | 57 | 69 |
+| distance | 220 | 181 | 220 |
+
+**Not confirmed in play.**
