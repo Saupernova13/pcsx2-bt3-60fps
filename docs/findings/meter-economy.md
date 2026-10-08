@@ -18,12 +18,16 @@ gauges: `+0x00/+0x04`, `+0x0C/+0x10`, `+0x14/+0x18` (`+0x09F8`) and `+0x1C`,
 each a current/max pair.
 
 **Which gauge is which is not settled.** This section first called `+0x09F8`
-total ki. On the SuperCombo wiki the number beside the portrait is the **Blast
-Stock** count, and the Ki gauge is five bars for every character, so `+0x09F8`
-is most likely Blast Stock. `+0x09F0`, capped at 100000, is most likely the Ki
-gauge: Drain Life Cell, a 3-Ki-Bar move, takes it from 100000 to 40000 (#41).
-Neither has been re-measured. The fix below gates every gauge alike, so it does
-not depend on the labels.
+total ki, and a correction of 2026-10-05 then called it most likely Blast Stock.
+Neither holds. On the SuperCombo wiki the number beside the portrait is the
+Blast Stock count, and on 2026-10-08 (#51) that number was found elsewhere: a
+fusion's cost check (`FUN_001CED60`, cost 500000 for 5 stocks) reads `+0x14` of
+the current team member's record (`FUN_001CE050`, member index at `+0x994`), whose
+`+0x18` is its cap. With SSJ4 Vegeta showing 6, that word was 600000 while
+`+0x09F8` was 90625, and the fusion went through. `+0x09F0`, capped at 100000, is
+most likely the Ki gauge: Drain Life Cell, a 3-Ki-Bar move, takes it from 100000
+to 40000 (#41). What `+0x09F8` is stays open. The fix below gates every gauge
+alike, so it does not depend on the labels.
 
 Two earlier attempts found nothing, and both failures are reusable:
 
