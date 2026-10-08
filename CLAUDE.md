@@ -12,6 +12,25 @@ Then [`docs/status.md`](docs/status.md) for what every group is and whether it i
 trusted, and [`docs/findings/`](docs/findings/README.md), split by topic, for the derivation of any of
 it.
 
+## Working an issue
+
+The owner decides; you do everything else.
+
+1. **Reproduce and measure it yourself, in the rig.** PCSXROO gives you both
+   pads, breakpoints, pause, frame advance and screenshots, and
+   `tools/transplant.py` loads the owner's own EmuDeck saves. Never ask the
+   owner to try something, and never offer it as a next step.
+2. **Comment on the issue as you go**: what you found, and how confident you
+   are that it is the cause.
+3. **Open a PR when you are confident the problem is fixed**, ending in
+   `Closes #N`.
+4. **The owner play-tests the PR.** If it is solid they merge it; if not they
+   hand it back, and you pick it up again from their comment.
+
+**Never close an issue and never merge a PR - any PR, docs and tooling
+included.** Both are the owner's. If an issue needs no change, say so on the
+issue with the evidence and leave it open.
+
 ## Pull requests
 
 **The first line of the body is for a player, not a developer.** Someone who
