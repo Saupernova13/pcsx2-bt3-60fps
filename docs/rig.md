@@ -190,8 +190,15 @@ group off:
 | `rocky-super17-vs-standing-gohan.p2s` | Super 17 225 units from a standing Ultimate Gohan, full Ki | Hell's Storm (#40) |
 | `rocky-gs2-vs-standing-gohan.p2s` | Great Saiyaman 2 against a standing Ultimate Gohan | Justice Finishing Pose 2 turns Max Power Mode on, then her Ultimate (#44) |
 | `rocky-cell1-near-standing-gohan.p2s` | Cell 1st Form 11 units from a standing Ultimate Gohan | Giant Throw, Special Beam Cannon, Heavy Finish (#42, #13) |
+| `owner-ssj4-vegeta-fusion-native.p2s` | the owner's own save, cut with their test build on (patchctl puts back the words of any group an arm leaves off): Team Battle, SSJ4 Vegeta with SSJ4 Goku as partner, 6 Blast Stocks, a COM that attacks within seconds | fusion (#51): hold `Right`+`R3` 24 vsyncs or more |
 
 Copy one over a slot before using it, and back up whatever that slot held.
+
+**The owner's own save states do not load here.** EmuDeck's PCSX2 (v2.5.274) writes
+format `0x9A55` and PCSXROO wants `0x9A59`, so `loadstate` refuses them with
+"no longer compatible". Do not fall back to a look-alike scene: load any battle
+state, then `python tools/transplant.py <their .p2s> --save-slot N` writes their
+EE memory over it and saves a native copy. Check it with a screenshot.
 
 Save with every group **off** so the snapshot carries the game's original words
 and each arm can apply its own.
