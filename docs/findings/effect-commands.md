@@ -4,7 +4,7 @@ Newest sections at the bottom.
 
 ## 2026-09-28 - issue #77: the effect-command ramps
 
-Hercule's Present Bomb (`L2` + `Triangle`, `rocky-hercule-vs-standing-gohan.p2s`)
+Hercule's Dynamic Mess Em Up Punch (`L2` + `Triangle`, `rocky-hercule-vs-standing-gohan.p2s`)
 throws a white flash on its first hit. With every open fix on, the flash at
 60fps filled the screen for three vsyncs, where the 30fps flash is a medium
 burst around the fist. Great Saiyaman 2's rush in his Ultimate does the same: a
@@ -12,7 +12,7 @@ yellow fireball fills the view at 60fps and is a small orange one at 30fps.
 
 ### Which effect draws it
 
-Five effect classes run during Present Bomb (the class map is in
+Five effect classes run during Dynamic Mess Em Up Punch (the class map is in
 `effect-classes.md`, added by PR #76). Making each class's draw return at once,
 one at a time, and photographing the hit, the flash disappears only with the
 scripted-effect-track class's draw (`FUN_0019DD38`, vtable `002C4278`). That
@@ -50,7 +50,7 @@ value from the command's definition (`$s3`):
     rate:                  value += def+0x30 a tick                   00150AA4
                            until it reaches the end value
 
-Both count 30Hz ticks. A write watch on Present Bomb's value reads 0.24, 0.29,
+Both count 30Hz ticks. A write watch on Dynamic Mess Em Up Punch's value reads 0.24, 0.29,
 0.34 ... one step a tick at 60fps.
 
 ### The fix
@@ -67,7 +67,7 @@ a random spray direction per emission. None of them is a clock.
 
 ### Measured, every open fix on
 
-| Present Bomb's flash | 30fps | before | after |
+| Dynamic Mess Em Up Punch's flash | 30fps | before | after |
 |---|---|---|---|
 | scale step per 30Hz tick | -0.516 | -1.03 | -0.516 |
 | scale when the flash ends, v119 | -2.12 | -5.73 | -2.64 |
@@ -94,6 +94,6 @@ and without the group). Traced in memory instead: its timer reads 0, 0.5, 1.0,
 
 ### What is left
 
-- Present Bomb as a whole leads 30fps by about 3 vsyncs, measured on v24 back
+- Dynamic Mess Em Up Punch as a whole leads 30fps by about 3 vsyncs, measured on v24 back
   on 2026-09-22 (issue #8); nothing here moves that.
 - The two-tick start of a ramp, above.

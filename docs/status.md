@@ -375,13 +375,13 @@ among them - once a tick, by a rate per tick or by a timer against seconds *
 30.0. At 60fps hit flashes grew twice as fast. The timer steps 0.5 and the rate
 is halved.
 
-| Present Bomb's first hit flash, every open fix on | 30fps | 60fps before | 60fps with it |
+| Dynamic Mess Em Up Punch's first hit flash, every open fix on | 30fps | 60fps before | 60fps with it |
 |---|---|---|---|
 | scale step per 30Hz tick | -0.516 | -1.03 | -0.516 |
 | scale when the flash ends (v119) | -2.12 | -5.73 | -2.64 |
 | looks like | medium flash | fills the screen | medium flash |
 
-Best-match pixel difference against 30fps at Present Bomb's hits: v112 37.9 ->
+Best-match pixel difference against 30fps at Dynamic Mess Em Up Punch's hits: v112 37.9 ->
 21.6, v116 68.0 -> 25.9, v200 19.2 -> 9.6, v250 26.0 -> 11.3. GS2's rush hit: the
 fireball is the 30fps size instead of filling the view. The ramp starts two game
 ticks after its effect in both arms, so at 60fps it runs one 30Hz step longer
