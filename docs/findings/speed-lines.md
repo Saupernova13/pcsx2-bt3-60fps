@@ -4,11 +4,11 @@ Newest sections at the bottom.
 
 ## 2026-09-29 - issue #8: the speed lines spawn about 1.66x as often
 
-The pink and yellow radial streaks round a hit in Hercule's Present Bomb (save
+The pink and yellow radial streaks round a hit in Hercule's Dynamic Mess Em Up Punch (save
 state 5, `L2`+`Triangle`) are sprites spawned by the sprite effect class
 (vtable `002C3EF0`, update `FUN_001866C0`). Found through the random numbers
 they use: over v100-v300, three sites in `FUN_001840A0` (`00184320`, `0018434C`,
-`00184380`) draw once per line in the Present Bomb and never in idle.
+`00184380`) draw once per line in the Dynamic Mess Em Up Punch and never in idle.
 `FUN_001840A0` is called by `FUN_001853C8`, which `FUN_001866C0` calls at
 `001867B4`. With that one call removed, the streaks are gone. They were missed
 by the earlier draw-disable test because the class's own draw method does not
@@ -58,12 +58,25 @@ Every open fix on:
 
 | | 30fps | 60fps before | 60fps with the group |
 |---|---|---|---|
-| Present Bomb lines spawned, v100-v300 | 47 | 78 | 47 |
+| Dynamic Mess Em Up Punch lines spawned, v100-v300 | 47 | 78 | 47 |
 | emitter `01A2E850` spawns | 108, 112, 116, 166 ... (15) | 107, 110, 113, 116, 119 ... (35) | 107, 111, 115, 165 ... (15) |
 | GS2's Ultimate hearts, class updates | 24, v135-v253 | 51, v134-v254 | 24, v134-v252 |
 | Kamehameha, first four objects' updates | 18, 49, 28, 30 | 39, 100, 52, 58 | 19, 50, 28, 29 |
 
 Every emitter spawns as often as at 30fps, at the same spacing, one vsync
-earlier. Present Bomb and Kamehameha damage and both fighters' state
+earlier. Dynamic Mess Em Up Punch and Kamehameha damage and both fighters' state
 timelines are the same with and without the group. All 15 smoke moves return
 to idle.
+
+## 2026-10-09 - the scene above is Dynamic Mess Em Up Punch; Present Bomb too
+
+`L2`+`Triangle` for Hercule is Dynamic Mess Em Up Punch, the name the game
+shows and the wiki lists (1 or 6360 damage, chosen at random). The sections
+above called it Present Bomb, which is `L2`+`Up`+`Triangle`. Present Bomb, the
+move issue #8 names, spawns the same lines while the bomb flies. Calls to
+`FUN_001840A0` over v60-v200 from save state 5, `L2`+`Up`+`Triangle`, in the
+full test build:
+
+| | 30fps | without `sprite effect clock` | with it |
+|---|---|---|---|
+| lines spawned | 24 | 32 | 24 |

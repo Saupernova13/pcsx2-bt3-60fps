@@ -1282,13 +1282,13 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 
 // Speed lines, found 2026-09-29 for issue #8. The sprite effect class (vtable
 // 002C3EF0, update FUN_001866C0) spawns the radial speed lines round a hit - the
-// pink and yellow streaks of Hercule's Present Bomb - through FUN_001853C8 ->
+// pink and yellow streaks of Hercule's Dynamic Mess Em Up Punch - through FUN_001853C8 ->
 // FUN_001840A0. Each tick the update either spawns, when the countdown +0x1F8 is
 // at or below 0 (the spawner reloads it with the emitter's interval), or counts
 // +0x1F8 down. [blast effect duration] halves that step and five others in this
 // update, which keeps each timer's length but not its order: the spawn tick does
 // not count down, so a cycle took 1 + interval/0.5 ticks at 60fps against
-// 2 * (1 + interval/1.0) vsyncs at 30fps - 3 vsyncs against 4 in Present Bomb -
+// 2 * (1 + interval/1.0) vsyncs at 30fps - 3 vsyncs against 4 in Dynamic Mess Em Up Punch -
 // and a window that closed on an odd tick let one more burst through.
 //
 // This group runs the whole update at 30Hz, as the game does: after the freeze
@@ -1300,7 +1300,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // stepper, if present, always passes: it too runs on even ticks.
 // The draw is a separate method, so the lines are still drawn every frame.
 //
-// Present Bomb, L2 + Triangle from save state 5, every open fix on, v100-v300:
+// Dynamic Mess Em Up Punch, L2 + Triangle from save state 5, every open fix on, v100-v300:
 //
 //                          30fps       60fps before   with this group
 //   lines spawned          47          78             47

@@ -488,7 +488,7 @@ on countdowns that `[blast effect duration]` halves; that kept each timer's
 length but not the update's order, so lines spawned every 3 vsyncs instead of 4.
 The whole update now runs at 30Hz with full steps.
 
-| Present Bomb, every open fix on | 30fps | 60fps before | 60fps with it |
+| Dynamic Mess Em Up Punch, every open fix on | 30fps | 60fps before | 60fps with it |
 |---|---|---|---|
 | speed lines spawned, v100-v300 | 47 | 78 | 47 |
 | spacing between spawns | 4 vsyncs | 3 | 4 |
