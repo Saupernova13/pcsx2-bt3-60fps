@@ -1288,7 +1288,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // 0023D63C, 0023D7C4) and it is the constant's only reader, so the constant
 // itself becomes 1/60.
 //
-// Present Bomb's first hit, every open fix on: the two slots it fills reach 0
+// Dynamic Mess Em Up Punch's first hit, every open fix on: the two slots it fills reach 0
 // at v117 and v123 at 30fps, v111 and v114 without this, v117 and v123 with it.
 // Not covered: the shake's random offsets are drawn once a tick, so at 60fps
 // the camera jitters twice as often; matching that would mean caching the
@@ -1307,7 +1307,7 @@ patch=1,EE,002FE544,word,3C888888 // 1/30 -> 1/60 s a tick   the shake's countdo
 // gated: FUN_00122F10 sends the pad's accumulated rumble and zeroes it on every
 // call, so a skipped tick would switch the motors off for a frame.
 //
-// Present Bomb's first hit: rumble reaches the pad for 10 vsyncs at 30fps, 5
+// Dynamic Mess Em Up Punch's first hit: rumble reaches the pad for 10 vsyncs at 30fps, 5
 // without this, 11 with it, over the same pulse curve (191, 250 ... 131).
 [60FPS - controller rumble]
 description=Run the controller's rumble in real time, so hits rumble for as long as at 30fps and pulse at the same rate.

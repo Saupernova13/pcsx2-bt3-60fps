@@ -4,7 +4,7 @@ Newest sections at the bottom.
 
 ## 2026-09-28 - issue #80: both counted 30Hz ticks
 
-Found by recording all of RAM at every vsync of Hercule's Present Bomb hit
+Found by recording all of RAM at every vsync of Hercule's Dynamic Mess Em Up Punch hit
 (`rocky-hercule-vs-standing-gohan.p2s`, `L2` + `Triangle`) in both arms, and
 keeping the words whose values are the same per tick in the two - the signature
 of a clock no group compensates. Two families came out besides the effects
@@ -26,7 +26,7 @@ once a tick, and two in the camera code at `0023D63C` and `0023D7C4`, not
 measured. The constant has one reader, so it is patched in data: 1/30 becomes
 1/60.
 
-| Present Bomb, first hit | 30fps | before | after |
+| Dynamic Mess Em Up Punch, first hit | 30fps | before | after |
 |---|---|---|---|
 | slot filled with 0.2 s reaches 0 | v117 | v111 | v117 |
 | slot filled with 0.3 s reaches 0 | v123 | v114 | v123 |
@@ -58,7 +58,7 @@ them and zeroes them. That is why the update is not gated: a skipped tick would
 send zero and pulse the motors. Instead the three 30.0s become 60.0 and the
 small motor toggles on bit 1.
 
-| Present Bomb, first hit | 30fps | before | after |
+| Dynamic Mess Em Up Punch, first hit | 30fps | before | after |
 |---|---|---|---|
 | vsyncs with rumble sent to the pad | 10 (v109-v118) | 5 | 11 (v107-v117) |
 | the large motor's values | 191, 250, 227, 152, 131 | the same, one a vsync | the same curve, over the same time |
