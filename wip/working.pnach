@@ -1426,3 +1426,36 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The Max Power shockwave, found 2026-10-02 and fixed 2026-10-09 for issue #137.
+// Reaching Max Power Mode makes a ring that warps the background as it spreads
+// from the fighter. It lives in a 10-object pool, *(gp-0x566C), that
+// FUN_002454E0 updates once a tick. FUN_00244E20 ticks one object: life +0x08
+// -= 1, radius +0x0C += speed +0x10, speed += +0x14, width +0x18 += +0x1C, and in
+// the last 6 ticks alpha +0x20 += +0x24. FUN_00245740 makes one (7 call sites;
+// the Max Power one is in FUN_00175F40) with life = seconds * 30.0 and the speed
+// and width steps divided by that life. At 60fps the ring spread and faded in
+// half its real time.
+//
+// The ring is scaled for 60 ticks a second where it is made: life = seconds *
+// 60, the starting speed halved and the slow-down quartered (the life doubling
+// halves it once, the extra 0.5 on its numerator again), and the width step
+// halves on its own. The fade starts 12 ticks from the end with half the step;
+// 002FE624 has one reader. A 30Hz gate on the pool update gives the same curve,
+// but the draw (FUN_00245668) does not wait for an object's first update and
+// the allocator clears nothing, so a ring made on an odd tick would be drawn
+// for a frame with its slot's old shape.
+//
+// Goku (Early) holding L2 into Max Power Mode:
+//
+//                        30fps         60fps before   with this group
+//   ring alive           46 vsyncs     23             47
+//   radius, 10 in        68            113            63
+//   radius at the end    208           208            211
+[60FPS - max power shockwave]
+description=Spread and fade the Max Power Mode shockwave ring over its real time instead of half of it.
+patch=1,EE,00245794,word,3C014270 // lui at,0x41F0 -> 0x4270      life: seconds * 60
+patch=1,EE,002457F0,word,4604C602 // nop -> mul.s f24,f24,f4       starting speed * 0.5
+patch=1,EE,002457F4,word,46040002 // nop -> mul.s f0,f0,f4         slow-down numerator * 0.5
+patch=1,EE,002450C0,word,3C014140 // lui at,0x40C0 -> 0x4140      fade from 12 ticks before the end
+patch=1,EE,002FE624,word,BD2B5600 // -0.0837 -> -0.0418            fade step

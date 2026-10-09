@@ -499,10 +499,58 @@ Checked on 2026-10-02:
 | `001795D4`, `00179B9C` | called only from the lightning class | gated with it |
 | `00192EF4` | called only from the swirl class | gated with it |
 | `001A11E0`, `001A1738` | called from the beam-impact burst class | gated with it |
-| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Not fixed. |
+| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Fixed under #137: it is the Max Power shockwave. |
 
 Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
 `0014D708`, `00160168`, `0016A2D4`, `0019522C`, `00195514`, `00195F90`,
 `00195FB4`, `00196070`, `0019A9C4`; the 64 unpatched sites that never ran in a
 rig scene; and `FUN_001DC4C0`, which adds seconds * 30 to a battle counter
 (`battle+0x1C`) only in game modes 4 and 0x1B.
+
+## 2026-10-09 - issue #137: the Max Power shockwave
+
+The ring object at `00245794` in the table above. Holding `L2` with Goku
+(Early) at full Ki fills the Max Power gauge at about v164, and `FUN_00175F40`
+makes one ring through `FUN_00245740`. Drawn, it warps the background in a band
+that spreads out from the fighter: photographed at 30fps with and without the
+pool's draw (`FUN_00245668` returning at once), the rocks behind Goku bend
+along the ring.
+
+| what | where |
+|---|---|
+| the pool | 10 objects of `0x470` bytes at `**(gp-0x566C)`; the counts of live ones at `+0xA4` / `+0xA8` of the header |
+| update, once a tick | `FUN_002454E0`, from `FUN_002456E8`, which skips it while paused and always calls the draw |
+| one object's tick | `FUN_00244E20` |
+| the maker | `FUN_00245740`, 7 call sites |
+
+`FUN_00244E20` per tick: life `+0x08` -= 1 (gone at 0); radius `+0x0C` += speed
+`+0x10` while the radius is at most 600; speed += `+0x14`; width `+0x18` +=
+`+0x1C`; and while the life is at most 6, alpha `+0x20` += `+0x24` (clamped at 0).
+The maker sets life = seconds * 30.0 (`00245794`), `+0x14` = -(speed * 0.3) /
+life and `+0x1C` = (width * 3.2) / life, and the alpha 0.502 and its step -0.0837
+(`gp-0x5C50`, `gp-0x5C4C`).
+
+`[60FPS - max power shockwave]` scales the ring where it is made. Life doubles,
+which halves both divided steps; the starting speed and the slow-down's
+numerator are halved as well, so the speed is halved and the slow-down
+quartered, as a per-tick and a per-tick-squared quantity must be. The fade
+starts 12 ticks from the end and its step is halved in `.data` (one reader).
+
+| Goku (Early), from the cheat file | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| ring alive | v164-v209, 46 vsyncs | v165-v187, 23 | v165-v211, 47 |
+| radius 10 vsyncs in | 68 | 113 | 63 |
+| radius at mid-life | 122 | 122 | 121 |
+| radius at the end | 208 | 208 | 211 |
+| fade, 0.50 to 0 | over 14 vsyncs | gone before it starts | over 14 vsyncs, in half-steps |
+
+A 30Hz gate on `FUN_002454E0` gives the same curve and was tried first. It was
+not kept: the draw renders any live object without checking it has had its
+first update, and `FUN_00244D00` hands out a slot without clearing it, so a
+ring made on an odd tick would be drawn for one frame with its slot's previous
+vertices.
+
+A trap met on the way: in this scene two identical 60fps runs photograph
+differently at the same vsync although their RAM is identical, so the ring
+could not be isolated by photographs at 60fps. The 30fps arm photographs
+reproducibly. The comparison above is read from RAM.
