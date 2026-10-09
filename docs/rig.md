@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Eleven traps, most of which cost an hour or more
+## Thirteen traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -98,6 +98,17 @@ takes every mark that follows the previous one a frame late: `drift.py --marks
 "consecutive vsyncs" series built that way samples every other vsync, which is
 exactly the series that cannot see an odd-frame flicker. Skip the advance when
 it would be zero; #75 does that for `drift.py`.
+
+**12. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
+`stopping: true`, and `status` then says `stopping` indefinitely; `boot` refuses
+with "already running" and `run` with `no_vm`. Stop `pcsxroo-qt` (the rig's own
+process, never the user's PCSX2) and `launch` again. Save states are files on
+disk and survive. Needed whenever the rig's ini gains a name, because it is read
+at boot only.
+
+**13. `tools/export.py` writes to the Desktop unless told otherwise.** A
+validation run leaves a `428113C2.pnach` there that looks like a deliverable.
+Pass `--to work/export-check` when all you want is the validator.
 
 ## Getting to any scene
 
@@ -249,9 +260,13 @@ shipped set without editing anything:
     python tools/patchctl.py --on full
     # in a script:  groups = PRESETS["full"] + ["60FPS - state phase timers"]
 
-`60FPS - spare 1/2/3` are names the ini already enables that no group uses. A new
-group given one of those names can be tested **without restarting the emulator**,
-which otherwise costs a full boot per experiment.
+`60FPS - spare 1` to `spare 12` are names the rig's ini already enables (1-3
+since 2026-09, 4-12 added 2026-10-09). A new group given one of those names can
+be tested **without restarting the emulator**, which otherwise costs a full boot
+per experiment. A group under its real name that the ini does not list applies
+nothing at all, so `fk` silently runs without it: rename it to a free spare in
+the rig's cheat file, and check `work/tools-scratch` notes or the cheat file for
+which spares are taken.
 
 ## The three instruments
 
