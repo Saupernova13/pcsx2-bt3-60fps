@@ -63,9 +63,6 @@ KNOWN_BROKEN: list[str] = [
     "count are exact, but the beams now travelling at their correct speed change "
     "where the clash forms and the AI reacts to that, so a near-tie the 30fps "
     "game gives the CPU can fall the player's way",
-    "death by a body-erasing attack: the camera around the victim was reported "
-    "too fast and cutting oddly, and has never been re-checked since the camera "
-    "work landed. It may have gone with the other camera fixes, or it may not",
 ]
 
 
