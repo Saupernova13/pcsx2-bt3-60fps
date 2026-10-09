@@ -239,12 +239,16 @@ TRANSFLASH = ["60FPS - transformation flash"]
 # limit in seconds * 30.0. The constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
+# The lock-on search, found 2026-10-09 for issue #135. State 54 widens a search
+# cone and range once a tick in FUN_001EB2D0; a trampoline halves both steps.
+SEARCH = ["60FPS - lock-on search"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + SEARCH
                   + SPARES)
 
 PRESETS = {
@@ -304,7 +308,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + SEARCH),
+    # "full" without the lock-on search, so that group has a named baseline.
+    "nosearch": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                 + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

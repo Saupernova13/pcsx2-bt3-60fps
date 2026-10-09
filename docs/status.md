@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the lock-on search (#135)
+
+Adds `[60FPS - lock-on search]`. A fighter who lost the lock-on after a
+knockdown widened its search cone and range by a fixed step a tick, so at 60fps
+it found the opponent again in half the time. Both steps are halved.
+
+| Gohan's search after an Ultimate Blast | 30fps | 60fps before | with it |
+|---|---|---|---|
+| Super 17's Shocking Death Ball | 40 vsyncs | 20 | 39 |
+| Devilman's Devilmite Beam | 20 vsyncs | 10 | 19 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2

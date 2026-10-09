@@ -1426,3 +1426,30 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The lock-on search, found 2026-10-09 for issue #135. A fighter who has lost the
+// lock-on after a knockdown stands in state 54 (FUN_001EB4A8) looking around for
+// the opponent. Once a tick, FUN_001EB2D0 (its only caller is 001EB57C) widens a
+// search cone, fighter+0xD58, by a per-character angle (FUN_0020E648) and a search
+// range, +0xD5C, by a per-character distance (FUN_0020E6F0); FUN_001EB3A0 locks on
+// again once the opponent is inside both. The steps were the same per tick at
+// both rates, so at 60fps the search ended in half its real time.
+//
+// A trampoline at 001EB30C halves both steps before they are added. The cap at pi
+// and the find test are unchanged.
+//
+// Gohan's state 54 after an Ultimate Blast knocks him down:
+//
+//                                      30fps        60fps before   with this group
+//   Super 17's Shocking Death Ball     40 vsyncs    20             39
+//   Devilman's Devilmite Beam          20 vsyncs    10             19
+[60FPS - lock-on search]
+description=Let a fighter who lost the lock-on look around for the opponent for its real time, instead of finding them again in half the time.
+patch=1,EE,001EB30C,word,0803C85C // andi s0,s0,0x1 -> j 000F2170
+patch=1,EE,000F2170,word,32100001 // andi s0,s0,0x1                the original
+patch=1,EE,000F2174,word,3C013F00 // lui at,0x3F00
+patch=1,EE,000F2178,word,44811000 // mtc1 at,f2                    0.5
+patch=1,EE,000F217C,word,4602A502 // mul.s f20,f20,f2              cone step
+patch=1,EE,000F2180,word,46020842 // mul.s f1,f1,f2                range step
+patch=1,EE,000F2184,word,0807ACC5 // j 001EB314
+patch=1,EE,000F2188,word,00000000 // nop
