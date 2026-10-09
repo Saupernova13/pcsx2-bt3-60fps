@@ -239,12 +239,17 @@ TRANSFLASH = ["60FPS - transformation flash"]
 # limit in seconds * 30.0. The constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
+# The CPU opponent's decision rate, found 2026-10-09 for issue #100. FUN_001BB620
+# runs the whole AI once a tick from 0012BC8C; a wrapper runs it every 2 ticks,
+# on a fighter state change, and every tick in the two struggles.
+CPUAI = ["60FPS - CPU decision rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + CPUAI
                   + SPARES)
 
 PRESETS = {
@@ -304,7 +309,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + CPUAI),
+    # "full" without the CPU decision rate, so that group has a named baseline.
+    "nocpuai": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

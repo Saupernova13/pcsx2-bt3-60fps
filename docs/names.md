@@ -41,6 +41,7 @@ from SuperCombo's names to this repo's old terms.
 | transformations (Cell, Vegeta (Scouter)'s Great Ape) | Transformation (`R3`, costs Blast Stock) | issues #7, #10 |
 | Vegeta's energy ball, the flash before the Great Ape | A scripted effect with timed tracks (small flash, then the ball) | `effect track clock`, issue #10 |
 | the white before a transformation reveal | The transformation flash that covers the model swap | `transformation flash`, issue #10 |
+| the CPU reacting too fast, a launched CPU flying too far | The CPU opponent's AI, which decides once a tick (my label; the wiki has no name for it) | `CPU decision rate`, issue #100 |
 
 `effect rotation` is the spin of aura and effect swirls. It is not the aura's
 playback speed; that is `aura update rate`.

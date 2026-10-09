@@ -27,7 +27,7 @@ Confirmed by diffing the loaded ELF against live EE RAM from the battle save sta
 | `.text` | `00100000` - `002C33C0` | 1,848,256 bytes |
 | `.data` | `002C3400` - `002FF16E` | 245,102 bytes file-backed |
 | `.bss` end | `00334BF8` | |
-| Safe zone | `000F0000` | 8 KB verified zero-filled in the battle state |
+| Safe zone | `000F0000` - `000FFFFF` | below the ELF; the first 8 KB verified zero in the battle state, `000F2000` on verified zero in all ten rig save states (2026-10-09) |
 
 **ELF addresses are pnach addresses, verbatim.** The ELF loads at `00100000` with no
 rebasing, no overlays and no self-modifying code, so a Ghidra address can be pasted
