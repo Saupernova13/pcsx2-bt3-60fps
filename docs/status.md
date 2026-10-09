@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the hit effect (#139)
+
+Adds `[60FPS - hit effect rate]`. The effect class behind every hit's sparks ran
+its emitters once a tick, so at 60fps a hit sprayed about twice as many. It now
+runs at 30Hz.
+
+| spawns from the class | 30fps | 60fps before | with it |
+|---|---|---|---|
+| Cell's rush hit | 46 | 79 | 46 |
+| Super 17's Hell's Storm | 424 | 872 | 440 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2

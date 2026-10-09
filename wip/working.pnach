@@ -1426,3 +1426,38 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The hit effect, found 2026-10-09 for issue #139. Every melee hit, smash, ki blast
+// hit and Blast 2 hit makes an object of effect class 002C3F20, update
+// FUN_001876A0. Once a tick that update runs FUN_001871A8, which asks each of its
+// 19 emitters whether to spawn (FUN_0014D908, start and stop flags, no clock) and
+// spawns through FUN_0014FF90 at 00187284. Continuous emitters therefore emitted
+// once a tick, and at 60fps a hit sprayed about twice as many sparks.
+//
+// The class now runs at 30Hz the way the burst effect rate group (PR #83) runs
+// the burst class: its freeze check (jal FUN_0012D1D0 at 001876C0) goes through
+// a wrapper that also reports "frozen" on odd ticks. The draw is a separate
+// vtable slot and still runs every frame. The wrapper is this group's own copy,
+// so the group does not depend on that one.
+//
+// Spawner calls from this class over a hit, from the cheat file:
+//
+//                                   30fps   60fps before   with this group
+//   Cell's rush, v8-v45             46      79             46
+//   Krillin's ki blast, v12-v70     78      159            78
+//   Cell's smash, v70-v140          70      115            65
+//   Super 17's Hell's Storm         424     872            440
+[60FPS - hit effect rate]
+description=Run the sparks of every hit at the game's own 30Hz, so a hit sprays as many as on a PS2 instead of about twice as many.
+patch=1,EE,000F2190,word,27BDFFF0 // addiu sp,sp,-16
+patch=1,EE,000F2194,word,AFBF0000 // sw ra,0(sp)
+patch=1,EE,000F2198,word,0C04B474 // jal 0x0012D1D0               the game's own freeze check
+patch=1,EE,000F219C,word,00000000 // nop
+patch=1,EE,000F21A0,word,3C080033 // lui t0,0x33
+patch=1,EE,000F21A4,word,8D081D64 // lw t0,0x1D64(t0)             frame counter
+patch=1,EE,000F21A8,word,31080001 // andi t0,t0,1
+patch=1,EE,000F21AC,word,00481025 // or v0,v0,t0                  odd tick: frozen too
+patch=1,EE,000F21B0,word,8FBF0000 // lw ra,0(sp)
+patch=1,EE,000F21B4,word,03E00008 // jr ra
+patch=1,EE,000F21B8,word,27BD0010 // addiu sp,sp,16
+patch=1,EE,001876C0,word,0C03C864 // jal 0012D1D0 -> jal 000F2190   hit class update

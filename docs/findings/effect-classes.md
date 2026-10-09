@@ -155,3 +155,52 @@ the freeze check, and `aura update rate` and `particle update rate` gate them.
   fills the view, against 4 at 30fps and a smaller orange ball. Not this class;
   one of the unexamined ones above.
 - The transformation event lead above: 3 vsyncs on Goten, 2 on Vegeta.
+
+## 2026-10-09 - issue #139: the hit effect, class `002C3F20`
+
+A census of the classes listed above as not examined: every rig scene, idle and
+nine moves (ki charge, both Blast 2s, an Ultimate, a rush, ki blasts, a
+transformation, a smash), with a breakpoint on each update
+(`work/tools-scratch/effcensus.py`). Four ran:
+
+| vtable | update | ran in |
+|---|---|---|
+| `002C3F20` | `FUN_001876A0` | almost every hit: rushes, smashes, ki blasts, Blast 2s, Ultimates |
+| `002C3D58` | `FUN_00175F40` | reaching Max Power Mode; it makes the shockwave of #137 |
+| `002C3B38` | `FUN_0016BAC8` | Krillin's Ultimate |
+| `002C3DB8` | `FUN_001771D8` | Goten's Ultimate |
+
+None of `002C3A00`, `002C3B08`, `002C3B98`, `002C3C88`, `002C3CC8`, `002C3D28`,
+`002C3EA8`, `002C42A8`, `002C4338` or `002C4368` ran in any of them.
+
+`FUN_001876A0`, once a tick unless its freeze check (`FUN_0012D1D0`, at
+`001876C0`) says frozen:
+
+- if `+0x545`, `+0x14` -= `+0x54C`;
+- for each set bit of `+0x544`, `FUN_00151810` copies the object's position into
+  a sub-effect;
+- `FUN_001871A8` runs the emitters: for each of 19, `FUN_0014D908` works out the
+  start and stop flags (no clock) and `FUN_0014FF90` spawns;
+- with flag 1 set (from outside), `+0x550` += 1.0 until it reaches `+0x554`,
+  then flag 2, then `FUN_001ADA58` removes it.
+
+The life `+0x554` was 0.0 on a rush hit, so the object ends one tick after its
+owner sets flag 1, at v31 at 30fps and v32 at 60fps: the life is the owner's.
+What runs per tick is the emission. Calls to `FUN_0014FF90` from `00187284`:
+
+| scene | 30fps | 60fps before | with `[60FPS - hit effect rate]` |
+|---|---|---|---|
+| Cell (1st Form)'s rush, v8-v45 | 46 | 79 | 46 |
+| Krillin's ki blast hit, v12-v70 | 78 | 159 | 78 |
+| Cell's smash, v70-v140 | 70 | 115 | 65 |
+| Super 17's Hell's Storm, v85-v200 | 424 | 872 | 440 |
+
+The group makes the freeze check report odd ticks as frozen, the shape
+`[60FPS - burst effect rate]` uses. Photographed on Cell's rush at v12-v26, the
+spark draws in all three arms.
+
+Two more emitter paths showed up in the same counts and are not this class: the
+ki blast projectile's own (`001766B8`, 27 calls at 30fps against 37 on the ki
+blast hit) and the game objects' (Hell's Storm's bullets, through
+`FUN_00155918` and `FUN_0014FF50`: 257 against 410). There are 10 direct callers
+of `FUN_0014FF90` and 12 per-object emit helpers that call `FUN_0014FF50`.
