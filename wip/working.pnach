@@ -1298,14 +1298,16 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // time as 30fps and the same sequence sample for sample: 0.04 0.09 0.13 ...
 // 0.98 1.00.
 //
-// It also restores the Perfect Smash window, which is the part of the report
-// that matters in play. fighter+0xD84 counts TICKS since the charge hit
-// maximum and 001E4804 grants the Perfect Smash on a single tick's worth of
-// release timing. Releasing on each vsync in turn and breakpointing the grant
-// at 001E4810: 30fps accepts 2 vsyncs, the patch alone accepts 1, and this puts
-// it back to 2. Widening the 001E4804 test to accept 1 OR 2 was built and
-// measured as well and is NOT here - it makes the window 3 vsyncs, wider than
-// the real game.
+// The Perfect Smash window. fighter+0xD84 counts TICKS since the charge hit
+// maximum and 001E4804 grants the Perfect Smash only when it reads exactly 1,
+// which is one tick of release timing: 2 vsyncs at 30fps, 1 at 60fps. Releasing
+// on each vsync in turn and breakpointing the grant at 001E4810, in the full test
+// build of 2026-10-09: 30fps accepts v59 and v60, the charge fix alone only v58.
+// (An earlier note here said the charge fix alone restored 2 vsyncs; in the full
+// build it does not.) The test now accepts 1 or 2 through 000F1CE0, which gives
+// v58 and v59 - the 30fps width, one vsync earlier because the charge state
+// starts 2 vsyncs earlier. Every other value takes the original branch with a0
+// untouched, so the ordinary Full Power smash is unchanged.
 //
 // Needs the meter economy group (PR #16). The step is scaled by Momentum
 // (fighter+0xD80, which rush hits fill), and Momentum drains 400 a tick inside
@@ -1314,6 +1316,15 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 [60FPS - smash charge]
 description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
 patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick
+patch=1,EE,000F1CE0,word,2481FFFF // addiu $at, $a0, -1        a0 = fighter+0xD84
+patch=1,EE,000F1CE4,word,2C210002 // sltiu $at, $at, 2         1 or 2?
+patch=1,EE,000F1CE8,word,10200003 // beqz $at, +3
+patch=1,EE,000F1CEC,word,00000000 // nop
+patch=1,EE,000F1CF0,word,08079203 // j 0x001E480C               Perfect Smash
+patch=1,EE,000F1CF4,word,00000000 // nop
+patch=1,EE,000F1CF8,word,08079208 // j 0x001E4820               the original non-perfect path
+patch=1,EE,000F1CFC,word,00000000 // nop
+patch=1,EE,001E4804,word,0803C738 // bne $a0, $v0, 001E4820 -> j 000F1CE0   Perfect Smash test
 
 // The charge flash, found 2026-09-22 for issue #6. Level 3 is "indicated by your
 // character flashing white", and the flash is a pulse. While the fighter holds

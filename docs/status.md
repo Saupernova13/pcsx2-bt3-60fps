@@ -408,6 +408,11 @@ The charge is not merely the same length - it is the same sequence, 0.04 0.09
 measured by releasing on each vsync in turn with a breakpoint on the grant at
 `001E4810`.
 
+**Corrected 2026-10-09.** In the full test build the charge fix alone gives the
+Perfect Smash a 1-vsync window (v58), against 2 at 30fps (v59, v60). The group
+now also widens the grant's test at `001E4804` to accept `fighter+0xD84` of 1 or 2,
+which gives v58 and v59: the 30fps width.
+
 **Not confirmed in play.** Only the neutral Smash was tested, on one character.
 
 **Ship it with `[60FPS - meter economy]` (#16), never without.** The charge rate

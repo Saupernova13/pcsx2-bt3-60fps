@@ -309,3 +309,23 @@ and the decrement happen in the same tick before the draw, so 30fps shows 0.167,
 of `0x1D`, re-fired every tick, shows 0.167 in both. Both constants have exactly
 one reader, and these three routines are the only callers of `FUN_0024E5B8`.
 
+
+## 2026-10-09 - the Perfect Smash window needed its test widened after all
+
+Re-measured in the full test build (every open fix PR on). Square held from
+save state 1, released on each vsync from v54 to v70 in turn, with a breakpoint
+on the Perfect Smash grant at `001E4810`:
+
+| arm | released on, Perfect Smash granted | width |
+|---|---|---|
+| 30fps | v59, v60 | 2 vsyncs |
+| full build, charge fix alone | v58 | 1 vsync |
+| full build + the 1-or-2 test | v58, v59 | 2 vsyncs |
+
+The earlier note that the charge fix alone restored a 2-vsync window does not
+hold in the full build. `fighter+0xD84` steps once a tick, so `== 1` is one vsync
+at 60fps. The test at `001E4804` now goes through `000F1CE0`, which accepts 1 or
+2 and otherwise takes the original branch with `a0` untouched. The window is one
+vsync earlier than at 30fps because the charge state itself starts 2 vsyncs
+earlier (v15 against v17). Charge to Level 3 is 44 vsyncs in both, and the Level
+3 flash repeats every 8 vsyncs in both.
