@@ -590,3 +590,41 @@ because `FUN_00265298` has 13 callers including the menus.
 
 Vegeta's picture does not change: his cinematic waits for a later signal
 (`+0x264` = 4 at v397/398 in every arm), so his early load was invisible.
+
+## 2026-10-09 - issue #129: the shake's jitter, held for two ticks
+
+`FUN_0023F478(slots, out3, out2)` takes the shake slot with the largest size,
+zeroes both outputs, and, if anything is shaking, draws five random numbers
+(`FUN_002A9C78`) into a position offset (`out3`) and an angle offset (`out2`),
+scaled by `time left * k * size`. It runs once a tick whether or not anything
+shakes. In battle its only caller is `001C6B48` in the camera update, once per
+fighter camera (slot arrays `01870B30` and `01872130` in save state 0), with
+the outputs on the stack at `01FFEC30` / `01FFEC40`. The two callers in the
+camera clip code, `0023D63C` and `0023D7C4`, did not run in any rig scene.
+
+At 60fps the camera got a new offset every frame. Gating the call would leave
+the outputs zeroed on odd ticks and strobe the camera between shaken and still
+(see the 2026-09 note on render requests). So the call goes through a wrapper
+at `000F1D90` instead. On even ticks it calls the function and saves the five
+outputs under the slot array's address. On odd ticks it copies the saved values
+back and draws nothing. The two cameras share the call site, so the values sit
+in a table at `000F1F00`: four entries of the key plus five floats, a new key
+taking the entry the round-robin index at `000F1F80` points at. No patch line
+may write the table, because the patch rewrites its words every frame. It
+starts zero because the scratch zone is.
+
+Goku's Kamehameha on Ultimate Gohan (save state 0, `L2`+`Triangle` held 60
+vsyncs), each camera's outputs at every return to `001C6B50`, through the rig's
+own patch path (`spare 6`):
+
+| | 30fps | without the group | with it |
+|---|---|---|---|
+| new offsets during the shake, per camera | 11 | 21 | 11 |
+| vsyncs each offset is held | 2 | 1 | 2 |
+
+The first odd tick after a state load misses the empty table and calls the
+function, which shows as one 1-vsync gap in a run started from a state; in play
+the table fills on the battle's first tick, because the function runs every
+tick. Seven smoke moves give the same state timelines with and without the
+group. Odd ticks also draw no random numbers now, so the shake uses the shared
+random sequence at its 30fps rate.

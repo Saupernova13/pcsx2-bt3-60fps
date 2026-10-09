@@ -867,6 +867,101 @@ patch=1,EE,001C6C18,word,00000000 // nop
 patch=1,EE,001C5720,word,0803C4D0 // -> 0F1340  gate the camera-move countdown
 patch=1,EE,001C5724,word,00000000 // nop
 
+// The screen shake's jitter, found 2026-10-09 for issue #129. FUN_0023F478 draws
+// five random numbers once a tick - three for a position offset, two for an
+// angle - scaled by the largest shake slot. Its battle caller (001C6B48) runs
+// once per fighter camera every tick, so at 60fps the camera jumped to a new
+// offset every frame instead of every other one. The call now goes through a
+// wrapper that holds each camera's five values for two ticks: on even ticks it
+// calls the function and saves the outputs under the camera's slot array; on odd
+// ticks it copies the saved ones back and draws nothing. Two cameras share the
+// call site, so the saved values sit in a table of four entries (slot array, then
+// five floats) at 000F1F00, filled round-robin through the index at 000F1F80.
+// The table is never written by a patch line: the patch rewrites its words every
+// frame, which would wipe it. It relies on the scratch zone being zero.
+//
+// Goku's Kamehameha on Ultimate Gohan (save state 0), each camera's offsets at
+// every return to 001C6B50:
+//
+//                          30fps       60fps before   with this group
+//   new offsets in shake   11          21             11
+//   vsyncs each is held    2           1              2
+[60FPS - camera shake jitter]
+description=Hold each new screen-shake offset for two frames, so the camera shakes as often as on a PS2 instead of jumping every frame.
+patch=1,EE,001C6B48,word,0C03C764 // jal 0023F478 -> jal 000F1D90
+patch=1,EE,000F1D90,word,27BDFFE0 // addiu sp,sp,-0x20
+patch=1,EE,000F1D94,word,FFBF0000 // sd ra,0x0(sp)
+patch=1,EE,000F1D98,word,FFB00008 // sd s0,0x8(sp)
+patch=1,EE,000F1D9C,word,FFB10010 // sd s1,0x10(sp)
+patch=1,EE,000F1DA0,word,FFB20018 // sd s2,0x18(sp)
+patch=1,EE,000F1DA4,word,0080802D // daddu s0,a0,zero
+patch=1,EE,000F1DA8,word,00A0882D // daddu s1,a1,zero
+patch=1,EE,000F1DAC,word,00C0902D // daddu s2,a2,zero
+patch=1,EE,000F1DB0,word,3C080033 // lui t0,0x33
+patch=1,EE,000F1DB4,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F1DB8,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F1DBC,word,11000017 // beq t0,zero,0xf1e1c
+patch=1,EE,000F1DC0,word,3C0A000F // lui t2,0xF
+patch=1,EE,000F1DC4,word,254A1F00 // addiu t2,t2,0x1F00
+patch=1,EE,000F1DC8,word,254B0080 // addiu t3,t2,0x80
+patch=1,EE,000F1DCC,word,8D4C0000 // lw t4,0x0(t2)
+patch=1,EE,000F1DD0,word,11900006 // beq t4,s0,0xf1dec
+patch=1,EE,000F1DD4,word,00000000 // nop
+patch=1,EE,000F1DD8,word,254A0020 // addiu t2,t2,0x20
+patch=1,EE,000F1DDC,word,154BFFFB // bne t2,t3,0xf1dcc
+patch=1,EE,000F1DE0,word,00000000 // nop
+patch=1,EE,000F1DE4,word,1000000D // beq zero,zero,0xf1e1c
+patch=1,EE,000F1DE8,word,00000000 // nop
+patch=1,EE,000F1DEC,word,8D4C0004 // lw t4,0x4(t2)
+patch=1,EE,000F1DF0,word,AE2C0000 // sw t4,0x0(s1)
+patch=1,EE,000F1DF4,word,8D4C0008 // lw t4,0x8(t2)
+patch=1,EE,000F1DF8,word,AE2C0004 // sw t4,0x4(s1)
+patch=1,EE,000F1DFC,word,8D4C000C // lw t4,0xC(t2)
+patch=1,EE,000F1E00,word,AE2C0008 // sw t4,0x8(s1)
+patch=1,EE,000F1E04,word,8D4C0010 // lw t4,0x10(t2)
+patch=1,EE,000F1E08,word,AE4C0000 // sw t4,0x0(s2)
+patch=1,EE,000F1E0C,word,8D4C0014 // lw t4,0x14(t2)
+patch=1,EE,000F1E10,word,AE4C0004 // sw t4,0x4(s2)
+patch=1,EE,000F1E14,word,10000020 // beq zero,zero,0xf1e98
+patch=1,EE,000F1E18,word,00000000 // nop
+patch=1,EE,000F1E1C,word,0C08FD1E // jal 0x23F478
+patch=1,EE,000F1E20,word,00000000 // nop
+patch=1,EE,000F1E24,word,3C0A000F // lui t2,0xF
+patch=1,EE,000F1E28,word,254A1F00 // addiu t2,t2,0x1F00
+patch=1,EE,000F1E2C,word,254B0080 // addiu t3,t2,0x80
+patch=1,EE,000F1E30,word,8D4C0000 // lw t4,0x0(t2)
+patch=1,EE,000F1E34,word,1190000E // beq t4,s0,0xf1e70
+patch=1,EE,000F1E38,word,00000000 // nop
+patch=1,EE,000F1E3C,word,254A0020 // addiu t2,t2,0x20
+patch=1,EE,000F1E40,word,154BFFFB // bne t2,t3,0xf1e30
+patch=1,EE,000F1E44,word,00000000 // nop
+patch=1,EE,000F1E48,word,3C0D000F // lui t5,0xF
+patch=1,EE,000F1E4C,word,8DAE1F80 // lw t6,0x1F80(t5)
+patch=1,EE,000F1E50,word,31CE0003 // andi t6,t6,0x3
+patch=1,EE,000F1E54,word,25CF0001 // addiu t7,t6,0x1
+patch=1,EE,000F1E58,word,31EF0003 // andi t7,t7,0x3
+patch=1,EE,000F1E5C,word,ADAF1F80 // sw t7,0x1F80(t5)
+patch=1,EE,000F1E60,word,000E7140 // sll t6,t6,5
+patch=1,EE,000F1E64,word,25AA1F00 // addiu t2,t5,0x1F00
+patch=1,EE,000F1E68,word,014E5021 // addu t2,t2,t6
+patch=1,EE,000F1E6C,word,AD500000 // sw s0,0x0(t2)
+patch=1,EE,000F1E70,word,8E2C0000 // lw t4,0x0(s1)
+patch=1,EE,000F1E74,word,AD4C0004 // sw t4,0x4(t2)
+patch=1,EE,000F1E78,word,8E2C0004 // lw t4,0x4(s1)
+patch=1,EE,000F1E7C,word,AD4C0008 // sw t4,0x8(t2)
+patch=1,EE,000F1E80,word,8E2C0008 // lw t4,0x8(s1)
+patch=1,EE,000F1E84,word,AD4C000C // sw t4,0xC(t2)
+patch=1,EE,000F1E88,word,8E4C0000 // lw t4,0x0(s2)
+patch=1,EE,000F1E8C,word,AD4C0010 // sw t4,0x10(t2)
+patch=1,EE,000F1E90,word,8E4C0004 // lw t4,0x4(s2)
+patch=1,EE,000F1E94,word,AD4C0014 // sw t4,0x14(t2)
+patch=1,EE,000F1E98,word,DFBF0000 // ld ra,0x0(sp)
+patch=1,EE,000F1E9C,word,DFB00008 // ld s0,0x8(sp)
+patch=1,EE,000F1EA0,word,DFB10010 // ld s1,0x10(sp)
+patch=1,EE,000F1EA4,word,DFB20018 // ld s2,0x18(sp)
+patch=1,EE,000F1EA8,word,03E00008 // jr ra
+patch=1,EE,000F1EAC,word,27BD0020 // addiu sp,sp,0x20
+
 // Mouth movement, found 2026-09-08. The cut-in speech is not skeletal
 // animation - [60FPS - animation clock] already paces that correctly, and the
 // three "time += rate" sites it hooks really are the only ones on the
