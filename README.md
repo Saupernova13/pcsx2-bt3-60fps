@@ -44,7 +44,7 @@ Also stated in the shipped file's header.
 
 | | |
 |---|---|
-| An ultimate's beam | lands its first hit about half a second early |
+| An Ultimate Blast | lands its first hit 2-5 frames early and finishes 6-11 frames early (#127) |
 | Frieza's *I Might Die This Time*, Buu's Super Kamehameha | the wind-up before the launch still runs about five frames fast |
 | Some pre-fight intros | paced wrong against the camera |
 | A body-erasing death | the camera has never been re-checked since the camera work landed |

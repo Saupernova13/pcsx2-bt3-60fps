@@ -48,11 +48,10 @@ DEVELOPMENT_ONLY = config.NEVER_SHIP
 
 # Stated plainly at the top of the shared file rather than left to be discovered.
 KNOWN_BROKEN: list[str] = [
-    "an ultimate's beam lands its first hit about half a second early. The "
-    "cinematic up to the launch is now correct to within two vsyncs; what is "
-    "left is the flight, and it is neither an integer tick counter nor a "
-    "per-tick float step - every one of those in the game has been gated or "
-    "halved and none of them moves it",
+    "an Ultimate Blast lands its first hit 2-5 frames early and finishes 6-11 "
+    "frames early. Every step of the move runs at the right speed; each "
+    "hand-off from one step to the next comes one frame sooner than at 30fps, "
+    "and a move is a chain of them (issue #127)",
     "Frieza's summoned rocks now travel at the right speed, but the summon "
     "animation before the launch - which is most of that move - still runs "
     "about five frames fast. The same short pre-launch overshoot is on Buu's "
