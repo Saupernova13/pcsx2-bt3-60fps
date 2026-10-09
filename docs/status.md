@@ -536,6 +536,20 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the Max Power shockwave (#137)
+
+Adds `[60FPS - max power shockwave]`. The ring that warps the background when a
+fighter reaches Max Power Mode was made with a life of seconds * 30 ticks and
+per-tick steps, so at 60fps it spread and faded in half its time. It is now
+made for 60 ticks a second.
+
+| Goku (Early) | 30fps | 60fps before | with it |
+|---|---|---|---|
+| ring alive | 46 vsyncs | 23 | 47 |
+| radius 10 vsyncs in | 68 | 113 | 63 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
