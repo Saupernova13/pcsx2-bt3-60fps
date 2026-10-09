@@ -489,3 +489,32 @@ Two residuals, both outside this change:
 Whether #56's story-mode "clashes where we teleport a lot and must press buttons"
 are this struggle is the user's call. The fighters do zip around the arena
 between exchanges, and nothing else found so far runs a contest on this clock.
+
+## 2026-10-09 - the Rush Struggle's scoring block, paced for the player too
+
+Re-measured in the full test build with the stick driven from game time
+(`angle = 2 pi * rot/s * vsync / 59.94`), Cell against Devilman from
+`cell-vs-devilman-rush-struggle.p2s`, player-CPU hits and the winner:
+
+| rot/s | 30fps | full build before | full build + scoring block |
+|---|---|---|---|
+| 0 | 26-52 CPU | 26-49 CPU | 26-49 CPU |
+| 3 | **49-55 CPU** | **56-54 P1** | 51-52 CPU |
+| 5 | 65-59 P1 | 73-57 P1 | 65-57 P1 |
+| 8 | 82-60 P1 | 96-57 P1 | 81-57 P1 |
+
+The player was not counting more rotations - 36 bit-raises at 30fps against 39
+over a 14-vsync longer struggle - but gaining automatic hits. In `FUN_001F47C8`
+a tick whose rotation bit (`fighter+0x74C` `0x02000000`) is up scores a hit
+**instead of** that tick's cadence hit. At 30fps the bit lasts a whole tick (2 or
+4 vsyncs) and pre-empts about 40% of the cadence ticks; at 60fps it lasts one
+vsync and pre-empts about 20%, so more cadence hits got through.
+
+The whole scoring block (`001F4930`-`001F4AB8`) now runs on even ticks of
+`fighter+0x964` only, through `000F1D00`. The CPU keeps the AI-only query gate at
+`000F1500`; a human's rotation is `CUR_B | PREV_B` (`+0x74C | +0x750`), so a
+crossing on the odd tick still scores once. Evaluated on even counts only, the
+odd cadences that were never doubled (attributes `0x12`-`0x14`: every 5, 11 and
+17 ticks) land on their 30fps timing too.
+
+The CPU still ends 2-3 hits under 30fps, as it did before this change.

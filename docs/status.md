@@ -298,6 +298,12 @@ so the longer contest does not double the automatic hits.
 | struggle | 196 vsyncs | 116 | 192 |
 | hits, player / CPU | 26 / 52 | 26 / 36 | 26 / 49 |
 
+**Added 2026-10-09: the scoring block on even ticks.** In the full build the player
+gained 7-14 automatic hits, and at 3 rotations a second the 30fps CPU win (49-55)
+became a player win (56-54). With the struggle's scoring block on even ticks and a
+human's rotation latched over the odd tick, the winner matches 30fps at 0, 3, 5 and
+8 rotations a second, the player's count within 2 hits.
+
 **Not confirmed in play**, and not yet confirmed to be the story-mode clash #56
 describes.
 

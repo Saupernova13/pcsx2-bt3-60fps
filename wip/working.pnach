@@ -1093,6 +1093,22 @@ patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 fr
 // From the Cell v Devilman struggle, no input: 196 vsyncs, player 26 hits, CPU 52
 // at 30fps; 116, 26 and 36 on v24; 192, 26 and 49 with this. The CPU's 3-hit gap
 // is the AI gate above - its every-4 stream fires on fewer of the even ticks.
+// The scoring block, added 2026-10-09. A tick with the rotation bit (fighter+0x74C
+// 0x02000000) scores a hit INSTEAD of that tick's automatic cadence. At 30fps a
+// quadrant crossing holds the bit for a whole 1/30 s tick, so rotations pre-empt
+// about 40% of the cadence ticks; at 60fps the bit lasts half as long and pre-empts
+// half as many, and the player came out 7-14 hits ahead: at 3 rotations a second
+// the 30fps CPU wins 49-55 and the build gave the player 56-54. The whole block now
+// runs on even ticks of +0x964 only. The CPU's query keeps the gate above; a human's
+// rotation is (CUR_B | PREV_B), so a crossing on the odd tick still counts once.
+// Every cadence modulus is then sampled on even counts, which also paces the three
+// that were never doubled (attributes 0x12-0x14: every 5, 11, 17 ticks).
+// Cell against Devilman, stick driven from game time, player-CPU (winner):
+//   rot/s   30fps          before          with the block
+//   0       26-52 CPU      26-49 CPU       26-49 CPU
+//   3       49-55 CPU      56-54 P1        51-52 CPU
+//   5       65-59 P1       73-57 P1        65-57 P1
+//   8       82-60 P1       96-57 P1        81-57 P1
 [60FPS - rush struggle]
 description=Pace the Rush Struggle in real time at 60fps - its length, its automatic hits, and the CPU's stick rotation, which is honoured every other tick - so the clash lasts as long as at 30fps and the AI cannot out-rotate the player.
 patch=1,EE,000F1500,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
@@ -1115,6 +1131,30 @@ patch=1,EE,001F4980,word,3042000F // andi $v0, 7 -> 15         hit cadence, attr
 patch=1,EE,001F49A4,word,2402000A // li $v0, 5 -> 10           hit cadence, attribute 0x68
 patch=1,EE,001F49DC,word,30420007 // andi $v0, 3 -> 7          hit cadence, default
 patch=1,EE,001F49FC,word,2402001E // li $v0, 15 -> 30          extra hit, fighter+0x3D0 bit 0
+patch=1,EE,000F1D00,word,8E280964 // lw   $t0, 0x964($s1)     scoring block: the state's tick counter
+patch=1,EE,000F1D04,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1D08,word,15000010 // bnez $t0, 000F1D4C       odd tick: skip the whole block
+patch=1,EE,000F1D0C,word,00000000 // nop
+patch=1,EE,000F1D10,word,8E281278 // lw   $t0, 0x1278($s1)    AI-driven?
+patch=1,EE,000F1D14,word,1500000A // bnez $t0, 000F1D40       AI: the original query (gated at 000F1500)
+patch=1,EE,000F1D18,word,00000000 // nop
+patch=1,EE,000F1D1C,word,8E28074C // lw   $t0, 0x74C($s1)     human: this tick's input (CUR_B)
+patch=1,EE,000F1D20,word,8E290750 // lw   $t1, 0x750($s1)     ... and last tick's (PREV_B)
+patch=1,EE,000F1D24,word,01094025 // or   $t0, $t0, $t1
+patch=1,EE,000F1D28,word,3C090200 // lui  $t1, 0x0200          the rotation bit
+patch=1,EE,000F1D2C,word,01094024 // and  $t0, $t0, $t1
+patch=1,EE,000F1D30,word,15000008 // bnez $t0, 000F1D54       rotated this tick or last: a hit
+patch=1,EE,000F1D34,word,00000000 // nop
+patch=1,EE,000F1D38,word,0807D252 // j 0x001F4948               no rotation: the cadence checks
+patch=1,EE,000F1D3C,word,00000000 // nop
+patch=1,EE,000F1D40,word,0220202D // move $a0, $s1
+patch=1,EE,000F1D44,word,0807D24E // j 0x001F4938               the rotation query
+patch=1,EE,000F1D48,word,24050033 // li   $a1, 0x33            (delay)
+patch=1,EE,000F1D4C,word,0807D2AE // j 0x001F4AB8               past the scoring block
+patch=1,EE,000F1D50,word,00000000 // nop
+patch=1,EE,000F1D54,word,0807D271 // j 0x001F49C4               score the hit
+patch=1,EE,000F1D58,word,00000000 // nop
+patch=1,EE,001F4930,word,0803C740 // move $a0, $s1 -> j 000F1D00   the struggle's scoring block
 
 // The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter
 // state 304 (FUN_001FB660) and rotate their sticks. Rotations are counted into
