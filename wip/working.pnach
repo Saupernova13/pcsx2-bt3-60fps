@@ -1147,6 +1147,96 @@ patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
 
+// The CPU opponent's decisions, found 2026-10-09 for issue #100. FUN_001BB620 is
+// the whole AI: once a tick, from the battle loop at 0012BC8C, it reads the
+// situation, rolls its random choices and writes each CPU fighter's buttons and
+// stick (fighter+0x127C, +0x1280/+0x1284). At 60fps it decided 60 times a second
+// and flipped its mashed buttons every frame. One visible result: even a CPU set
+// to stand mashes Down to recover in mid-air, and after a Rush Finish the game
+// recovers it only if that mash is down on the tick its flight loop ends, so
+// the victim flew 22% further at 60fps.
+//
+// The call now goes through a wrapper that runs the AI when any of these holds:
+//   - 2 ticks have passed since its last run (the frame counter, 00331D64)
+//   - a fighter's state differs from the one the AI last saw, so it never acts
+//     a tick on a decision made for a state that has ended, as at 30fps where
+//     it always sees a new state on the next tick
+//   - a fighter is in state 250 or 304, the Rush Struggle and the Beam Struggle,
+//     whose groups already pace the CPU's stick by letting its rotation count
+//     only on even ticks; gated twice, the CPU stopped scoring altogether
+// Its last-run frame and the states it saw (up to four fighters) live at
+// 000F2100-000F2113, which no patch line may write: the patch rewrites its words
+// every frame. The scratch zone continues past 000F2000 for this; it is zero in
+// every save state and the ELF loads from 00100000.
+//
+// Pan's and Devilman's Rush Finish on a standing Ultimate Gohan:
+//
+//                          30fps       60fps before   with this group
+//   Gohan's flight         44 vsyncs   59             43
+//   Pan: Gohan knocked     229.6       280.5          226.2
+//   Devilman: knocked      229.9       280.7          226.4
+//
+// Rush Struggle, CPU hits at 0 / 2 / 5 / 8 player rotations a second: 30fps
+// 51/51/62/62, before 49/51/57/57, with it 53/55/60/61; the winner matches.
+[60FPS - CPU decision rate]
+description=Let the CPU opponent decide and mash at its real rate, 30 times a second, instead of twice as often.
+patch=1,EE,0012BC8C,word,0C03C800 // jal 001BB620 -> jal 000F2000
+patch=1,EE,000F2000,word,3C080030 // lui t0,0x30
+patch=1,EE,000F2004,word,8D09EB14 // lw t1,-0x14EC(t0)
+patch=1,EE,000F2008,word,11200030 // beq t1,zero,0xf20cc
+patch=1,EE,000F200C,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2010,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F2014,word,3C0E000F // lui t6,0xF
+patch=1,EE,000F2018,word,8DCF2100 // lw t7,0x2100(t6)
+patch=1,EE,000F201C,word,010F7823 // subu t7,t0,t7
+patch=1,EE,000F2020,word,2DEF0002 // sltiu t7,t7,0x2
+patch=1,EE,000F2024,word,39EF0001 // xori t7,t7,0x1
+patch=1,EE,000F2028,word,8D2A0000 // lw t2,0x0(t1)
+patch=1,EE,000F202C,word,8D2B0004 // lw t3,0x4(t1)
+patch=1,EE,000F2030,word,2D580005 // sltiu t8,t2,0x5
+patch=1,EE,000F2034,word,17000002 // bne t8,zero,0xf2040
+patch=1,EE,000F2038,word,00000000 // nop
+patch=1,EE,000F203C,word,240A0004 // addiu t2,zero,0x4
+patch=1,EE,000F2040,word,25D92104 // addiu t9,t6,0x2104
+patch=1,EE,000F2044,word,1940000F // blez t2,0xf2084
+patch=1,EE,000F2048,word,00000000 // nop
+patch=1,EE,000F204C,word,8D6C0948 // lw t4,0x948(t3)
+patch=1,EE,000F2050,word,8F2D0000 // lw t5,0x0(t9)
+patch=1,EE,000F2054,word,118D0002 // beq t4,t5,0xf2060
+patch=1,EE,000F2058,word,258DFF06 // addiu t5,t4,-0xFA
+patch=1,EE,000F205C,word,240F0001 // addiu t7,zero,0x1
+patch=1,EE,000F2060,word,11A00007 // beq t5,zero,0xf2080
+patch=1,EE,000F2064,word,258DFED0 // addiu t5,t4,-0x130
+patch=1,EE,000F2068,word,11A00005 // beq t5,zero,0xf2080
+patch=1,EE,000F206C,word,00000000 // nop
+patch=1,EE,000F2070,word,254AFFFF // addiu t2,t2,-0x1
+patch=1,EE,000F2074,word,256B1600 // addiu t3,t3,0x1600
+patch=1,EE,000F2078,word,1000FFF2 // beq zero,zero,0xf2044
+patch=1,EE,000F207C,word,27390004 // addiu t9,t9,0x4
+patch=1,EE,000F2080,word,240F0001 // addiu t7,zero,0x1
+patch=1,EE,000F2084,word,11E00013 // beq t7,zero,0xf20d4
+patch=1,EE,000F2088,word,00000000 // nop
+patch=1,EE,000F208C,word,ADC82100 // sw t0,0x2100(t6)
+patch=1,EE,000F2090,word,8D2A0000 // lw t2,0x0(t1)
+patch=1,EE,000F2094,word,8D2B0004 // lw t3,0x4(t1)
+patch=1,EE,000F2098,word,2D580005 // sltiu t8,t2,0x5
+patch=1,EE,000F209C,word,17000002 // bne t8,zero,0xf20a8
+patch=1,EE,000F20A0,word,00000000 // nop
+patch=1,EE,000F20A4,word,240A0004 // addiu t2,zero,0x4
+patch=1,EE,000F20A8,word,25D92104 // addiu t9,t6,0x2104
+patch=1,EE,000F20AC,word,19400007 // blez t2,0xf20cc
+patch=1,EE,000F20B0,word,00000000 // nop
+patch=1,EE,000F20B4,word,8D6C0948 // lw t4,0x948(t3)
+patch=1,EE,000F20B8,word,AF2C0000 // sw t4,0x0(t9)
+patch=1,EE,000F20BC,word,254AFFFF // addiu t2,t2,-0x1
+patch=1,EE,000F20C0,word,256B1600 // addiu t3,t3,0x1600
+patch=1,EE,000F20C4,word,1000FFF9 // beq zero,zero,0xf20ac
+patch=1,EE,000F20C8,word,27390004 // addiu t9,t9,0x4
+patch=1,EE,000F20CC,word,0806ED88 // j 0x1BB620
+patch=1,EE,000F20D0,word,00000000 // nop
+patch=1,EE,000F20D4,word,03E00008 // jr ra
+patch=1,EE,000F20D8,word,00000000 // nop
+
 // Thrown objects, found 2026-09-16 for issue #5 - "Hercule's ki blasts are
 // sped up". They are, and [60FPS - projectile travel] does not touch them: a
 // breakpoint on the effect-node stepper at 00176A2C never fires once while

@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the CPU opponent's decision rate (#100)
+
+Adds `[60FPS - CPU decision rate]`. The AI ran once a tick, so at 60fps the CPU
+decided and mashed twice as often. It now runs every 2 ticks, and also on a
+tick where a fighter's state changed, and every tick in the two struggles.
+
+| | 30fps | 60fps before | with it |
+|---|---|---|---|
+| Pan's Rush Finish, Gohan knocked | 229.6 | 280.5 | 226.2 |
+| Rush Struggle CPU hits, 0 / 5 rot/s | 51 / 62 | 49 / 57 | 53 / 60 |
+
+**Not confirmed in play.** It changes how every CPU fight plays.
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
