@@ -4,7 +4,7 @@ Newest sections at the bottom.
 
 ## 2026-09-28 - issue #84: the health bar counted 30Hz ticks
 
-Found by recording all of RAM at every vsync of Hercule's Present Bomb against
+Found by recording all of RAM at every vsync of Hercule's Dynamic Mess Em Up Punch against
 Ultimate Gohan (`rocky-hercule-vs-standing-gohan.p2s`, `L2` + `Triangle`) and
 keeping words that fall steadily: Gohan's displayed health stepped down by the
 same amount per tick in both arms. A write watch on it lands in `FUN_0021CD20`,
@@ -60,7 +60,7 @@ speed.
 
 ### Measured
 
-Present Bomb against Ultimate Gohan, every open fix on:
+Dynamic Mess Em Up Punch against Ultimate Gohan, every open fix on:
 
 | | 30fps | 60fps before | 60fps with both groups |
 |---|---|---|---|

@@ -1294,7 +1294,7 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // The drain keeps its 60 steps a second at half the size; the shake loop runs
 // on even ticks, so its offsets change every 2 vsyncs as at 30fps.
 //
-// Present Bomb against Ultimate Gohan (rocky-hercule-vs-standing-gohan.p2s),
+// Dynamic Mess Em Up Punch against Ultimate Gohan (rocky-hercule-vs-standing-gohan.p2s),
 // every open fix on:
 //
 //                          drain 6360    shake, count 10       shake, count 5
