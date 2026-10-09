@@ -21,15 +21,40 @@ patch=1,EE,000F004C,word,E4440C80 // swc1 $f4, 0xc80($v0)
 patch=1,EE,000F0050,word,08071145 // j 0x1c4514
 patch=1,EE,000F0054,word,00000000 // nop
 
-// Menu auto-repeat. Its delay and rate are counted in ticks, so both double.
+// Menu auto-repeat. The timer (FUN_002577B0) counts its delay and rate down once
+// a call and fires after delay + 1 calls, then every rate + 1. Its two callers
+// (00122D30, 00257760) run once a battle tick in battle - 30 a second at 30fps,
+// 60 with this patch - and once a vsync in the menus outside battle on any
+// version. SetRepeat (002577F8) still stores both values doubled, as before, so
+// boots and save states made with earlier versions keep the same stored values.
+// Both callers now go through a wrapper that turns the stored values into the
+// ones for where the game is:
+//   battle manager (002FEB14) set:   delay + 1, rate + 1   SetRepeat(20, 1) -> 41 / 3
+//   no battle:                       delay / 2, rate / 2   -> 20 / 1, the PS2 values
+// The timer then fires 42 battle ticks after a press and every 4, as 30fps's 21
+// and 2 ticks, and outside battle 22 vsyncs after and every 2, as on a PS2
+// (issue #88; doubling alone fired at 41 and every 3 in battle, and halved the
+// speed of every menu outside it).
 [60FPS - input repeat timing]
-description=Double the auto-repeat delay and rate so menus scroll at the right speed.
+description=Keep menu auto-repeat at its real speed: in battle the timer counts 60 ticks a second, so its delay and rate double there, and menus outside battle keep the PS2 values.
 patch=1,EE,002577F8,word,0803C020 // lui -> j 000F0080
 patch=1,EE,000F0080,word,00042040 // sll $a0, $a0, 1
 patch=1,EE,000F0084,word,00052840 // sll $a1, $a1, 1
 patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
 patch=1,EE,000F008C,word,08095E00 // j 0x257800
 patch=1,EE,000F0090,word,00000000 // nop
+patch=1,EE,00122D30,word,0C03C758 // jal 002577B0 -> jal 000F1D60
+patch=1,EE,00257760,word,0C03C758 // jal 002577B0 -> jal 000F1D60
+patch=1,EE,000F1D60,word,3C010030 // lui $at, 0x30
+patch=1,EE,000F1D64,word,8C21EB14 // lw $at, -0x14EC($at)    battle manager, 002FEB14
+patch=1,EE,000F1D68,word,14200004 // bnez $at, 000F1D7C
+patch=1,EE,000F1D6C,word,00000000 // nop
+patch=1,EE,000F1D70,word,00084042 // srl $t0, $t0, 1         no battle: delay / 2
+patch=1,EE,000F1D74,word,08095DEC // j 002577B0
+patch=1,EE,000F1D78,word,00094842 // srl $t1, $t1, 1         rate / 2
+patch=1,EE,000F1D7C,word,25080001 // addiu $t0, $t0, 1       battle: delay + 1
+patch=1,EE,000F1D80,word,08095DEC // j 002577B0
+patch=1,EE,000F1D84,word,25290001 // addiu $t1, $t1, 1       rate + 1
 
 // The 128 per-button frame counters behind double taps, holds and combo links,
 // counted on even ticks only.

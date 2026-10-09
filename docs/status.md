@@ -536,6 +536,20 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - menu auto-repeat in and out of battle (#88)
+
+Changes `[60FPS - input repeat timing]`. v26 doubled the repeat delay and rate
+once at boot. In battle that fired one tick early; outside battle, where the
+timer always ran once a vsync, it halved the speed of every menu. A wrapper on
+the timer's two callers now picks the values by whether a battle is running.
+
+| held direction, repeat timing | PS2 / 30fps | v26 | with the change |
+|---|---|---|---|
+| battle: first repeat, then every | 42, 4 vsyncs | 41, 3 | 42, 4 |
+| character select: first repeat, then every | 22, 2 vsyncs | 42, 3 | 22, 2 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
