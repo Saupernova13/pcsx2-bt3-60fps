@@ -805,3 +805,28 @@ move is to find the node that *owns* a live blast and walk its fields, rather
 than scanning RAM blind again.
 
 **No fix. Nothing shipped from this session's blast work.**
+
+## 2026-10-09 - the Ultimate's first hit, re-measured
+
+"The ultimate, and where it stands" above left the Angry Kamehameha's first hit
+about half a second early. Four Ultimate Blasts timed tonight against a standing
+Ultimate Gohan (hold `L2` 220 vsyncs into Max Power Mode, then
+`L2`+`Down`+`Triangle`, every arm from the same save), against 30fps:
+
+| Ultimate (save) | first hit, released v26 | first hit, full test build | back to idle, full test build |
+|---|---|---|---|
+| Goku (Early)'s Spirit Bomb (0) | 2 vsyncs early | 2 early | 6 early |
+| Super 17's Shocking Death Ball (4) | 3 early | 3 early | 9 early |
+| Devilman's Devilmite Beam (6) | - | 4 early | 6 early |
+| Krillin's Destructo Disc (`rocky-krillin-vs-standing-gohan.p2s`) | 5 early | 5 early | 11 early |
+
+Hit spacing and damage match 30fps in all of them. The half second is gone; it
+went with v26 at the latest, since the released patch already shows these
+numbers. What is left is the hand-off shortfall of issue #127: the state driver
+`FUN_001E23D0` applies a state requested through `FUN_001E0290`
+(`fighter+0x94C`) at the start of the next tick, 1 vsync at 60fps against 2 at
+30fps, and a move is a chain of such steps. On Krillin's, the disc's data is
+cleared at v496 against v502 at 30fps, its last hit, and his pose then ends at
+v516 against v527.
+
+The Angry Kamehameha itself was not re-timed: no rig scene has its owner.
