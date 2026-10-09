@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the screen shake's jitter (#129)
+
+Adds `[60FPS - camera shake jitter]`. The shake draws a new random camera offset
+once a tick, so at 60fps the camera jumped every frame. A wrapper on its battle
+call site holds each camera's offset for two ticks.
+
+| Goku's Kamehameha hit, per camera | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| new offsets during the shake | 11 | 21 | 11 |
+| vsyncs each is held | 2 | 1 | 2 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
