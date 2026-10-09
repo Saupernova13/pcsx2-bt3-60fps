@@ -1426,3 +1426,33 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The match clock, found 2026-10-09 for issue #133. FUN_00216EF8 is a clock: each
+// call adds 34, 32, 34 ms in turn, exactly 1/30 s, and carries into seconds,
+// minutes and hours. FUN_00217090 ticks two of them, *(gp-0x5738)+0x118 and the
+// time-limit clock at +0x108, then writes the seconds left (+0x108+0xC, the
+// number on the HUD) and returns 1 once the limit is reached. Its only caller is
+// 00217F6C in FUN_00217EF0, the battle's per-tick end-of-match check, so at 60fps
+// a 60-second Duel ran out in 30 real seconds.
+//
+// The call now goes through a wrapper that ticks the clocks on even ticks of the
+// frame counter (00331D64) only, and returns 0, "time not up", on odd ones. The
+// KO checks in FUN_00217EF0 still run every tick.
+//
+// Duel Time 60, Goku (Early) against a COM Ultimate Gohan:
+//
+//                              30fps   60fps before   with this group
+//   vsyncs per shown second    60      30             60
+//   time up, from 0:55         v300    v150           v299
+[60FPS - match timer]
+description=Count a timed match down at its real speed, so a 60-second Duel lasts 60 seconds instead of 30.
+patch=1,EE,00217F6C,word,0C03C850 // jal FUN_00217090 -> jal 000F2140
+patch=1,EE,000F2140,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2144,word,8D081D64 // lw t0,0x1D64(t0)              frame counter
+patch=1,EE,000F2148,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F214C,word,11000002 // beq t0,zero,0xf2158           even: tick the clocks
+patch=1,EE,000F2150,word,00000000 // nop
+patch=1,EE,000F2154,word,03E00008 // jr ra                         odd: hold them, time not up
+patch=1,EE,000F2158,word,0000102D // move v0,zero
+patch=1,EE,000F215C,word,08085C24 // j FUN_00217090
+patch=1,EE,000F2160,word,00000000 // nop
