@@ -147,8 +147,8 @@ seconds with a hard-coded 30.0 at `0020F028`. It has one caller.
 
 `[60FPS - max power charge]` makes that 60.0. From the pnach, with the economy
 gate: **113 vsyncs**, 265 a tick. Ki charging itself (`L2` below full Ki, Ki
-poked to one bar) was already right with the economy gate: +35k per 20 vsyncs
-in both arms.
+poked to one bar) looked right with the economy gate: +35k per 20 vsyncs in both
+arms. That covered only the charge's first second; see 2026-10-09 below.
 
 ### Not established
 
@@ -196,3 +196,32 @@ Krillin's After Image Strike, published at 15 seconds, save state 3:
 
 The four stat slots at `+0xF64` end on the same vsync as `+0xE08` in every arm.
 This group fixes #20 on its own, so #25 should not ship with it.
+
+## 2026-10-09 - issue #4: the rest of a held charge was still double speed
+
+The 2026-09-17 check of ki charging covered only its first 20 vsyncs. Holding
+`L2` plays the charge state's start animation (`0x34`) for about 25 ticks, then
+loops `0x35`. During the start, ki comes from the gated economy. In the loop,
+the charge state's handler `FUN_001EB718` adds an amount once a tick itself:
+`FUN_0020EC00` (or `FUN_0020EC88` with flag `0x11`) computes it as a per-second
+table value / 30 plus terms, clamped by `FUN_001DC0E0(x, 200)`, and
+`FUN_001CEBB8` adds it at `001EB8D4`. A write watch on `fighter+0x9F0` at v70
+finds +795 a tick from there and nothing from the economy.
+
+Not every term is divided by 30, so the fix halves the result at the call:
+`[60FPS - ki charge loop]` sends `001EB8D4` through a wrapper at `000F2120` that
+adds the frame counter's low bit and shifts right. An odd amount alternates
+(397, 398), so two ticks add exactly what one 30fps tick did, and the bar still
+moves every frame.
+
+Krillin (save state 3) holding `L2` from 20000 ki, ki gained per 10 vsyncs:
+
+| | v0-v50 | v50-v180 |
+|---|---|---|
+| 30fps | 5425 | 3975, every sample |
+| 60fps, economy gate only | 5425 | 7950 |
+| with `ki charge loop` | 5425 | 3975, every sample |
+
+The CPU charges through the same handler: in save state 8 its loop gained 850
+a vsync at 60fps against 425 at 30fps.
+

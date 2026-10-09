@@ -228,12 +228,17 @@ ECONOMY = ["60FPS - meter economy"]
 # an amount FUN_0020F000 derives from seconds * 30.0. That 30.0 becomes 60.0.
 MPMCHARGE = ["60FPS - max power charge"]
 
+# The ki charge loop, found 2026-10-09 for issue #4. Past the charge's start
+# animation, its handler adds ki once a tick at 001EB8D4, outside the economy
+# gate; a wrapper halves each amount, alternating the rounding.
+KICHARGE = ["60FPS - ki charge loop"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + ECONOMY
-                  + MPMCHARGE + SPARES)
+                  + MPMCHARGE + KICHARGE + SPARES)
 
 PRESETS = {
     "off": [],
@@ -292,7 +297,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + ECONOMY
-             + MPMCHARGE),
+             + MPMCHARGE + KICHARGE),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER

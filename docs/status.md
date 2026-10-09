@@ -409,6 +409,14 @@ covers the system.
 Value for value, for both fighters, at every sample over 60 vsyncs. Spending ki
 on a move is untouched - that runs on the move's own path, not per tick.
 
+Also adds `[60FPS - ki charge loop]` (2026-10-09): past a charge's first
+second, the charge state's handler adds ki itself once a tick, outside the gate.
+A wrapper halves each amount, alternating the rounding.
+
+| Krillin holding `L2`, ki per 10 vsyncs after v50 | 30fps | gate only | gate + charge loop |
+|---|---|---|---|
+| ki gained | 3975 | 7950 | 3975 |
+
 **Not confirmed in play.** Max Power mode, which the report names as where the
 drain is most obvious, was never entered; the drain routine is inside the gated
 function, but the mode itself was not watched.

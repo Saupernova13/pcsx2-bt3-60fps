@@ -1318,6 +1318,32 @@ patch=1,EE,000F159C,word,03E00008 // jr $ra
 patch=1,EE,000F15A0,word,00000000 // nop
 patch=1,EE,001E2584,word,0C03C560 // jal 001E16C0 -> jal 000F1580
 
+// The rest of a ki charge, found 2026-10-09 for issue #4. Holding L2 plays the
+// charge state's start animation (0x34), then loops 0x35. Ki during the start
+// comes from the meter economy, which the group above gates. In the loop the
+// charge state's handler (FUN_001EB718) adds FUN_0020EC00's amount (or
+// FUN_0020EC88's with flag 0x11) through FUN_001CEBB8 once a tick, outside the
+// economy: a per-second table value / 30 plus terms, clamped, so it cannot be
+// fixed at a divisor. The call at 001EB8D4 now goes through a wrapper that adds
+// the frame counter's low bit and halves: 795 becomes 397 and 398 on alternate
+// ticks, 795 per two ticks as at 30fps, and the bar still moves every frame.
+//
+// Krillin (save state 3) holding L2 from 20000 ki, ki gained per 10 vsyncs:
+//
+//                          v0-v50    v50 on
+//   30fps                  5425      3975
+//   60fps before           5425      7950
+//   with this group        5425      3975
+[60FPS - ki charge loop]
+description=Fill ki at its real speed for the whole of a held charge, not only its first second.
+patch=1,EE,001EB8D4,word,0C03C848 // jal 001CEBB8 -> jal 000F2120
+patch=1,EE,000F2120,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2124,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F2128,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F212C,word,00A82821 // addu a1,a1,t0
+patch=1,EE,000F2130,word,08073AEE // j 0x1CEBB8
+patch=1,EE,000F2134,word,00052843 // sra a1,a1,1
+
 // Max Power Mode's charge, found 2026-09-17, the other half of issue #4.
 // SuperCombo: Max Power Mode is "activated by charging while both having a full
 // Ki gauge and at least one Blast Stock", shown as a blue gauge over the Ki bars.
