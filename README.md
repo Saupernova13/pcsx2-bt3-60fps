@@ -46,7 +46,6 @@ Also stated in the shipped file's header.
 |---|---|
 | An Ultimate Blast | lands its first hit 2-5 frames early and finishes 6-11 frames early (#127) |
 | Frieza's *I Might Die This Time*, Buu's Super Kamehameha | the wind-up before the launch still runs about five frames fast |
-| Some pre-fight intros | paced wrong against the camera |
 | A Beam Struggle | the CPU ends a little weaker than at 30fps, so a near-tie can fall the player's way |
 
 Per-group confidence, and what is confirmed in play rather than only measured,

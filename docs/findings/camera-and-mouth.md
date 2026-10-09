@@ -618,3 +618,24 @@ The shots (whiteout, K.O.!, Goku from behind) match when photographed. The
 only difference is when it starts: state 235 at v785 against v794, the
 Ultimate's end lead of issue #127. The item is closed on this measurement; the
 plain Kamehameha KO matched as well.
+
+## 2026-10-09 - the pre-fight intro against the camera, checked
+
+The other half of the user's item 6 ("some intro animations are too fast or too
+slow for the camera"), never addressed after the mouths were fixed. A match's
+opening cannot be timed from a state cut at the match start, so each arm started
+a fresh Duel through the menus (from `rocky-goku-early-timed60-vs-com.p2s`:
+pause, Return to Character Select, defaults for Goku (Early) and Ultimate Gohan,
+Rocky Area), with the arm applied before the first menu press. The pause menu is
+confirmed open by the game's pause flag, bit `0x100` of `003337B8`
+(`00331DC8+0x19F0`); the battle's frame counter keeps running under it.
+
+Photographed at fixed vsyncs from the battle manager's first frame: the stage
+fly-over to about v600, Goku's close-up v680-v780, Gohan's v800-v880, the
+two-shot, "Ready!" at v1000 and "Fight!" at v1100. Every 20 vsyncs through both
+close-ups, the shot and the pose match the 30fps arm, in the full test build and
+on the released v26 alike. The item is closed on this measurement for this
+pair; it went with v26's cinematic camera (#21), which paced exactly these poses
+and cameras.
+
+Tools: `work/tools-scratch/intro_shots.py`.

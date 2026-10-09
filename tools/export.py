@@ -56,8 +56,6 @@ KNOWN_BROKEN: list[str] = [
     "animation before the launch - which is most of that move - still runs "
     "about five frames fast. The same short pre-launch overshoot is on Buu's "
     "charged blast",
-    "some pre-fight intro animations are paced wrong against the camera. The "
-    "mouths in that scene are fixed; this is the other half of the same report",
     "in a beam clash the CPU ends a little weaker than it is at 30fps when both "
     "sides rotate at a middling speed. The clash's pacing and the player's own "
     "count are exact, but the beams now travelling at their correct speed change "
