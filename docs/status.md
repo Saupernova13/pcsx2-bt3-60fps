@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the match timer (#133)
+
+Adds `[60FPS - match timer]`. A timed match's clock advanced 1/30 s a tick, so
+at 60fps a 60-second Duel ran out in 30 real seconds. The clocks now tick on
+even ticks only.
+
+| Duel Time 60 | 30fps | 60fps before | with it |
+|---|---|---|---|
+| vsyncs per shown second | 60 | 30 | 60 |
+| time up, set to 0:55 | v300 | v150 | v299 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
