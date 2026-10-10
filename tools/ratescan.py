@@ -1,21 +1,14 @@
 """Find every field still moving at double speed, by comparing per-tick motion.
 
-The game has no timestep, so a quantity is correct at 60fps only if it moves
-*half as far per tick* as it does at 30fps - twice as many ticks then cover the
-same ground per second. That makes the audit mechanical: record the same memory
-tick by tick under both configurations and take the ratio of per-tick motion.
+A quantity is correct at 60fps only if it moves *half as far per tick* as at 30fps.
+Record the same memory tick by tick under both configurations and take the ratio:
 
     ratio ~0.50   compensated, correct at 60fps
     ratio ~1.00   NOT compensated, running at double real speed
 
-Per tick, not per vsync: at 30fps the game ticks every second vsync, so the
-frame counter is what says when a tick happened. The metric is total absolute
-variation, which behaves the same for a ramp and for an oscillator, and it is
-taken per word so a struct offset comes out named.
-
-Both runs have to be in the same *situation*, not the same state - they will
-have diverged by then. A hover with the pad released is ideal: nothing depends
-on how far through an animation either run happens to be.
+Per tick, not per vsync (the frame counter says when a tick happened). The metric
+is total absolute variation per word, so a struct offset comes out named. Both
+runs need the same *situation*, e.g. a hover with the pad released.
 
     python tools/ratescan.py --setup air --region model
     python tools/ratescan.py --setup ground --region fighter --limit 40
@@ -77,10 +70,8 @@ def record(roo: Roo, cfg: str, setup: str, region: str, ticks: int, who: int):
 def plausible(value: float) -> bool:
     """Could this word be a float the game animates, rather than an integer?
 
-    Most of a fighter struct is counters, bitmasks and pointers, and reading
-    those as floats produces changes of 1e20 that swamp everything real. A
-    world-space quantity in this game lives well inside a million, and exact
-    zero is always fine.
+    Counters, bitmasks and pointers read as floats give huge changes; world-space
+    values stay well inside a million, and exact zero is fine.
     """
     if value != value:                      # NaN
         return False

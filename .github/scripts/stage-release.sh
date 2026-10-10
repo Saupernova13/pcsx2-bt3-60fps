@@ -1,35 +1,25 @@
 #!/usr/bin/env bash
 # Scaffold a version note, export the shipped patch, and open the release PR.
 #
-# Run by .github/workflows/version.yml from two places: once for the merge that
-# changed what ships, and once more after a release publishes, to pick up any
-# patch merge that landed while that release PR was waiting. Both are the same
-# job, so it lives here rather than being written twice in the YAML.
+# Run by .github/workflows/version.yml, for a patch merge and again after a release
+# publishes.
 #
 #   stage-release.sh <pr-number> <pr-title> <pr-url> <pr-body-file>
 #
-# Every argument is optional. A manual run has no PR to name, and so does the
-# run straight after a publish - the merged PR there is the release PR, whose
-# body describes the version just published, not the next one.
-#
-# The patch is exported here, not at publish time, so the release PR pins what
-# the version contains and the note describes exactly that file. A human
-# rewrites the note; merging the PR is what publishes the release.
+# Every argument is optional (a manual run, or the run after a publish, has no PR).
+# The patch is exported here, not at publish time, so the note describes exactly
+# the file the release PR carries.
 set -euo pipefail
 
 pr_number="${1:-}" pr_title="${2:-}" pr_url="${3:-}" pr_body="${4:-/dev/null}"
 repo="${GITHUB_REPOSITORY:?must be run from GitHub Actions, or set GITHUB_REPOSITORY}"
 work="$(mktemp -d)"
-# $GITHUB_OUTPUT takes key=value lines only. Human-readable notes must not be
-# written to it, or the runner rejects the file and fails the step after the
-# work has already succeeded ("Invalid format 'staged ...'").
+# $GITHUB_OUTPUT takes key=value lines only; anything else fails the step.
 out() { [ -n "${GITHUB_OUTPUT:-}" ] && echo "$1=$2" >> "$GITHUB_OUTPUT" || true; }
 say() { echo "$1"; }
 
-# One release PR at a time: a branch already open for a version is someone
-# else's to finish, and staging a second would make two versions out of one.
-# `gh pr list --head` matches a branch name exactly, not a prefix, so the
-# release/ prefix is matched with jq instead.
+# One release PR at a time. `gh pr list --head` is exact-match, so match the
+# release/ prefix with jq.
 if [ "$(gh pr list --repo "$repo" --state open --limit 100 \
         --json headRefName \
         --jq '[.[] | select(.headRefName | startswith("release/"))] | length')" != "0" ]; then
@@ -65,19 +55,15 @@ branch="release/${tag}"
 git checkout -b "${branch}"
 git add patch/428113C2.pnach docs/versions/
 if git diff --cached --quiet; then
-  # prepare leaves an existing note alone, and export writes the same bytes for
-  # the same tree, so a re-run of a staging that already committed has nothing
-  # to add. Committing nothing is a `git commit` failure, not a result.
+  # A re-run of a staging that already committed has nothing to add, and an
+  # empty commit would fail.
   say "${tag} is already staged in the tree; nothing to commit"
   out changed false
   exit 0
 fi
 git commit -m "chore(release): prepare ${tag}"
-# A release/ branch can be left behind with no open PR - by a PR closed without
-# merging, or by a run whose `gh pr create` failed - and a plain push to it is
-# then rejected as non-fast-forward. It is replaced, but only while its tip is
-# still this script's own scaffold commit. Anything else is someone's rewritten
-# note, which is the whole point of the release PR, and must not be thrown away.
+# A stale release/ branch with no open PR is replaced, but only while its tip is
+# still this script's scaffold commit; anything else is a rewritten note and must be kept.
 remote_tip="$(git ls-remote --heads origin "${branch}" | cut -f1)"
 if [ -n "${remote_tip}" ]; then
   git fetch --quiet origin "${branch}"

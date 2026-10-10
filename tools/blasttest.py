@@ -1,23 +1,16 @@
 """Fire a scripted blast at both rates and time how long the beam is on screen.
 
-The ki-blast bug has no memory signal anyone has found yet, but it has an
-obvious visual one: a Kamehameha whites out the screen, so mean screen
-brightness says exactly when the beam starts and stops. Same save state, same
-scripted input, same number of vsyncs - and a vsync is real time at either rate,
-so the two windows are directly comparable.
+A Kamehameha whites out the screen, so mean brightness says when the beam starts
+and stops. Same save state, scripted input and vsync count; a vsync is real time
+at either rate.
 
-Two things that are easy to get wrong:
+* **Script the input in ticks, not vsyncs.** A press long enough at 60fps can be
+  too short at 30 and the move never comes out. The defaults suit both.
+* **Check the move actually fired**, by watching damage; a blast that never
+  happened looks like a very short beam.
 
-* **Script the input in ticks, not vsyncs.** At 30fps the same number of vsyncs
-  is half as many ticks, and a press that is long enough at 60fps can be too
-  short to register at 30 - the move then simply never comes out and the run
-  silently measures nothing. The defaults here are long enough for both.
-* **Check the move actually fired**, by watching damage rather than assuming.
-  A run where the blast never happened looks like a very short beam.
-
-The move is Goku's Super Kamehameha, L2 + Triangle, which costs 3 blast stock.
-The game will tell you any character's inputs: pause, View Skill List, and the
-input for the highlighted move is drawn at the bottom of the panel.
+The move is Goku's Super Kamehameha, L2 + Triangle (3 blast stock). Pause, View
+Skill List shows any character's inputs.
 
     python tools/blasttest.py
     python tools/blasttest.py --pokes "cand=0x00186810:0x3C013F00"
@@ -29,8 +22,7 @@ import argparse
 import pathlib
 import time
 
-# Before numpy and PIL: until this has run, tools/ is at the front of
-# sys.path and shadows the stdlib. See tools/_bootstrap.py.
+# Before numpy and PIL; see tools/_bootstrap.py.
 import _bootstrap  # noqa: F401
 
 import numpy as np
@@ -49,8 +41,7 @@ BRIGHT = 80.0                # mean luma that means "a beam is on screen"
 def brightness(roo: Roo, path: pathlib.Path) -> float:
     """Photograph the current frame and reduce it to mean luma.
 
-    The file appears before the writer has finished with it, so a bare exists()
-    check races the capture and opening it then fails with a permission error.
+    The file appears before the writer has finished, so a bare exists() check races it.
     """
     if path.exists():
         path.unlink()

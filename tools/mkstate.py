@@ -1,10 +1,7 @@
 """Build the save states the A/B runs start from.
 
-An A/B is only meaningful if both runs begin from the identical situation, and
-"identical" has to include the fighter's momentum, not just its position. The
-launch itself runs at whatever rate is under test, so it cannot be part of the
-measured window: the state has to be cut afterwards, once the victim is already
-in the air with a velocity baked in.
+Both runs must begin from the identical situation, momentum included, so the state
+is cut after the launch, once the victim is already in the air.
 
     python tools/mkstate.py air --slot 2       opponent launched and flying
     python tools/mkstate.py airidle --slot 3   player hovering, fully settled
@@ -30,20 +27,14 @@ GROUND_SLOT = 1
 # Each recipe names the fighter it is about and a list of
 # (buttons, press vsyncs, release vsyncs, left stick) steps.
 #
-# A rush combo. Four hits is enough to launch; ten sends the victim into orbit,
-# which leaves no room to watch the fall.
+# A rush combo: four hits launch; ten sends the victim into orbit.
 _RUSH = (["Square"], 4, 12, None)
 RECIPES = {
     "air": (1, [_RUSH] * 4 + [([], 0, 20, None)]),
     "highair": (1, [_RUSH] * 7 + [([], 0, 20, None)]),
-    # The player flying up under its own power and settling into the airborne
-    # idle. Cross with the stick forward is the only input that gets off the
-    # ground - R1 alone does nothing - and the long release is what makes this
-    # worth cutting a state for: the ascent must finish before any measurement
-    # starts. The same number of vsyncs is half as many ticks at 30fps, so a run
-    # that flies inside its own measurement window arrives somewhere different,
-    # carrying different momentum, and every positional word then differs for
-    # reasons that have nothing to do with the patch.
+    # The player flying up and settling into the airborne idle. Cross with the stick
+    # forward is the only input that gets off the ground. The long release lets the
+    # ascent finish before any measurement starts.
     "airidle": (0, [(["Cross"], 180, 300, (0.0, 1.0))]),
 }
 
@@ -83,10 +74,8 @@ def main() -> int:
     parser.add_argument("recipe", nargs="?", choices=sorted(RECIPES))
     parser.add_argument("--slot", type=int, default=2)
     parser.add_argument("--list", action="store_true")
-    # Which patches are live while the state is cut. It matters more than it
-    # looks: a tween object carries the step it was built with, so a state cut
-    # under the wrong configuration hands both arms of a later A/B a set of
-    # objects that were already wrong when they were frozen.
+    # Which patches are live while the state is cut: a tween object carries the step it
+    # was built with, so a state cut under the wrong configuration poisons both arms.
     parser.add_argument("--config", default="shipped")
     args = parser.parse_args()
 

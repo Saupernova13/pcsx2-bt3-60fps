@@ -78,9 +78,8 @@ def cmd_watch(pine: Pine, args) -> int:
 def cmd_fps(pine: Pine, args) -> int:
     """Measure the game's own frame counter rate.
 
-    BT3 increments a counter at 0x00331D64 once per main-loop iteration. If it
-    climbs at ~30/s the game logic is running at 30fps; ~60/s means the limiter
-    is off and every system is stepping twice as often as it was authored for.
+    0x00331D64 increments once per main-loop iteration: ~30/s is 30fps logic, ~60/s
+    means every system steps twice as often as authored.
     """
     addr = int(args.addr, 16)
     first = pine.read(addr)
@@ -98,9 +97,7 @@ def cmd_fps(pine: Pine, args) -> int:
 def cmd_apply(pine: Pine, args) -> int:
     """Write a pnach's word patches straight into RAM - no restart needed.
 
-    Only unconditional EE word writes are applied. E-code conditionals are
-    evaluated by PCSX2 every frame and cannot be replayed this way, so they are
-    reported and skipped.
+    Only unconditional EE word writes are applied; E-code conditionals are reported and skipped.
     """
     pnach = Pnach.load(args.pnach)
     problems = pnach.validate()

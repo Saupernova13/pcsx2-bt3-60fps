@@ -1,6 +1,4 @@
-"""Three questions about the boot ELF that this project keeps asking by hand.
-
-None of them needs the emulator running, so none of them should cost a boot.
+"""Three questions about the boot ELF, none of which needs the emulator running.
 
     python tools/lookup.py state 238 239      # which routine handles a state
     python tools/lookup.py callers 001E16C0   # every jal to an address
@@ -53,9 +51,7 @@ def show_callers(elf: ElfImage, args) -> None:
 def show_gp(elf: ElfImage, args) -> None:
     """A gp word with exactly one reader can be halved in data.
 
-    That is how the gravity constant, the smash charge step and the stage
-    animation step were all fixed. More than one reader and the value is
-    shared, so halving it changes something else too.
+    With more readers the value is shared, so halving it changes something else too.
     """
     for value in args.values:
         offset = int(value, 16)

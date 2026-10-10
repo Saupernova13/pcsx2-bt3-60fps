@@ -1,27 +1,17 @@
 """Record a fighter's trajectory frame by frame, and compare two of them.
 
-This is the measurement the airborne question turned on. The game is correct at
-30fps by definition, so the reference run is the same save state, the same
-scripted input and the same number of vsyncs with every compensation patch
-removed. A perfect 60fps patch makes the two trajectories identical; wherever
-they separate, something is still running at the wrong rate.
+The reference run is the same save state, scripted input and number of vsyncs
+with every compensation patch removed; a perfect 60fps patch makes the two
+trajectories identical. ``compare`` works per vsync (equal vsyncs mean equal real
+time); ``ticks`` folds each capture to one row per tick, so a channel whose
+per-tick step halves is already fixed.
 
-Comparing per vsync rather than per logic tick is deliberate. At 30fps the game
-ticks every second vsync, so equal vsync counts mean equal real time, which is
-what "twice as fast" is a claim about. The ``ticks`` verb does the opposite and
-folds each capture down to one row per tick, which answers the other question:
-a channel whose per-tick step is the same at both rates is uncompensated, and
-one whose step halves is already fixed.
-
-A script is a list of segments, and a segment is either:
+A script is a list of segments, each either:
 
     ("hold", frames, buttons, stick)   advance in one call, no sampling
     ("record", frames, buttons, stick) advance a frame at a time, sample each
 
-Recording with a button held needs a PCSXROO built after the frame-advance
-input fix. Before it, the vsync handler paused the VM ahead of the input hook,
-which then returned early - so an advance of a single frame applied no input at
-all and a stepped capture recorded the game ignoring the pad.
+Recording with a button held needs a PCSXROO with the frame-advance input fix.
 
     python tools/traj.py capture ref --script coast --config off  --slot 2
     python tools/traj.py capture new --script coast --config air  --slot 2
@@ -45,21 +35,17 @@ from ps2ee.roo import Roo
 
 OUT = config.WORK / "captures"
 
-# Takeoff has a wind-up of roughly 35 vsyncs, so a hold shorter than that
-# leaves the 30fps reference still standing on the floor while the 60fps run is
-# already airborne - which reads as a far bigger difference than there is.
+# Takeoff has a wind-up of about 35 vsyncs; a shorter hold leaves the 30fps
+# reference on the floor while the 60fps run is already airborne.
 SCRIPTS: dict[str, list[tuple]] = {
-    # Nothing but physics: start from an already-launched state and watch.
-    # No input at all, so nothing here depends on the input path.
+    # Nothing but physics: start from an already-launched state, no input.
     "coast": [("record", 300, [], None)],
     # Climb, then let go.
     "fall": [("hold", 90, [], (0.0, 1.0)), ("record", 240, [], None)],
     # Stand still. Any divergence here is noise, not physics.
     "idle": [("record", 180, [], None)],
-    # Held movement, recorded throughout. The hold before it exists so both
-    # rates are already cruising when the recording starts - a 60fps run gets
-    # further through a wind-up in the same real time, and that is not a rate
-    # bug but it swamps one.
+    # Held movement, recorded throughout. The hold first lets both rates reach
+    # cruising before recording starts.
     "back": [("hold", 90, [], (0.0, 1.0)), ("record", 180, [], (0.0, 1.0))],
     "forward": [("hold", 90, [], (0.0, -1.0)), ("record", 180, [], (0.0, -1.0))],
     "strafe": [("hold", 90, [], (1.0, 0.0)), ("record", 180, [], (1.0, 0.0))],
@@ -69,8 +55,7 @@ SCRIPTS: dict[str, list[tuple]] = {
 
 
 def capture(roo: Roo, tag: str, script: str, cfg: str, slot: int) -> None:
-    # Flush the pad before the load, not after: the frame a stale button would
-    # be read on is the first frame after the restore.
+    # Flush the pad before the load: a stale button would be read on the first frame after the restore.
     roo.flush_input()
     roo.loadstate(slot)
     groups = patchctl.PRESETS.get(cfg) or cfg.split(",")
@@ -137,7 +122,7 @@ def compare(left: str, right: str, who: int) -> None:
 
 
 def ticks_only(cap: dict, who: int) -> list[tuple[int, dict]]:
-    """One row per game tick - the vsyncs in between are duplicates."""
+    """One row per game tick; the vsyncs in between are duplicates."""
     out, last = [], None
     for tick, row in zip(cap["ticks"], cap["rows"]):
         if tick != last:
@@ -165,15 +150,8 @@ def show_ticks(tag: str, who: int, limit: int) -> None:
 def speeds(tags: list[str], who: int, window: int) -> None:
     """Instantaneous speed in units per second, against real time.
 
-    Everything else in this file compares distances, and a distance is the
-    integral of the thing actually under test. Two runs whose speeds match
-    perfectly still show different distances if one entered a ramp a fraction
-    of a second earlier, and a run that is genuinely 20% slow looks fine over a
-    window that happens to start later in the same ramp. So: sample the speed
-    itself, at the same wall-clock offsets, in units both rates can be read in.
-
-    A vsync is 1/60s whatever the game does with it, so the divisor is the same
-    for both - which is the whole point of measuring per vsync.
+    Sampling the speed itself avoids distance comparisons, which depend on when each
+    run entered a ramp. A vsync is 1/60s at either rate, so the divisor is the same.
     """
     caps = [(tag, load(tag)) for tag in tags]
     n = min(len(c["rows"]) for _, c in caps)

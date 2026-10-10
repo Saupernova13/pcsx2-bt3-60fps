@@ -1,8 +1,6 @@
 """Drive an input for N frames from a save state, then photograph the result.
 
-A screenshot is the only check that the numbers describe the situation you
-think they do - a position vector far from the arena reads the same whether the
-fighter flew there or the camera cut to a cutscene.
+A screenshot checks that the numbers describe the situation you think they do.
 
     python tools/shot.py idle
     python tools/shot.py fly --hold Cross --stick 0,1 --frames 90

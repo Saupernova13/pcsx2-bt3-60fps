@@ -1,26 +1,19 @@
 """Time a multi-hit attack by its damage schedule, and optionally by the screen.
 
 The damage readout at 0033371C moves in exact integers, so reading it once per
-vsync says precisely when each hit lands - no screenshots, no threshold, no
-sampling-grid artefacts. That is what this measures by default, and it is the
-oracle that found the ki-blast bug:
+vsync says precisely when each hit lands:
 
     off  (30fps)   2840 4260 5680 7100 8520   every 8 vsyncs, span 32
     full (60fps)   the same five values       every 4 vsyncs, span 16
 
-Same damage, same hit count, half the real time. A correct patch brings the
-60fps span back to the 30fps span.
+A correct patch brings the 60fps span back to the 30fps span.
 
-``--curve`` measures the other channel instead: mean screen luma every few
-vsyncs, printed as a curve rather than thresholded. Use it for the launch flash
-and other purely visual effects, which the damage counter cannot see. Read the
-curve, do not threshold it - a fixed cutoff catches the flash and misses the
-beam.
+``--curve`` instead prints mean screen luma every few vsyncs as a curve, for
+purely visual effects the damage counter cannot see. Read it; do not threshold it.
 
 The move is Goku's Super Kamehameha, L2 + Triangle. Script input in TICKS, not
-vsyncs: at 30fps the same vsync count is half as many ticks, and a press that
-registers at 60fps can be too short at 30, so the move silently never fires.
-The defaults here are long enough for both.
+vsyncs: a press that registers at 60fps can be too short at 30 and the move
+never fires. The defaults suit both.
 
     python tools/hitclock.py --baselines
     python tools/hitclock.py --pokes "cand=0x00186358:0x3C014270"
@@ -75,8 +68,7 @@ def fire(roo: Roo, groups: list[str], writes, hold: int, press: int) -> None:
 def luma(roo: Roo, path: pathlib.Path) -> float:
     """Mean brightness of the current frame.
 
-    The screenshot file appears before the writer has finished with it, so an
-    exists() check races the capture and opening it then fails.
+    The screenshot file appears before the writer has finished, so exists() races it.
     """
     import numpy as np
     from PIL import Image

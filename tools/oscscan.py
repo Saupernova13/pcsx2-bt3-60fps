@@ -1,35 +1,22 @@
 """Sweep all of RAM for what OSCILLATES twice as fast, not what steps twice as far.
 
-ratescan asks whether a field's per-tick step halved. That question needs both
-runs to be in the same situation, and for anything positional they never quite
-are - so from an identical state the two rates drift apart and ordinary noisy
-words read anywhere between 1.1x and 1.7x for reasons that have nothing to do
-with the patch. An animation that plays at double speed has a signature that
-survives all of it: in the same number of vsyncs it reverses direction twice as
-often. Counting sign changes needs no magnitude and no alignment, and costs one
-word of state per address, so it can sweep the whole 32 MB.
+An animation at double speed reverses direction twice as often in the same number
+of vsyncs. Counting sign changes needs no magnitude and no alignment, and costs
+one word of state per address, so it can sweep the whole 32 MB (unlike ratescan,
+which needs both runs in the same situation).
 
-Three things this has to get right, each learned by getting it wrong:
+Requirements:
 
-* **Sample both rates on the same real-time grid, with the same number of
-  samples.** Reading every vsync gives the 60fps run twice as many looks at the
-  same two seconds, and twice as many looks at a noisy word find twice as many
-  reversals whatever its speed. ``--stride 2`` is also exactly one sample per
-  tick at 30fps, so nothing is read twice there. Without it this reported 6792
-  words at 2x, nearly all of them in the display packets.
-* **Check the words are floats.** The display packets are DMA and GIF data whose
-  bit patterns are denormals and 1e30 spikes when read as floats; their sign
-  flips are meaningless. Filtering to plausible floats cut 6836 candidates to
-  657.
-* **Start from a state that needs no input.** Flying to the situation inside the
-  measured window is not an oracle - the same vsync count is half the ticks at
-  30fps. Use ``tools/mkstate.py airidle``.
+* **Sample both rates on the same real-time grid, same number of samples.**
+  Reading every vsync gives the 60fps run twice as many looks at a noisy word.
+  ``--stride 2`` is one sample per tick at 30fps.
+* **Check the words are floats.** Display packets (DMA/GIF data) read as
+  denormals and spikes; their sign flips are meaningless.
+* **Start from a state that needs no input.** Use ``tools/mkstate.py airidle``;
+  the same vsync count is half the ticks at 30fps.
 
     python tools/oscscan.py --slot 3
     python tools/oscscan.py --slot 3 --base 0x01870000 --size 0x10000
-
-This is the instrument that found the tween system: an airborne idle's tell was
-a triangle wave with a 12 vsync period at 30fps and 6 at 60fps.
 """
 
 from __future__ import annotations
@@ -51,10 +38,7 @@ CHUNK = 1 << 22
 def as_float64(raw: np.ndarray) -> np.ndarray:
     """Widen the snapshot, with the non-finite bit patterns flattened to zero.
 
-    Most of RAM is not float data at all, so the cast trips numpy's invalid
-    warning on packet bytes that happen to decode as NaN. They are dealt with
-    immediately and never reach the comparison; the plausibility mask is what
-    keeps them out of the results.
+    Packet bytes that decode as NaN would trip numpy's invalid warning.
     """
     with np.errstate(invalid="ignore"):
         return np.nan_to_num(raw.astype(np.float64), posinf=0.0, neginf=0.0)
@@ -81,9 +65,8 @@ def measure(roo: Roo, cfg: str, base: int, size: int, samples: int,
     for addr, value in poke:
         if not roo.write(addr, value):
             raise SystemExit(f"poke {addr:08X}={value:08X} did not take")
-    # Let the configuration take hold before the first sample. Anything the
-    # state froze mid-flight - a tween carries the step it was built with -
-    # is still running on the old numbers until something rebuilds it.
+    # Let the configuration take hold before the first sample: anything the state
+    # froze mid-flight still runs on the old numbers until something rebuilds it.
     roo.frame_advance(2 + settle)
 
     raw = snap(roo, base, size)

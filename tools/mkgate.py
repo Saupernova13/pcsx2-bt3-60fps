@@ -1,11 +1,10 @@
 """Turn an integer 'field += 1' into one that counts on even ticks only.
 
-The counter is authored in 30Hz frames, so at 60fps it has to advance half as
-often. Halving is not an option for an integer, and freezing it is not either,
-so each site jumps to a small trampoline that reloads the field, adds one only
-when the global frame counter is even, replays whatever sat between the add and
-the next branch, and returns to that branch. Nothing else about the site
-changes: the store in the branch's delay slot still runs every tick.
+The counter is authored in 30Hz frames, so at 60fps it must advance half as
+often. Each site jumps to a small trampoline that reloads the field, adds one
+only when the global frame counter is even, replays whatever sat between the add
+and the next branch, and returns to that branch. The store in the branch's delay
+slot still runs every tick.
 
     python tools/mkgate.py 001F7A00,001F6778 --base F1000
     python ../pcsxroo/pcsxroo/tools/phasetimer.py --sites-only | python tools/mkgate.py --stdin --base F1000
@@ -48,8 +47,7 @@ def gate(elf: ElfImage, site: int, at: int):
     load, step = elf.u32(site), elf.u32(site + 4)
     if is_branch(elf.u32(site - 4)):
         raise ValueError(f"{site:08X} sits in a delay slot")
-    # Return to the instruction after the add. It can never be a delay slot -
-    # the instruction before it is the add - so no replay is needed at all.
+    # Return to the instruction after the add; it can never be a delay slot, so no replay is needed.
     ret = site + 8
     for a in range(ret, ret + 4 * AT_LOOKAHEAD, 4):
         word = elf.u32(a)

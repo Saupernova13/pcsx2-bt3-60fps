@@ -1,9 +1,8 @@
 """This game's config: repo paths, patch policy, and the bound identity.
 
-Imports the generic discovery config from the sibling pcsxroo checkout's
-ps2ee, binds this game's identity, then re-exports the generic functions so
-tools keep reading ``from game import config`` the way they read the old
-``from ps2ee import config``.
+Binds this game's identity into the generic discovery config of the sibling
+pcsxroo checkout's ps2ee and re-exports it, so tools read
+``from game import config``.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ _generic.LOCAL_JSON = REPO / "local.json"
 
 _generic.bind(identity.IDENTITY)
 
-# Game constants as module-level names, so the tools stay unchanged.
+# Game constants as module-level names.
 SERIAL = identity.SERIAL
 CRC = identity.CRC
 ELF_NAME = identity.ELF_NAME
