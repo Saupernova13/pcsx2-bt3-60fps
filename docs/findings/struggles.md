@@ -428,3 +428,93 @@ which contains `001D945C`, the winner decision found on 2026-09-10. **The Rush
 Struggle's 88-tick duration is almost certainly that manager's own clock**, not
 the animation clip that was hunted and never found. The technique above - double
 the phase lengths, leave the per-tick work alone - should apply to it directly.
+
+## 2026-09-22 - the Rush Struggle's length (#56)
+
+The lead above was right. `FUN_001D9330` is the Rush Struggle's manager:
+
+| mode | what it does |
+|---|---|
+| 6 | zeroes `[m+0x70]` and starts the contest |
+| 7 | counts `[m+0x70]` once a tick, cues each fighter's introduction (event `0x18`) at 0 and at 15, and after 76 ticks (`001D940C` `slti $v1, $v0, 0x4C`) hands over to mode 8 |
+| 8 | compares the two `fighter+0xE50` counts once (`001D945C`), raises `0xBF`/`0xC0`, and runs until `FUN_001D87D8` reports the finish |
+
+So the contest was always 76 ticks plus an animation-paced finish. Doubling the
+cue (`001D93D8` and `001D93EC`, both `li $v0, 0xF`) and the length puts it back
+on its real time.
+
+Twice the ticks would also double the automatic hits. Those land when the
+state's tick counter `fighter+0x964` is a multiple of an authored cadence, so
+the five literals double with it:
+
+| site | was | cadence |
+|---|---|---|
+| `001F4958` | `li $v0, 0x1C` | every 28 ticks, attribute `0x6A` |
+| `001F4980` | `andi $v0, 7` | every 8, attribute `0x69` |
+| `001F49A4` | `li $v0, 5` | every 5, attribute `0x68` |
+| `001F49DC` | `andi $v0, 3` | every 4, the default |
+| `001F49FC` | `li $v0, 0xF` | every 15, while `fighter+0x3D0` bit 0 |
+
+Cell against Devilman, the 2026-09-10 transplant, now kept as
+`work/state-backups/cell-vs-devilman-rush-struggle.p2s`:
+
+| no input | 30fps | v24 | v24 + this |
+|---|---|---|---|
+| struggle | 196 vsyncs | 116 | 192 |
+| player's hits | 26 | 26 | 26 |
+| CPU's hits | 52 | 36 | 49 |
+
+| player's stick at a true N rotations a second | 30fps | v24 | v24 + this |
+|---|---|---|---|
+| 3 | 51-56, CPU | 40-37, player | 54-53, player |
+| 5 | 66-59, player | 48-37, player | 72-57, player |
+| 8 | 82-60, player | 58-37, player | 95-57, player |
+
+The counts are back on the 30fps scale, and the winner matches at 5 and 8. At 3
+the 30fps game gives it to the CPU by 5 and this build to the player by 1, which
+v24 already did.
+
+Two residuals, both outside this change:
+
+- **The CPU is about 3 hits low.** By source, 30fps gives it 30 hits on the
+  rotation and attribute path (`001F49C4`) and 15 on the every-4 cadence
+  (`001F49E8`); this build gives 34 and 8. The every-4 cadence only runs on
+  ticks where the rotation condition is false. The shipped AI gate honours
+  rotation on even ticks, which are also the only ticks the doubled cadence can
+  fire on, and the 60Hz AI's rotation lands on more of them.
+- **A spinning player gets a few more hits than at 30fps**: 54 against 51 at 3
+  rotations a second. The stick is read every tick, as the Beam Struggle section
+  explains.
+
+Whether #56's story-mode "clashes where we teleport a lot and must press buttons"
+are this struggle is the user's call. The fighters do zip around the arena
+between exchanges, and nothing else found so far runs a contest on this clock.
+
+## 2026-10-09 - the Rush Struggle's scoring block, paced for the player too
+
+Re-measured in the full test build with the stick driven from game time
+(`angle = 2 pi * rot/s * vsync / 59.94`), Cell against Devilman from
+`cell-vs-devilman-rush-struggle.p2s`, player-CPU hits and the winner:
+
+| rot/s | 30fps | full build before | full build + scoring block |
+|---|---|---|---|
+| 0 | 26-52 CPU | 26-49 CPU | 26-49 CPU |
+| 3 | **49-55 CPU** | **56-54 P1** | 51-52 CPU |
+| 5 | 65-59 P1 | 73-57 P1 | 65-57 P1 |
+| 8 | 82-60 P1 | 96-57 P1 | 81-57 P1 |
+
+The player was not counting more rotations - 36 bit-raises at 30fps against 39
+over a 14-vsync longer struggle - but gaining automatic hits. In `FUN_001F47C8`
+a tick whose rotation bit (`fighter+0x74C` `0x02000000`) is up scores a hit
+**instead of** that tick's cadence hit. At 30fps the bit lasts a whole tick (2 or
+4 vsyncs) and pre-empts about 40% of the cadence ticks; at 60fps it lasts one
+vsync and pre-empts about 20%, so more cadence hits got through.
+
+The whole scoring block (`001F4930`-`001F4AB8`) now runs on even ticks of
+`fighter+0x964` only, through `000F1D00`. The CPU keeps the AI-only query gate at
+`000F1500`; a human's rotation is `CUR_B | PREV_B` (`+0x74C | +0x750`), so a
+crossing on the odd tick still scores once. Evaluated on even counts only, the
+odd cadences that were never doubled (attributes `0x12`-`0x14`: every 5, 11 and
+17 ticks) land on their 30fps timing too.
+
+The CPU still ends 2-3 hits under 30fps, as it did before this change.
