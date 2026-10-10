@@ -225,3 +225,48 @@ input block, whose update function ends in the history recorder.
   countdown in a whole minute for exactly that reason.
 - Save raw captures. Re-analysing offline beats asking the player to replay the
   session for every new hypothesis.
+
+## 2026-10-08 - issue #51, the fusion command is a held R3
+
+The owner could not fuse SSJ4 Vegeta with SSJ4 Goku while the screen showed 6
+Blast Stocks, against a cost of 5. Carried into the rig with
+`tools/transplant.py`, the same save fuses in every arm, 30fps included. The
+reason a press fails is the command, not the patch.
+
+### How the game reads it
+
+`FUN_00203900`, once a tick for the player, asks the input matcher
+`FUN_001D4F30` for commands `0x68`, `0x69` and `0x6A` (fusions 0, 1 and 2), then
+runs the fusion check `FUN_00203788` (state blockers, the partner's slot and
+health, and the cost through `FUN_001CED60`). The CPU calls the same check from
+`00208EC0`. Each fusion command needs:
+
+| condition | field |
+|---|---|
+| a direction held: Left `0x40`, Up `0x10`, Right `0x80` (d-pad and left stick alike) | `fighter+0x73C`, held mask |
+| `R3` held | `0x2000` in the same mask |
+| `R3`'s hold counter **equal to 12** | `fighter+0x7C0 + 13`, one byte, counts up while held and stops at 13 |
+| button 15's release counter at least 30 | `fighter+0x7A0 + 15` |
+
+The transformation command `0x67` (`Down` bit `0x20`) instead fires while the
+hold counter is under 13. So a fusion is a direction plus `R3` held for 12 game
+ticks; a tap never reaches 12. The counters are the 128 per-button frame counters
+`[60FPS - input timing]` already counts on even ticks, so the hold is 0.4 s in
+both arms:
+
+| shortest `Right`+`R3` hold that fuses SSJ4 Vegeta | 30fps | test build |
+|---|---|---|
+| vsyncs | 25 | 24 |
+
+From there the fusion cutscene matches 30fps at every matched vsync from v120 to
+v640.
+
+### Where Blast Stock lives
+
+The cost check compares the cost (500000 for 5 stocks) with `+0x14` of the
+current team member's record, `FUN_001CE050(fighter) + 0x40` (member index at
+`fighter+0x994`); `+0x18` is its cap. Here it was 600000, the 6 on screen.
+`fighter+0x9F8`, once taken for Blast Stock, read 90625 at the same moment and
+the fusion still went through, so it is not. The HUD object at `01876860` keeps
+P1's displayed stock at `+0x70`.
+
