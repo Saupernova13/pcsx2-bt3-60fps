@@ -482,14 +482,16 @@ It is the first version published as a GitHub Release, with the patch attached.
 
 ## Proposed - cape flutter (#92)
 
-Adds `[60FPS - cape flutter]` (a wrapper at `000F1B30` and one hook). The cloth
-update `FUN_00250DE8` has 60Hz settings of its own behind a model flag no battle
-model sets; it now takes them whenever a battle exists.
+Adds `[60FPS - cape flutter]`. In battle the cape step (`BObjChainB_Step`) takes the game's
+slow-chains settings, and four per-tick terms those settings leave alone are fixed: the swing
+step on alternate links, the blend toward the target (`t -> 1 - sqrt(1 - t)`), the speed cap and
+the damping. Push and sway decay by `sqrt(0.85)` a tick (shared with hair).
 
-| Save state 2, Great Saiyaman 2's first cape phase | v100 | v116 |
-|---|---|---|
-| 30fps | -1.05 | -0.247 |
-| 60fps before | -2.23 | -0.63 |
-| 60fps with the group | -1.05 | -0.247 |
+| Great Saiyaman 2, cape path vs 30fps, links 0 / 1 / 2 | moving | standing | ki charge |
+|---|---|---|---|
+| 60fps before | 0.56 / 0.74 / 0.80 | 2.99 / 1.57 / 1.26 | 1.66 / 1.67 / 1.75 |
+| with the group | 0.95 / 0.97 / 0.84 | 1.50 / 0.82 / 1.00 | 0.98 / 0.91 / 0.99 |
+
+Standing link 0 barely moves (0.7 rad over 8 s at 30fps against 1.0 with the group).
 
 **Not confirmed in play.**

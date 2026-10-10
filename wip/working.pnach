@@ -1280,29 +1280,15 @@ patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 
-// Cape flutter, found 2026-09-28 for issue #92. FUN_00250DE8 updates a cloth
-// piece (a cape has three) once a tick: three phases at cloth+0x28/+0x2C/+0x30
-// advance by f23 * 0.1, 0.23 and 0.27, and the flutter is built from their sines.
-// On entry it picks its rate settings - f23 = 1.0, f24 = 1.0, f25 = 30.0 - unless
-// the model's flags (model+0xA40) carry 0x01000000, which selects the game's own
-// 60Hz ones: f23 = 0.5 (the phase step), f24 = 2.0 (a velocity scale) and f25 =
-// 60.0 (ticks a second, dividing a per-tick speed limit). No battle model sets
-// that flag, so at 60fps a cape fluttered twice as fast.
-//
-// The beqz on the flag (00250E74) becomes a jump here; its delay slot still runs.
-// The 60Hz settings are taken if the flag is set or a battle exists (the battle
-// manager at 0x002FEB14 is non-null - through the win pose too); outside a battle
-// nothing changes.
-//
-// Save state 2, Great Saiyaman 2 standing, every open fix on - the first phase:
-//
-//                       v100     v108     v116
-//   30fps               -1.05    -0.647   -0.247   0.1 a tick, every 2 vsyncs
-//   60fps, before       -2.23    -1.43    -0.63    0.1 every vsync
-//   60fps, this group   -1.05    -0.647   -0.247   0.05 every vsync
+// Capes flutter at their real speed, standing, moving and charging.
+// In battle the cape step (BObjChainB_Step, FUN_00250DE8) takes the game's slow-chains settings
+// (velocity x2, phase step x0.5), and four per-tick terms they leave alone are fixed: the swing step
+// on alternate links (x scale), the blend toward the target (t -> 1 - sqrt(1 - t)), the speed cap
+// (fps stays 30) and the damping (half, not half x2). Push and sway decay by sqrt(0.85) a tick
+// instead of 0.85 (BtlObj_DecayPush, shared with hair).
 [60FPS - cape flutter]
-description=Flutter capes at the real rate, using the game's own 60Hz cloth settings in battle.
-patch=1,EE,000F1B30,word,14400007 // bnez $v0, 000F1B50        the model's own 60Hz flag
+description=Flutter capes at their real speed, standing, moving and charging.
+patch=1,EE,000F1B30,word,14400007 // bnez $v0, 000F1B50        the model's own slow-chains flag
 patch=1,EE,000F1B34,word,00000000 // nop
 patch=1,EE,000F1B38,word,3C010030 // lui $at, 0x0030
 patch=1,EE,000F1B3C,word,8C21EB14 // lw $at, -0x14EC($at)      the battle manager, 0x002FEB14
@@ -1310,6 +1296,24 @@ patch=1,EE,000F1B40,word,14200003 // bnez $at, 000F1B50        in a battle
 patch=1,EE,000F1B44,word,00000000 // nop
 patch=1,EE,000F1B48,word,080943A5 // j 0x250E94                30Hz settings
 patch=1,EE,000F1B4C,word,00000000 // nop
-patch=1,EE,000F1B50,word,0809439F // j 0x250E7C                60Hz settings
+patch=1,EE,000F1B50,word,0809439F // j 0x250E7C                slow-chains settings
 patch=1,EE,000F1B54,word,00000000 // nop
 patch=1,EE,00250E74,word,0803C6CC // beqz $v0, 0x250E94 -> j 000F1B30
+patch=1,EE,00250E7C,word,3C0141F0 // lui $at, 0x41F0             slow branch: fps 60 -> 30 (the speed cap's only reader)
+patch=1,EE,0025120C,word,00000000 // mul.s $f12, $f12, $f24 -> nop   damping: half * mult -> half
+patch=1,EE,000F24E0,word,4614B502 // mul.s $f20, $f22, $f20      amount * 0.1 (displaced)
+patch=1,EE,000F24E4,word,080944E5 // j 0x00251394
+patch=1,EE,000F24E8,word,4617A502 // mul.s $f20, $f20, $f23      (delay) * scale, as the other links
+patch=1,EE,0025138C,word,0803C938 // mul.s $f20, $f22, $f20 -> j 000F24E0
+patch=1,EE,000F24F0,word,C78CA868 // lwc1 $f12, -0x5798($gp)     1.0
+patch=1,EE,000F24F4,word,00000000 // nop
+patch=1,EE,000F24F8,word,46186034 // c.lt.s $f12, $f24           mult > 1: the slow branch is on
+patch=1,EE,000F24FC,word,45000004 // bc1f 000F2510
+patch=1,EE,000F2500,word,46146341 // sub.s $f13, $f12, $f20      (delay) 1 - t
+patch=1,EE,000F2504,word,460D6B44 // sqrt.s $f13, $f13
+patch=1,EE,000F2508,word,0809455B // j 0x0025156C
+patch=1,EE,000F250C,word,460D6301 // sub.s $f12, $f12, $f13      (delay) t' = 1 - sqrt(1 - t)
+patch=1,EE,000F2510,word,0809455B // j 0x0025156C
+patch=1,EE,000F2514,word,4600A306 // mov.s $f12, $f20            (delay) t unchanged
+patch=1,EE,00251564,word,0803C93C // mov.s $f12, $f20 -> j 000F24F0
+patch=1,EE,002FE67C,word,3F6C0535 // push/sway decay 0.85 -> sqrt(0.85) a tick (one reader, BtlObj_DecayPush)

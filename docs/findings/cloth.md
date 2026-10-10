@@ -59,3 +59,39 @@ one per piece of the cape.
   vsyncs at 60fps as at 30fps, with `[60FPS - sky scroll]` on. It is not the sky
   scroll, not the class above, and not one of the 33 direct reads of the frame
   counter `0x00331D64` (each selects a frame buffer). Issue #11.
+
+## 2026-10-10 - the slow-chains settings are not a 60Hz mode
+
+BT3-Decompiled names the flag `BOBJ_FLAG_SLOW_CHAINS` ("chains use the half-speed
+constants"): a slow-motion setting, not a 60Hz one. `BObjChainB_Step`
+(`src/battle/btl_obj_chain.c`) under it scales some per-tick terms and leaves
+others, so the first version of the group fixed a standing cape and overdrove a
+moving one (`work/tools-scratch/capevis.py`: the angle each cape link travels and
+its spread over the same real time).
+
+| Per-tick term | slow-chains setting | at 60fps | the group |
+|---|---|---|---|
+| node and movement velocity | x `mult` 2 | right | kept |
+| idle phase step; swing step when `depthB & 1` | x `scale` 0.5 | right | kept |
+| swing step on the other links (`0025138C`) | not scaled | 2x (measured 1.97x) | x `scale`, cave `000F24E0` |
+| blend toward the target, `t` 0.1-0.5 (`00251564`) | not scaled | settles 2x as fast | `1 - sqrt(1 - t)` while `mult` > 1, cave `000F24F0` |
+| speed cap `1388.9 / fps` (`00251064`, the only reader of `f25`) | fps 60 | the cap halves | fps 30 (`00250E7C`) |
+| damping `vel * half * mult` (`0025120C`) | x2 | 2x | half only |
+| push / sway decay x0.85 a tick (`BtlObj_DecayPush`, data `002FE67C`, one reader) | - | decays 2x as fast | `sqrt(0.85)` |
+
+Great Saiyaman 2 (`rocky-gs2-vs-standing-gohan.p2s`), 240 vsyncs, cape path vs 30fps, links 0 / 1 / 2:
+
+| | moving (`Up`) | standing | ki charge (`L2`) |
+|---|---|---|---|
+| 60fps, no group | 0.56 / 0.74 / 0.80 | 2.99 / 1.57 / 1.26 | 1.66 / 1.67 / 1.75 |
+| first version | 2.85 / 1.99 / 1.85 | 1.59 / 1.01 / 1.08 | 1.64 / 1.42 / 1.43 |
+| this version | 0.95 / 0.97 / 0.84 | 1.50 / 0.82 / 1.00 | 0.98 / 0.91 / 0.99 |
+
+Standing link 0 barely moves: 0.70 rad over 8 s at 30fps, 1.01 with the group
+(2.18 without it). The cape's noise source (`BtlObj_ChaosRand`, a logistic map)
+advances once per call, so the paths can only match in total, not vsync by vsync.
+State timelines of eight moves are identical with and without the new lines.
+
+The decay word is shared with hair (chain A), whose own steps are not compensated:
+Ultimate Gohan's hair, standing, travels 0.91 / 0.81 / 0.62 of its 30fps path in
+the full build, with and without this group. That is a defect of its own.
