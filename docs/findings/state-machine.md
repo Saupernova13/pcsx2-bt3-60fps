@@ -416,3 +416,93 @@ to 521.
   its own, `fighter+0x3DC`, and nothing compensates it, so phase 0 takes 133ms
   instead of 267ms. That is a timing error, not a freeze, and it is not this
   fix.
+
+## 2026-09-30 - issue #115: a rushing Blast 2's time limit is seconds * 30
+
+An audit of the 145 `lui $at, 0x41F0` sites. 80 of them run somewhere in the
+rig's scenes (9 of those patched by now), found by breaking on all of them over
+26 scenes. `001F9260` is one that no group covered.
+
+### The limit
+
+`FUN_001F8C00` is the handler of fighter states 284-289 (the state table has it
+at `002C4DEC`-`002C4E00`): the rush of a rushing Blast 2. For the animations in
+which the fighter is closing on the opponent it runs, once a tick:
+
+    001F9240  lw    $v0, 0($s6)          fighter+0x3DC
+    001F924C  addiu $v0, $v0, 1
+    001F9258  jal   FUN_00210E28         params+0x1C of this blast: seconds
+    001F925C  sw    $v0, 0($s6)
+    001F9260  lui   $at, 0x41F0          * 30.0
+    001F926C  c.olt.s $f0, $f20          limit < counter: the rush is over
+
+`fighter+0x3D8`, next to it, counts 16 ticks of being in range and is one of
+the clocks `[60FPS - state phase timers]` gates. `+0x3DC` is not gated.
+
+### Measured
+
+Cell 2nd Form's Drain Life has a limit of 1.5 s. Save state 7 is a 1P vs 2P
+match against Ultimate Gohan; the scene backs Cell away with `Down` under the
+30fps words until the two are a set distance apart, waits 60 vsyncs, applies the
+arm under test and fires `L2 + Up + Triangle`. The stage wall stops him at 780
+units.
+
+| start distance | 30fps | 60fps before | with `001F9260` at 60.0 |
+|---|---|---|---|
+| 309 | grab v110, counter 10 | grab v109, counter 20 | grab v109, counter 20 |
+| 510 | grab v130, counter 20 | grab v130, counter 41 | grab v130, counter 41 |
+| 609 | grab v142, counter 26 | gives up v140 at 46, 72 units short | grab v141, counter 52 |
+| 701 | grab v152, counter 31 | gives up v140, 164 short | grab v151, counter 62 |
+| 780 | grab v160, counter 35 | gives up v140, 243 short | grab v159, counter 70 |
+
+`[60FPS - rushing Blast 2 time limit]` is that one word.
+
+### Left alone
+
+- **`FUN_001F7DE8`, states 275-277.** The same comparison at `001F8398`, against
+  `fighter+0x3D8` and with the limit less one. None of the seven blast inputs
+  from any of the ten save states enters those states, so there is nothing to
+  measure a change against.
+- **The limit itself.** 30fps would run out at about 940 units by the counter's
+  pace; the wall is at 780.
+
+### The rest of the audit
+
+Read and found already covered: the meter functions that divide by 30
+(`FUN_001C3A20` and its three siblings, `FUN_0020F070`, `001E1AF8`) are all
+called from the economy `[60FPS - meter economy]` gates; the combo record's
+display timer (`001CE920`, `001CE994`, victim+0xD48) counts down every second
+vsync in both arms; the camera shot length at `001C7944` feeds the countdown
+`[60FPS - camera pacing]` gates; `001C4550` sets the animation step that
+`[60FPS - animation clock]` halves when it is read.
+
+Found and fixed under their own issues: the blast ramps (#109), the arc effect
+class (#111), and the fourth word of `[60FPS - effect rotation]` (#113).
+
+Inside an effect class whose update a group already runs at 30Hz, so taken as
+covered without a measurement of their own: the sprite class (`00182F14`,
+`00183034`, `0018352C`, `00183A54`, `00186358`, `0018637C`, `001865F0`), the
+spiral (`00188128`, `0018883C`, `0018A484`, `0018BFD4`), the swirl (`00190EF8`,
+`001917B8`, `001918B4`, `00191910`), the lightning (`0017C824`), the rays
+(`001689EC`, `0016971C`), the sparks (`0017DD9C`) and the track class
+(`0019DAFC`).
+
+Checked on 2026-10-02:
+
+| site | what | verdict |
+|---|---|---|
+| `00210064` | ki blast turn rate | fixed under #117 |
+| `0021015C` | ki blast life in ticks, `node+0x5B4` | counted by `[60FPS - projectile life]` |
+| `00211584` | `fighter+0xE40`, the post-cinematic timer | counted by #35's combat timers |
+| `002115CC` | beam duration in states 272-274 (`FUN_001F7860`) | its counter's load is gated |
+| `0021277C` | a Blast 1's effect length (`params+0xA0`) | read by the paralysis and Solar Flare code, both counted in real time |
+| `001795D4`, `00179B9C` | called only from the lightning class | gated with it |
+| `00192EF4` | called only from the swirl class | gated with it |
+| `001A11E0`, `001A1738` | called from the beam-impact burst class | gated with it |
+| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Not fixed. |
+
+Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
+`0014D708`, `00160168`, `0016A2D4`, `0019522C`, `00195514`, `00195F90`,
+`00195FB4`, `00196070`, `0019A9C4`; the 64 unpatched sites that never ran in a
+rig scene; and `FUN_001DC4C0`, which adds seconds * 30 to a battle counter
+(`battle+0x1C`) only in game modes 4 and 0x1B.

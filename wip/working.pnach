@@ -1286,3 +1286,150 @@ patch=1,EE,000F17B0,word,0807700C // j 0x001DC030             the blend, returni
 patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
+
+// The cinematic camera, found 2026-09-21 for issue #21 - the "second animation
+// clock" that ran transformation cinematics ahead of their poses. The poses were
+// never wrong: the model's animation timer (+0xC78) reads the same in both arms
+// at every vsync. The camera was. During a cinematic the render camera
+// (FUN_0023D510, the controller at gp-0x56A4) plays a camera clip instead of
+// following a fighter, and steps the clip's time by a bare 2.0 a tick:
+//
+//   0023D69C  jal   FUN_0023DB68        the clip's current time
+//   0023D6A4  lui   $at, 0x4000         2.0
+//   0023D6B0  add.s $f20, $f0, $f1      time + 2.0, clamped to the clip length
+//   0023D6E8  jal   FUN_0023DB88        store it
+//
+// Two units a tick is the 60-units-a-second authoring every BT3 clip uses, so at
+// 60fps the camera ran through its shots in half the real time: on the close-up
+// at vsync 28 where the 30fps game is still on the chest, and cut away by 98
+// before the energy ball goes up. 1.0 a tick puts it back.
+//
+// Vegeta (Scouter)'s Great Ape transformation, R3 from the Rocky Area state,
+// pixel drift against the 30fps picture: 24.72 with every shipped group, 14.29
+// with this; at vsync 300 34.1 -> 0.8. The loader wait before the Great Ape
+// appears still ends ~19 vsyncs early - the disc is polled per tick - which is
+// the residual at the tail.
+[60FPS - cinematic camera]
+description=Play cinematic camera clips at their real speed, so transformation cameras stay with the action instead of cutting ahead.
+patch=1,EE,0023D6A4,word,3C013F80 // lui $at, 0x4000 -> 0x3F80   camera clip step 2.0 -> 1.0
+
+// The transformation loader, found 2026-09-22 for issue #67. A transformation
+// streams the new form's data while the power-up animation plays, and reveals it
+// when the battle loader FUN_001278B0 sees the load finish. Its poll, 00127A70
+// jal FUN_00265298, is a state machine that advances at most one stage per call
+// - open, read, wait, close - and it is called once a tick, so at 60fps the load
+// ends early and so does everything after it. Load time fits a fixed disc time
+// plus N polls: Goten 114 vsyncs + 10, Vegeta (Scouter)'s Great Ape 110 + 19.
+//
+// The wrapper answers "not ready" on odd ticks and otherwise tail-calls the poll,
+// so the loader is polled at the game's 30Hz. Only this call site is hooked:
+// FUN_00265298 has 13 callers, menus among them.
+//
+// Goten's Super Saiyan, R3 from rocky-goten-trunks-team-vs-gohan.p2s: the reveal
+// (animation 0x179) starts at v148 at 30fps, v135 on v24, v145 with this group.
+// Pixel drift against 30fps 67.6 -> 50.3; at v200 38.4 -> 4.8.
+[60FPS - transformation load]
+description=Poll the transformation loader at the game's own 30Hz, so a transformation reveals the new form at its real time instead of early.
+patch=1,EE,000F19A0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19A4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19A8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19AC,word,15000003 // bnez $t0, +3             odd tick: not ready
+patch=1,EE,000F19B0,word,00000000 // nop
+patch=1,EE,000F19B4,word,080994A6 // j 0x00265298             even tick: the real poll
+patch=1,EE,000F19B8,word,00000000 // nop
+patch=1,EE,000F19BC,word,03E00008 // jr $ra
+patch=1,EE,000F19C0,word,0000102D // dmove $v0, $zero          (delay) "not ready"
+patch=1,EE,00127A70,word,0C03C668 // jal 00265298 -> jal 000F19A0   transformation loader poll
+
+// The scripted effect tracks, found 2026-09-28 for issue #10. Vegeta (Scouter)'s
+// energy ball, Goten's transformation burst and a hit spark in Great Saiyaman 2's
+// Ultimate are all one effect class: vtable 002C4278, update FUN_0019DB90, draw
+// FUN_0019DD38 (vtable+0x14). An effect carries up to eight tracks of 0x60 bytes,
+// and FUN_001AAB40 advances every one of them once a tick:
+//     track+0x04 += 2 * track+0x18      the track clock: 60Hz frames per 30Hz tick
+//     track+0x20, +0x24 = rand()        jitter, two draws per track
+//     track+0x30 += track+0x40          spin
+//     track+0x14 -= 1.0                 the fade, once the track has run out
+// The class update then counts four more down by 1.0 a tick, all 30Hz ticks:
+// +0x9C the start delay, +0xA0 a hold and +0xA8 the fade (byte counts from the
+// effect command, 0014EDA0-0014EDC8), and +0xAC the lifetime (seconds * 30.0,
+// 0019DAFC). None of it was compensated, so every such effect ran at double
+// speed: Vegeta's big flash comes 10 ticks after the small one in both arms,
+// v89 at 30fps and v77 at 60.
+//
+// FUN_001AAB40 has one caller, 0019DBD4, and the draw is a separate method, so
+// that call goes through a wrapper that runs it on even ticks only: clock,
+// jitter, spin and fade at their authored 30Hz. The four countdowns step 0.5.
+// Each countdown's test is <= 0, so half steps take exactly twice the ticks.
+//
+// Vegeta (Scouter)'s Great Ape, R3 from rocky-vegeta-scouter-standing.p2s: the
+// big flash comes at v88 (v89 at 30fps, v77 without), and every frame from v70 to
+// v130 matches the 30fps frame one vsync later at 1.0-2.3 mean pixel difference
+// (without: 8.4-61.2 at the best offset within 3 vsyncs). A spark in GS2's Ultimate traced tick by tick: lifetime,
+// fade and track clock equal the 30fps values on every even vsync, and it ends
+// on the same vsync, v146.
+[60FPS - effect track clock]
+description=Run scripted effects - Vegeta's energy ball, transformation bursts, hit sparks - on the game's own 30Hz schedule, so each flash starts, lasts and fades at its real time while still drawing at 60fps.
+patch=1,EE,000F1A40,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1A44,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1A48,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1A4C,word,15000003 // bnez $t0, 000F1A5C       odd tick: leave the tracks
+patch=1,EE,000F1A50,word,00000000 // nop
+patch=1,EE,000F1A54,word,0806AAD0 // j 0x001AAB40             even tick: advance them
+patch=1,EE,000F1A58,word,00000000 // nop
+patch=1,EE,000F1A5C,word,03E00008 // jr $ra
+patch=1,EE,000F1A60,word,00000000 // nop
+patch=1,EE,0019DBD4,word,0C03C690 // jal 001AAB40 -> jal 000F1A40   the track update
+patch=1,EE,0019DBF4,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      lifetime +0xAC, 1.0 -> 0.5 a tick
+patch=1,EE,0019DC40,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      start delay +0x9C
+patch=1,EE,0019DC74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      hold +0xA0
+patch=1,EE,0019DC94,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      fade +0xA8
+
+// The transformation flash, found 2026-09-28 for issue #10. The white that
+// covers a transformation's model swap is its own effect class: vtable 002C42D8,
+// update FUN_001A0850, created by FUN_001CF890 for every transformation type
+// (fighter+0x12DC). Once the swap starts it holds the white while
+//     obj+0x564 += 1.0 a tick     until it passes obj+0x568 = 10.0 (001A06B8)
+// and a second timer, obj+0x55C += 1.0 a tick, ends the effect at a byte count
+// from its data (obj+0x560). Both count 30Hz ticks, so at 60fps the white held
+// 11 vsyncs instead of 22 and the camera cut to the new form early.
+//
+// Both steps become 0.5. The hold's test is strict (count > limit), so half
+// steps would trip it at 10.5, one step early; the limit becomes 10.5 and the
+// hold ends at 11.0, after 22 ticks - the 30fps 11 exactly. The end timer's
+// test is <=, so halving its step alone is exact.
+//
+// Vegeta (Scouter)'s Great Ape: white v405-v426 and the cut at v427 at 30fps,
+// v403-v413 and v414 without this group, v403-v424 and v425 with it. Goten's
+// Super Saiyan: the hold runs v149-v171 at 30fps, v146-v168 with it - 22 vsyncs
+// each. The 3-vsync lead comes before the hold starts, the same lead the
+// transformation loader fix (PR #68) leaves on the reveal.
+[60FPS - transformation flash]
+description=Hold a transformation's white flash for its real time, so the camera stays on it as long as at 30fps instead of cutting to the new form early.
+patch=1,EE,001A06B8,word,3C014128 // lui $at, 0x4120 -> 0x4128   hold limit 10.0 -> 10.5
+patch=1,EE,001A0930,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   hold +0x564, 1.0 -> 0.5 a tick
+patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55C
+
+// A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
+// handles fighter states 284-289. While the rush closes on the opponent it
+// steps fighter+0x3DC once a tick (001F9240) and gives up once that passes the
+// blast's limit in seconds (params+0x1C, read by FUN_00210E28) * 30.0. At 60fps
+// the rush got half its time, and as the dash covers ground at its real speed it
+// stopped short of an opponent it reaches at 30fps. The constant becomes 60.0;
+// the counter is not touched.
+//
+// Cell 2nd Form's Drain Life (limit 1.5 s), save state 7, backed away under the
+// 30fps words first, then every open fix on:
+//
+//   start distance   30fps          60fps before                   with this group
+//   309              grab v110      grab v109                      grab v109
+//   510              grab v130      grab v130                      grab v130
+//   609              grab v142      gives up v140, 72 short        grab v141
+//   701              grab v152      gives up v140, 164 short       grab v151
+//   780              grab v160      gives up v140, 243 short       grab v159
+//
+// Left alone: FUN_001F7DE8 (states 275-277) has the same comparison at 001F8398
+// against fighter+0x3D8. No move in the rig's save states enters those states.
+[60FPS - rushing Blast 2 time limit]
+description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
+patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60

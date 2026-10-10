@@ -9,19 +9,20 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [State of play and the user's reports](state-of-play.md) | The running summary, the user's defect lists and every play-test. | 5 |
 | [The engine, the frame routine and the first 60fps patch](engine.md) | How BT3 runs a frame, where 60fps comes from, and the early probes. | 13 |
 | [Tooling, the rig and the measurement method](tooling-and-method.md) | Instruments, the 30fps oracle, and how a shipped group is A/B'd. | 5 |
-| [Input timing](input.md) | The input subsystem and the combat input counters. | 2 |
+| [Input timing](input.md) | The input subsystem, the combat input counters and the fusion command. | 3 |
 | [Airborne motion, gravity and the hovering idle](airborne-and-hover.md) | Flight, gravity, the airborne idle animation and the hover bob. | 9 |
 | [Effects, the ki aura and particles](effects-aura-particles.md) | The effect-node system, the aura, effect rotation and the particle system. | 9 |
 | [Tweens, fades and staged sequences](tweens-fades-and-staging.md) | The tween service, the scripted-sequence clocks and the screen fade service. | 4 |
 | [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock. | 13 |
-| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, and the state 157 and state 93 traps. | 3 |
+| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, and the rush time limit. | 4 |
 | [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams. | 6 |
 | [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 1 |
-| [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing and the second clip player behind the mouths. | 5 |
+| [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing and the second clip player behind the mouths. | 6 |
 | [Rush Struggle and Beam Struggle](struggles.md) | Both stick-rotation contests, their tick clocks and the CPU's synthetic stick. | 2 |
 | [Widescreen](widescreen.md) | The widescreen model and every aspect group. | 2 |
 | [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 1 |
 | [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 1 |
+| [Effect classes and their clocks](effect-classes.md) | The 28 effect-node classes that share the freeze check, and which of them count 30Hz ticks. | 1 |
 
 ## The original introduction
 
