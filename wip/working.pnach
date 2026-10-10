@@ -1309,6 +1309,12 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 // starts 2 vsyncs earlier. Every other value takes the original branch with a0
 // untouched, so the ordinary Full Power smash is unchanged.
 //
+// The Perfect Smash then dashes on a counter of its own (work[2] in
+// BtlAct_SmashChargeHandler, BT3-Decompiled): the dash starts at frame 2 and the
+// attack moves on at frame 6, counted once a tick. Both compares are doubled, so
+// the Perfect Smash lasts its 30fps time: 62 vsyncs after the Perfect at 30fps,
+// 55 before, 61 with them (Goku (Early), rig slot 0).
+//
 // Needs the meter economy group (PR #16). The step is scaled by Momentum
 // (fighter+0xD80, which rush hits fill), and Momentum drains 400 a tick inside
 // the economy that group gates. Without it a charge started after a rush fills
@@ -1325,6 +1331,10 @@ patch=1,EE,000F1CF4,word,00000000 // nop
 patch=1,EE,000F1CF8,word,08079208 // j 0x001E4820               the original non-perfect path
 patch=1,EE,000F1CFC,word,00000000 // nop
 patch=1,EE,001E4804,word,0803C738 // bne $a0, $v0, 001E4820 -> j 000F1CE0   Perfect Smash test
+patch=1,EE,001E4644,word,28620004 // slti $v0, $v1, 2 -> 4        Perfect Smash dash starts at frame 2
+patch=1,EE,001E4664,word,28620004 // slti $v0, $v1, 2 -> 4
+patch=1,EE,001E466C,word,2862000C // slti $v0, $v1, 6 -> 12       and ends at frame 6
+patch=1,EE,001E4694,word,2862000C // slti $v0, $v1, 6 -> 12
 
 // The charge flash, found 2026-09-22 for issue #6. Level 3 is "indicated by your
 // character flashing white", and the flash is a pulse. While the fighter holds

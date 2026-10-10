@@ -329,3 +329,30 @@ at 60fps. The test at `001E4804` now goes through `000F1CE0`, which accepts 1 or
 vsync earlier than at 30fps because the charge state itself starts 2 vsyncs
 earlier (v15 against v17). Charge to Level 3 is 44 vsyncs in both, and the Level
 3 flash repeats every 8 vsyncs in both.
+
+## 2026-10-10 - the Perfect Smash's dash counts ticks
+
+Read in BT3-Decompiled (`BtlAct_SmashChargeHandler`, `src/battle/btl_act_1.c`).
+A release while `chargeFullFrames` (`fighter+0xD84`) is 1 sets held flag `0x84`,
+the Perfect Smash. Under that flag the charge states run a counter of their own,
+`work[2]`, once a tick: on 0 the effect bit `0xC` and sound `0x20`, from 2 flag
+`0xB` and a dash at 3500 km/h, from 6 the next animation. Nothing patched it, so
+at 60fps the dash started and ended in half the time.
+
+The four compares (`slti 2` at `001E4644` and `001E4664`, `slti 6` at `001E466C`
+and `001E4694`) become 4 and 12. Goku (Early), rig slot 0, Square held from v0,
+released in the Perfect window (`work/tools-scratch/perfdash.py`):
+
+| | Perfect at | vsyncs in state 75 after it | travel |
+|---|---|---|---|
+| 30fps, release v59 | v61 | 62 | 100.3 units |
+| 60fps, charge fix only, release v55 | v57 | 55 | 105.4 |
+| with the dash compares, release v55 | v57 | 61 | 105.4 |
+
+Travel is the same in every arm: the dash ends at the opponent. The other readers
+of `chargeFullFrames` are unaffected: a powered-up skill's check is `> 0`, and
+`BtlAct_DashSmashHandler` counts it but never tests it.
+
+The charge itself starts about 2 vsyncs sooner in the full build (0.133 at v20
+against 0.089 at 30fps, the same slope), so the window opens at v55 against v59.
+That is the hand-off class of #127, not this group; the Level 3 flash moves with it.

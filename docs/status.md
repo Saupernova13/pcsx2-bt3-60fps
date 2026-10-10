@@ -413,6 +413,17 @@ Perfect Smash a 1-vsync window (v58), against 2 at 30fps (v59, v60). The group
 now also widens the grant's test at `001E4804` to accept `fighter+0xD84` of 1 or 2,
 which gives v58 and v59: the 30fps width.
 
+**Added 2026-10-10: the Perfect Smash's dash.** After a Perfect release the attack
+dashes on its own counter, which starts the dash at frame 2 and moves on at frame
+6, counted once a tick (BT3-Decompiled, `BtlAct_SmashChargeHandler`). Both
+compares are doubled (`001E4644`, `001E4664`, `001E466C`, `001E4694`).
+
+| Goku (Early), rig slot 0 | vsyncs in the attack after the Perfect |
+|---|---|
+| 30fps | 62 |
+| 60fps, charge fix only | 55 |
+| with the dash compares | 61 |
+
 **Not confirmed in play.** Only the neutral Smash was tested, on one character.
 
 **Ship it with `[60FPS - meter economy]` (#16), never without.** The charge rate
