@@ -239,12 +239,16 @@ TRANSFLASH = ["60FPS - transformation flash"]
 # limit in seconds * 30.0. The constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
+# The ring shot, found 2026-10-10 for issue #149. Technique type 4 counted its setup per
+# update; its four steps are halved.
+RINGSHOT = ["60FPS - ring shot"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RINGSHOT
                   + SPARES)
 
 PRESETS = {
@@ -304,7 +308,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RINGSHOT),
+    # "full" without the ring shot, so that group has a named baseline.
+    "noringshot": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                   + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
