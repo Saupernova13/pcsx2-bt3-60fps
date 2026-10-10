@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - story mode's script clock (#145)
+
+Adds `[60FPS - story script clock]`. Dragon History's battle scripts count 10 a
+frame, so lines, texts, scripted waits and script cameras took half their time
+at 60fps. Each step is now 5.
+
+| Frieza saga mission 1 | 30fps | 60fps before | with it |
+|---|---|---|---|
+| scripted talk ends | v344 | v283 | v343 |
+| a line's text clears | v88 | v44 | v88 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2

@@ -27,6 +27,7 @@ from SuperCombo's names to this repo's old terms.
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
+| story mode dialogue, story lines vanish early | The Dragon History battle script (GSC) and its lines | `story script clock`, issue #145 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
