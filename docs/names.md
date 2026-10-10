@@ -27,6 +27,7 @@ from SuperCombo's names to this repo's old terms.
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
+| the pause when a Z-Counter or a clash lands, hit-stop | The freeze on guard counters, push-stop guards and smash clashes (hit-stop is my label) | `hit-stop`, issue #143 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
