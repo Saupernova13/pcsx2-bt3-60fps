@@ -1426,3 +1426,31 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The power-up glow, found 2026-10-10 for issue #153 by reading BT3-Decompiled.
+// EftGlowTask_Update (src/battle/eft_trail.c, class 0x2C3B68) runs EftGlow_Step,
+// the emitter (up to 14 quads a frame), and EftGlow_StepParts (eft_glow.c: each
+// quad's life, two-stage width and length, fade, animation timer and 4-frame
+// orientation lag) once per update unless the battle is paused. At 60fps it
+// spawned about twice the quads and each lived half as long.
+//
+// The step runs at 30Hz, as [60FPS - aura update rate] does for the aura: the
+// pause test at 00170F9C goes through 000F24C0, which also reports odd vsyncs as
+// paused for this task. Drawing is untouched.
+//
+// Goku (Early)'s L2 + Up + Triangle from rig slot 0, all 70 quads read per vsync:
+//
+//                      30fps       60fps before    with this group
+//   quads spawned      837         1447            841
+//   mean quad life     20.4 v      11.2 v          20.1 v
+[60FPS - power-up glow rate]
+description=Stream and fade the power-up glow at 30Hz, so it is as dense and lasts as long as at 30fps.
+patch=1,EE,000F24C0,word,DC4319F0 // ld v1,0x19F0(v0)         battle flags (displaced)
+patch=1,EE,000F24C4,word,30630100 // andi v1,v1,0x100         paused (displaced)
+patch=1,EE,000F24C8,word,3C010033 // lui at,0x33
+patch=1,EE,000F24CC,word,8C211D64 // lw at,0x1D64(at)         frame counter
+patch=1,EE,000F24D0,word,30210001 // andi at,at,1
+patch=1,EE,000F24D4,word,00611825 // or v1,v1,at              odd vsync: skip the glow step as if paused
+patch=1,EE,000F24D8,word,0805C3E9 // j 00170FA4
+patch=1,EE,000F24DC,word,00000000 // nop
+patch=1,EE,00170F9C,word,0803C930 // EftGlowTask_Update: ld v1,0x19F0(v0) -> j 000F24C0
