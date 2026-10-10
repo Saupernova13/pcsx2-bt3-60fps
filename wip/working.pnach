@@ -105,17 +105,24 @@ patch=1,EE,000F01D4,word,00000000 // nop
 patch=1,EE,001C4838,word,0803C068 // lwc1 -> j 000F01A0 (FUN_001C47A4 play-once step)
 patch=1,EE,001C49A8,word,0803C070 // lwc1 -> j 000F01C0 (FUN_001C4920 looping step)
 
-// Effect rotation phases: FUN_00251A48 advances three angles per effect slot by
-// a fixed amount per tick and wraps them at +/-pi, so at 60fps every aura, glow
-// and swirl rotates at double real speed. The rates are plain data words and each
-// is read by exactly one instruction in the binary, so halving them is safe and
-// needs no trampoline. Halving a positive float = subtract 0x00800000.
+// Sway phases of a model's dangling pieces (a hair lock, for example; the group
+// keeps its first name). FUN_00251A48 advances three angles per piece by a fixed
+// amount per tick and wraps them at +/-pi, so at 60fps the pieces swayed at
+// double real speed. The rates are plain data words and each is read by exactly
+// one instruction in the binary, so halving them is safe and needs no
+// trampoline. Halving a positive float = subtract 0x00800000.
+//
+// A fourth word, 002FE738 (0.90), was halved with them until 2026-09-30 (issue
+// #113). It is not a rate: a piece with a parent takes the parent's three phases
+// less 0.90 (00251EB0), and halving it put the second link of a chain 0.45 rad
+// behind the first instead of 0.90. Save state 3, idle, the second link's
+// phases against 30fps on the 61 30Hz ticks of v1-v121: equal on 0 with the
+// word halved, on 61 with it left alone.
 [60FPS - effect rotation]
-description=Halve the per-tick rotation rates behind auras and effect swirls.
+description=Sway hair locks and other dangling pieces at their real speed.
 patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
 patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
 patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
-patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 
 // The ki aura. FUN_00164860 is the aura node's vtable[0] method, and in this
 // engine vtable[0] is update AND draw in one call - which is why gating the

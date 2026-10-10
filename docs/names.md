@@ -42,5 +42,6 @@ from SuperCombo's names to this repo's old terms.
 | Vegeta's energy ball, the flash before the Great Ape | A scripted effect with timed tracks (small flash, then the ball) | `effect track clock`, issue #10 |
 | the white before a transformation reveal | The transformation flash that covers the model swap | `transformation flash`, issue #10 |
 
-`effect rotation` is the spin of aura and effect swirls. It is not the aura's
-playback speed; that is `aura update rate`.
+`effect rotation` is the sway of a model's dangling pieces, such as a hair
+lock (issue #113; it was first taken for the spin of aura swirls). It is not
+the aura's playback speed; that is `aura update rate`.
