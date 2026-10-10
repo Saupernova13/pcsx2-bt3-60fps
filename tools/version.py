@@ -51,14 +51,14 @@ def git(*args: str) -> str:
 
 
 def shipped(text: str, development_only: list[str]) -> dict[str, list[str]]:
-    """The groups a release would carry, each as its stripped ``patch=`` lines.
+    """The groups a release would carry, each as its ``patch=`` lines without comments.
 
     Development-only groups are dropped, exactly as export drops them, so a
     group that must never ship can be edited without owing a version.
     """
     _, blocks = export.split_groups(text)
     return {
-        name: [l.strip() for l in body if l.strip().startswith("patch=")]
+        name: [l.split("//")[0].strip() for l in body if l.strip().startswith("patch=")]
         for name, body in blocks if name not in development_only
     }
 
