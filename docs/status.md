@@ -1,9 +1,9 @@
 # Build confidence ladder
 
 Which build to trust, and why. Set by testing **in play**, not by measurement.
-Newest at the top. `patch/428113C2.pnach` currently holds **v25**.
+Newest at the top. `patch/428113C2.pnach` currently holds **v26**.
 
-What every version changed and discovered, v01 through v25, is in
+What every version changed and discovered, v01 through v26, is in
 [`versions/`](versions/README.md). This page is only about which build to trust.
 
 > **\*** means fixed and verified by measurement against the 30fps oracle -
@@ -32,7 +32,8 @@ None of it touches v12's input-timing flag, which still stands.
 
 | Build | Groups | Confidence | Ultimate Blast | Notes |
 |---|---|---|---|---|
-| `v25-state-phase-timers` | 33 | **FIXED, NOT YET PLAY-TESTED\*** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
+| `v26-cinematic-camera` | 38 | **CONFIRMED IN PLAY** | correct | Adds `cinematic camera`, `transformation load`, `effect track clock`, `transformation flash` and `rushing Blast 2 time limit`. Transformation cameras, reveals and flashes keep 30fps time; Drain Life reaches a far opponent. Confirmed 2026-10-05 in the test build |
+| `v25-state-phase-timers` | 33 | **CONFIRMED IN PLAY** | correct | Takes the four phase-number gates out of `state phase timers`. The user's frozen v24 save state returns to idle after 69 ticks. The first step of states 90-93 still runs at double speed (133ms against 267ms) |
 | `v24-state-phase-timers` | 33 | **FREEZE - #39** | correct | Reinstates `state phase timers`. Four of its 21 sites are phase numbers, not clocks, and one of them traps a fighter in state 93: frozen in place, model drawn every other frame. Reproduced from the user's own save state 2026-09-21. Fixed in v25 |
 | `v23-known-issues-refresh` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Patch lines identical to v22. The shipped header's KNOWN NOT FIXED list gains v22's own gap - the CPU ends a little weak in a Beam Struggle - which had been written in after v22 was tagged |
 | `v22-beam-clash` | 26 | **DURATION CONFIRMED IN PLAY, OUTCOME NOT YET\*** | correct | Adds `beam clash` - the whole beam-clash contest is counted in ticks, so at 60fps it played in half its real time (2.17s against 4.34s) while the CPU's synthetic stick rotated once per tick. The winner flipped. Now 4.30s, and the player's count matches the 30fps game exactly |
@@ -286,6 +287,61 @@ fix takes all four out and writes the game's own instruction back. Loading
 the user's frozen state under the fix frees the fighter within 69 ticks. See
 [`findings/state-machine.md`](findings/state-machine.md).
 
+## v26 - the cinematic camera (#21)
+
+Adds `[60FPS - cinematic camera]`, one word. In a cinematic the render camera
+plays a camera clip whose time steps a bare 2.0 a tick (`0023D6A4`), so
+transformation cameras ran through their shots in half the real time while the
+poses kept time. Now 1.0.
+
+| Vegeta (Scouter)'s Great Ape, drift from 30fps | mean | v28 | v300 |
+|---|---|---|---|
+| every shipped group | 24.72 | 34.1 | 14.3 |
+| **+ this group** | **14.29** | **12.4** | **0.8** |
+
+Photographed at matched vsyncs it shows the 30fps shot from v28 on, one vsync
+ahead, including the camera holding on Vegeta as the energy ball goes up (#10).
+Not fixed by it: the first cut lands 3 vsyncs early, and the ball's flash 12
+early. **Confirmed in play 2026-10-05**, in the test build: Vegeta (Scouter)'s
+and Cell's transformations play correctly.
+
+## v26 - the transformation loader (#67)
+
+Adds `[60FPS - transformation load]`. The battle loader polls a load state
+machine that advances one stage per call, once a tick, so transformations
+revealed their new form early. The poll is now answered "not ready" on odd
+ticks.
+
+| Goten's Super Saiyan | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| reveal starts | v148 | v135 | v145 |
+| drift from 30fps (mean) | 0 | 67.6 | 50.3 |
+
+## v26 - scripted effects and the transformation flash (#10)
+
+Adds two groups. `[60FPS - effect track clock]`: the effect class behind
+Vegeta (Scouter)'s energy ball, Goten's transformation burst and a hit spark in
+Great Saiyaman 2's Ultimate stepped its track clock, jitter, spin and four
+countdowns once a tick. The tracks now advance on even ticks and the countdowns
+by 0.5. `[60FPS - transformation flash]`: the white that covers every
+transformation's model swap held for 11 ticks counted per tick; its timers now
+step 0.5, and its strict limit is 10.5 so the hold is exactly 22 vsyncs.
+
+| Vegeta (Scouter)'s Great Ape | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| energy ball, big flash | v89 | v77 | v88 |
+| white before the Great Ape | v405-v426 | v403-v413 | v403-v424 |
+| cut to the Great Ape | v427 | v414 | v425 |
+| frames v70-v130, best match against 30fps within 3 vsyncs | 0 | 8.4-61.2 | 1.0-2.3, one vsync later |
+
+Goten's Super Saiyan: the white holds 22 vsyncs in both (v149-v171 at 30fps,
+v146-v168 here). The 3-vsync lead comes before the hold starts, the same lead
+#68 leaves on the reveal. GS2's hit spark matches 30fps value for value on even vsyncs and ends
+on the same one. No change to Cell's transformation or GS2's heart ring; all 13
+smoke-test moves return to idle.
+
+**Confirmed in play 2026-10-05**, in the test build.
+
 ## Proposed - the Rush Struggle's length (#56)
 
 Extends `[60FPS - rush struggle]`. The contest itself was counted in ticks: 76
@@ -500,3 +556,20 @@ was written into the `KNOWN NOT FIXED` block, so the file people installed never
 mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
+
+## v26 - a rushing Blast 2's time limit (#115)
+
+Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
+gives up after a number of seconds the game counted as `seconds * 30` ticks, so
+at 60fps it had half its time and stopped short of a far opponent.
+
+| Cell 2nd Form's Drain Life, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| from 510 units | grab v130 | grab v130 | grab v130 |
+| from 609 units | grab v142 | gives up, 72 units short | grab v141 |
+| from 780 units | grab v160 | gives up, 243 units short | grab v159 |
+
+The same comparison in the handler of states 275-277 is not changed: nothing in
+the rig reaches it.
+
+**Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).

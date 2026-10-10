@@ -1,7 +1,7 @@
 """Drive the game's menus, so any scene can be built rather than only reloaded.
 
-Until this existed, an A/B could only use a character, stage and loadout that
-somebody had already saved. The menus answer to pad injection like anything
+Until this existed, an A/B could only use a character and stage that somebody
+had already saved. The menus answer to pad injection like anything
 else, so the roster, Custom Select and Map Select are all reachable from a
 script - which is how the Vegeta (Scouter) and World Tournament states were
 made.
@@ -19,8 +19,8 @@ label band from each, as one tall image.
 The roster is a grid of 15 rows: Down moves a whole row, Right moves one
 character within it, and both wrap. Map Select is the same shape. Confirming a
 character opens its form list, then Custom Select, then Select Color - three
-Crosses takes the defaults, and Custom Select is the only way to reach a move
-that is not equipped by default.
+Crosses takes the defaults. Custom Select equips Z-Items; a character's moves
+are fixed and are never chosen here.
 """
 
 from __future__ import annotations
