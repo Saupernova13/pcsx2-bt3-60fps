@@ -1426,3 +1426,11 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// A launched or blown-away fighter can recover after its real 9 frames.
+// BtlAct_LaunchedHandler and BtlAct_BlowAwayHandler allow the recovery once actionFrame
+// (fighter+0x964, counted once a tick) passes 8 (slti 9); both now wait until it passes 17 (slti 18).
+[60FPS - recovery windows]
+description=Let a launched or blown-away fighter recover after its real 9 frames, not half that.
+patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
+patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
