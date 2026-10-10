@@ -848,3 +848,24 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-10-10 - issue #151: ground dust
+
+Found by reading BT3-Decompiled (`src/battle/eft_ground_dust.c`). The census of
+the clock audit's unpaced classes showed it in nearly every scene. Six dust kinds
+(puff, slide, dash, land, impact, debris) share `EftGndDust_UpdateParts`, which
+steps each particle once per update: `life--`, colour by life, `size += grow`
+with `grow *= growDamp`, `angle += spin`, `vel *= drag; vel += accel; pos += vel`,
+then `fade--` once the life is out. Slide and dash dust (fighter fx bits 0x30 and
+0x33, raised by `BtlAct_DashMoveHandler` and `BtlAct_LieDownHandler` while
+grounded) also count `tick++` and spawn every 5th update.
+
+`[60FPS - ground dust rate]` returns from the particle step on odd vsyncs and
+makes the two emitters read their emit flag as clear on odd vsyncs. Live
+particles (`gEftGndDust` `0x002FEAA0` + `0x62B4`, `work/tools-scratch/dusttl.py`):
+
+| Scene | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| slot 7, `Down` + `Cross` 100 vsyncs: puffs / mean life | 14 / 36.0 | 28 / 18.0 | 14 / 36.0 |
+| slot 7, rush string: puffs / mean life | 48 / 50.6 | 48 / 25.6 | 48 / 51.1 |
+| slot 5, Krillin's Ultimate: puffs / mean life | 41 / 48.1 | 41 / 24.0 | 41 / 48.3 |

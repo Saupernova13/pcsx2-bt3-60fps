@@ -1426,3 +1426,54 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// Ground dust, found 2026-10-10 for issue #151 by reading BT3-Decompiled. The
+// dust of dashes, slides, landings and impacts (src/battle/eft_ground_dust.c)
+// steps every particle once per update - life, grow, spin, drag, velocity,
+// fade (EftGndDust_UpdateParts, shared by all six kinds) - and the slide and
+// dash emitters spawn a puff every 5th update. At 60fps a dash raised twice the
+// puffs and every puff lived half as long.
+//
+// The class runs at 30Hz, as the other effect-rate groups do: the particle step
+// returns on odd vsyncs (000F2440), and the two emitters treat their emit flag
+// as clear on odd vsyncs (000F2470, 000F2490), so they neither tick nor spawn.
+// Drawing is untouched.
+//
+// Live particles (gEftGndDust + 0x62B4), rig slot 7:
+//
+//                                  30fps        60fps before    with this group
+//   Down + Cross dash: puffs       14           28              14
+//                      mean life   36.0 v       18.0 v          36.0 v
+//   rush string: mean life         50.6 v       25.6 v          51.1 v
+[60FPS - ground dust rate]
+description=Raise and fade the dust of dashes, slides and landings at 30Hz, so it is as thick and lasts as long as at 30fps.
+patch=1,EE,000F2440,word,3C010033 // lui at,0x33
+patch=1,EE,000F2444,word,8C211D64 // lw at,0x1D64(at)         frame counter
+patch=1,EE,000F2448,word,30210001 // andi at,at,1
+patch=1,EE,000F244C,word,10200003 // beqz at, even
+patch=1,EE,000F2450,word,00000000 // nop
+patch=1,EE,000F2454,word,03E00008 // jr ra                    odd: no particle step
+patch=1,EE,000F2458,word,00000000 // nop
+patch=1,EE,000F245C,word,27BDFFC0 // addiu sp,sp,-0x40        (displaced)
+patch=1,EE,000F2460,word,080666CA // j 00199B28
+patch=1,EE,000F2464,word,FFB40020 // sd s4,0x20(sp)           (displaced)
+patch=1,EE,00199B20,word,0803C910 // EftGndDust_UpdateParts entry -> j 000F2440
+patch=1,EE,00199B24,word,00000000 // (moved into 000F2440)
+patch=1,EE,000F2470,word,8E0200B4 // lw v0,0xB4(s0)           flags (displaced)
+patch=1,EE,000F2474,word,30420002 // andi v0,v0,2             EMIT (displaced)
+patch=1,EE,000F2478,word,3C010033 // lui at,0x33
+patch=1,EE,000F247C,word,8C211D64 // lw at,0x1D64(at)
+patch=1,EE,000F2480,word,30210001 // andi at,at,1
+patch=1,EE,000F2484,word,0806605E // j 00198178
+patch=1,EE,000F2488,word,0001100B // movn v0,zero,at          odd vsync: no tick, no spawn
+patch=1,EE,00198170,word,0803C91C // EftGndDustSlide_Update: lw v0,0xB4(s0) -> j 000F2470
+patch=1,EE,00198174,word,00000000 // (andi moved into 000F2470)
+patch=1,EE,000F2490,word,8E0200B4 // lw v0,0xB4(s0)           flags (displaced)
+patch=1,EE,000F2494,word,30420002 // andi v0,v0,2             EMIT (displaced)
+patch=1,EE,000F2498,word,3C010033 // lui at,0x33
+patch=1,EE,000F249C,word,8C211D64 // lw at,0x1D64(at)
+patch=1,EE,000F24A0,word,30210001 // andi at,at,1
+patch=1,EE,000F24A4,word,08066194 // j 00198650
+patch=1,EE,000F24A8,word,0001100B // movn v0,zero,at          odd vsync: no tick, no spawn
+patch=1,EE,00198648,word,0803C924 // EftGndDustDash_Update: lw v0,0xB4(s0) -> j 000F2490
+patch=1,EE,0019864C,word,00000000 // (andi moved into 000F2490)
