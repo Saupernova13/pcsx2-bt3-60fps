@@ -239,12 +239,16 @@ TRANSFLASH = ["60FPS - transformation flash"]
 # limit in seconds * 30.0. The constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
+# The battle script clock, found 2026-10-10 for issue #145. Story-mode scripts count
+# 10 a frame; the four steps become 5.
+STORYCLOCK = ["60FPS - story script clock"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + STORYCLOCK
                   + SPARES)
 
 PRESETS = {
@@ -304,7 +308,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + STORYCLOCK),
+    # "full" without the story script clock, so that group has a named baseline.
+    "nostoryclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                     + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

@@ -463,3 +463,33 @@ fade-out's 1.0 does double duty as both the step and the 1.0 in
 `blend = 1.0 - counter/duration`, so it needs `add.s $f2, $f2, $f2` inserted into
 one of the two nops at `001729AC` to rebuild it. Two words with no inserted
 instruction beat five with one.
+
+## 2026-10-10 - issue #145: the battle script clock (story mode)
+
+Found by reading BT3-Decompiled. Dragon History battles run a script on the GSC
+engine (`src/sys/gsc.c`); `Battle_Loop` is the only caller of `Gsc_Update`, so it
+exists only in battle and steps once a frame. Its time is 10 a frame:
+
+| Counter | Function | Word |
+|---|---|---|
+| a waiting command's time; "wait" compares it with seconds x 300 | `Gsc_StepTask` | `00257D64` |
+| "talk" (1603): 60 frames after its voice, 600 down by 10 | `BtlScriptCmd_Talk` | `0025B0E0` |
+| a said line's text: 60 frames after its voice, up by 10 to 600 | `BtlScript_UpdateLines` | `00259A74` |
+| script camera between keys timed in seconds x 300 | `BtlScript_UpdateView` | `00259110` |
+
+`[60FPS - story script clock]` makes each step 5. Running the engine at 30Hz was
+ruled out: "wait button" (1701) reads `gPad[0].gamePressed` and the triggers read
+`BtlEvent_IsNew`, both one-frame edges. Fades run on `Ramp_Step` and are paced by
+`[60FPS - tween duration]`; character moves (901) wait for the fighter's
+animation, which the animation groups pace.
+
+The scene: Frieza saga, first mission ("Super Saiyan?!"), saved after the intro
+(`work/state-backups/story-frieza-recoome-intro.p2s` is the intro itself). The
+mission registers 26 lines and 3 scripted events; event `0x48` for side 0 starts
+action 10001 (`work/tools-scratch/gsctl.py`, `linetl.py`, setting the event bit
+at `gBattleWork + 0x1988`):
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| action 10001's talk ends | v344 (waited 1700) | v283 (2810) | v343 (1705) |
+| a said line's text clears | v88 | v44 | v88 |
