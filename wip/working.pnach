@@ -1426,3 +1426,51 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// Discs, found 2026-10-10 for issue #147 by reading BT3-Decompiled. The disc
+// object (EftDisc, class 002C3B38: Krillin's Ultimate, Destructo Disc-type
+// pieces and disc ki blasts) does everything once per update and nothing paced
+// it: pos += dir * speed, EftDisc_Home turns it by up to `turn`, it spins by
+// `spin`, bobs by cos(timer * 0.04 * pi), and ages toward a life, grow, roll
+// and fade counted in frames (seconds * 30.0, EftDisc_Init). At 60fps it flew
+// twice as fast and landed early.
+//
+// It keeps moving every vsync: the frame counts use 60.0, speed and turn are
+// halved where the update loads them (two caves at 000F2340 and 000F2360,
+// f17 as scratch), EftDisc_Home's lead clamp (15 frames) and turn spread (from
+// 2 frames) double, and the spin's pi and the bob's 0.04 halve in data (one
+// reader each). The roll angle's decay multiplies once per update, so it
+// decays slightly faster; appearance only.
+//
+// Krillin's Ultimate from rig slot 5 on a standing Ultimate Gohan:
+//
+//                              30fps       60fps before    with this group
+//   first disc's flight        8 vsyncs    4               8
+//   per-vsync step             13.9 (avg)  27.8            13.9
+//   first hit vs 30fps         -           5 early         1 early (the throw's own hand-off)
+[60FPS - disc travel]
+description=Fly, home, spin and fade discs such as Krillin's Ultimate at their real speed, so they land when they do at 30fps.
+patch=1,EE,0016B76C,word,3C014270 // EftDisc_Init: lui at,0x41F0 -> 0x4270   30.0 -> 60.0: life, grow, roll and fade in frames
+patch=1,EE,002FCAE4,word,3FC90FDA // EftDisc_Init spin: pi -> pi/2 (one reader)
+patch=1,EE,002FCB00,word,3CA3D70A // EftDisc_Update bob: 0.04 -> 0.02 (one reader)
+patch=1,EE,0016CB54,word,3C0141F0 // EftDisc_Home: lead clamp 15 -> 30 frames
+patch=1,EE,0016CC10,word,3C014080 // EftDisc_Home: turn spread from 2 -> 4 frames
+patch=1,EE,000F2340,word,C64C0034 // lwc1 f12,0x34(s2)        speed (displaced)
+patch=1,EE,000F2344,word,C64D0044 // lwc1 f13,0x44(s2)        turn (displaced)
+patch=1,EE,000F2348,word,3C013F00 // lui at,0x3F00
+patch=1,EE,000F234C,word,44818800 // mtc1 at,f17
+patch=1,EE,000F2350,word,46116302 // mul.s f12,f12,f17        speed / 2
+patch=1,EE,000F2354,word,46116B42 // mul.s f13,f13,f17        turn / 2
+patch=1,EE,000F2358,word,0805AF71 // j 0016BDC4
+patch=1,EE,000F235C,word,00000000 // nop
+patch=1,EE,0016BDBC,word,0803C8D0 // EftDisc_Update: lwc1 f12,0x34(s2) -> j 000F2340   EftDisc_Home(speed, turn)
+patch=1,EE,0016BDC0,word,00000000 // (turn load moved into 000F2340)
+patch=1,EE,000F2360,word,02602025 // move a0,s3                (displaced)
+patch=1,EE,000F2364,word,C64C0034 // lwc1 f12,0x34(s2)        speed
+patch=1,EE,000F2368,word,3C013F00 // lui at,0x3F00
+patch=1,EE,000F236C,word,44818800 // mtc1 at,f17
+patch=1,EE,000F2370,word,46116302 // mul.s f12,f12,f17        speed / 2
+patch=1,EE,000F2374,word,0805AF7D // j 0016BDF4
+patch=1,EE,000F2378,word,00000000 // nop
+patch=1,EE,0016BDEC,word,0803C8D8 // EftDisc_Update: move a0,s3 -> j 000F2360   pos += dir * speed
+patch=1,EE,0016BDF0,word,00000000 // (speed load moved into 000F2360)
