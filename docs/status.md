@@ -536,6 +536,17 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - ground dust (#151)
+
+Adds `[60FPS - ground dust rate]`. Dash and slide dust spawned twice as often and
+every dust puff lived half as long. The class now steps at 30Hz.
+
+| Slot 7 dash | 30fps | 60fps before | with it |
+|---|---|---|---|
+| puffs / mean life | 14 / 36 v | 28 / 18 v | 14 / 36 v |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
