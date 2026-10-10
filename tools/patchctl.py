@@ -239,12 +239,18 @@ TRANSFLASH = ["60FPS - transformation flash"]
 # limit in seconds * 30.0. The constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
+# The shots of a Barrage Blast 2, found 2026-10-08 for issue #40. The homing-shot
+# controller FUN_0014C2B8 moves, steers and ages every shot once a tick, and the
+# shot's blast object FUN_0016A400 draws its tracer from last tick's head. Both run
+# their per-tick part on even ticks only; the draw still runs every vsync.
+BARRAGE = ["60FPS - barrage shot rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + BARRAGE
                   + SPARES)
 
 PRESETS = {
@@ -304,7 +310,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + BARRAGE),
+    # "full" without the barrage shots, so that group has a named baseline.
+    "nobarrage": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

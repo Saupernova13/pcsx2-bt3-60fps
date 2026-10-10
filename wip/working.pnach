@@ -1426,3 +1426,55 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The shots of a Barrage Blast 2, found 2026-10-08 for issue #40. Super 17's
+// Hell's Storm and Goten's Full Power Energy Blast Volley fire up to 30 homing
+// shots from one controller, FUN_0014C2B8 (slots of 0x50 at +0x5C0: position,
+// +0x600 flags, +0x604 age, +0x608 the shot's blast object). Once a tick its loop
+// runs each shot's script by age (FUN_001AF0C8: turn rate, speed, wobble), turns
+// and moves it 37 units along its heading (FUN_001AEE98), hands the position to
+// the shot's blast object (FUN_0016AB08) and ages it by 1.0. Nothing in it is
+// paced, so at 60fps the shots crossed the gap twice as fast and the hits came
+// early. The blast object's own update, FUN_0016A400 (vtable 002C3AD0), draws the
+// tracer as a streak from last tick's head to this tick's, and also counts down
+// a start delay and a lifetime once a tick.
+//
+// Two wrappers, both even ticks only. 0014C3B8 -> 000F1CB0: the controller's shot
+// loop is skipped on odd ticks; the fire events above it still run every vsync.
+// 0016A440 -> 000F1C80: on odd ticks the blast object skips its movement and
+// countdowns and goes straight to its attached effects and its draw
+// (0016A5C8), which keeps the 37-unit streak on screen on both vsyncs instead
+// of a zero-length one on the odd one. The draw's size ramp FUN_001518D8 still
+// runs every vsync, as before.
+//
+// Hell's Storm, save state 4, Super 17 walked back under the 30fps words, 30 hits
+// in every arm:
+//
+//   fired from      30fps hits     60fps before     with this group
+//   225 units       v106-v224      v100-v217        v106-v224
+//   666 units       v130-v248      v113-v230        v131-v249
+//
+// Super 17 returns to idle at v277 at 30fps, v264 before, v271 with it. Goten's
+// volley (save state 8, L2+Triangle) runs the same controller: v135, v128, v130.
+[60FPS - barrage shot rate]
+description=Fly the shots of Barrage Blast 2s such as Super 17's Hell's Storm at their real speed, so they land when they do at 30fps and their tracers look the same.
+patch=1,EE,000F1C80,word,3C080033 // lui  $t0, 0x0033
+patch=1,EE,000F1C84,word,8D081D64 // lw   $t0, 0x1D64($t0)   frame counter
+patch=1,EE,000F1C88,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C8C,word,15000003 // bnez $t0, +3            odd tick: draw only
+patch=1,EE,000F1C90,word,00000000 // nop
+patch=1,EE,000F1C94,word,0805A911 // j    0x0016A444         even tick: the whole update
+patch=1,EE,000F1C98,word,8E220580 // lw   $v0, 0x580($s1)    (delay) replay displaced
+patch=1,EE,000F1C9C,word,0805A972 // j    0x0016A5C8         attached effects, then the draw
+patch=1,EE,000F1CA0,word,00000000 // nop
+patch=1,EE,0016A440,word,0803C720 // lw $v0,0x580($s1) -> j 000F1C80   blast object update
+patch=1,EE,000F1CB0,word,3C080033 // lui  $t0, 0x0033
+patch=1,EE,000F1CB4,word,8D081D64 // lw   $t0, 0x1D64($t0)   frame counter
+patch=1,EE,000F1CB8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1CBC,word,15000003 // bnez $t0, +3            odd tick: skip the shot loop
+patch=1,EE,000F1CC0,word,00000000 // nop
+patch=1,EE,000F1CC4,word,080530EF // j    0x0014C3BC         even tick: the shot loop
+patch=1,EE,000F1CC8,word,3C013F80 // lui  $at, 0x3F80        (delay) replay displaced
+patch=1,EE,000F1CCC,word,08053113 // j    0x0014C44C         past the loop
+patch=1,EE,000F1CD0,word,00000000 // nop
+patch=1,EE,0014C3B8,word,0803C72C // lui $at,0x3F80 -> j 000F1CB0   shot controller loop

@@ -552,3 +552,20 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - the shots of a Barrage Blast 2 (#40)
+
+Adds `[60FPS - barrage shot rate]`. Super 17's Hell's Storm fires its 30 shots
+from one controller that moves, steers and ages every shot once a tick, so at
+60fps the shots crossed the gap twice as fast and the hits came early. The
+controller's shot loop and the shots' own movement now run on even ticks; the
+tracers are still drawn on every vsync.
+
+| Hell's Storm, 30 hits in every arm | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| from 225 units | hits v106-v224 | v100-v217 | v106-v224 |
+| from 666 units | hits v130-v248 | v113-v230 | v131-v249 |
+| back to idle | v277 | v264 | v271 |
+
+Goten's Full Power Energy Blast Volley uses the same controller. Not every
+Barrage Blast 2 has been checked. **Not confirmed in play.**

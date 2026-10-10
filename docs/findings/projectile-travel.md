@@ -521,3 +521,68 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-10-08 - issue #40, the homing shots of a Barrage Blast 2
+
+#40 was filed as "Hell's Storm renders no bullets". It does render them: from
+behind Super 17 they are small yellow tracer streaks flying off toward a distant
+opponent, easy to miss in a shrunken screenshot, and they show in the hardware
+and the software renderer alike. What is wrong is their speed.
+
+### The shots
+
+A RAM scan for float triples that lie on the line between the fighters and move
+toward the target (a scratch script, not in the repo) finds them at 37.03 units
+a tick, one new shot a tick, at 30fps. At 60fps the same 37.03 units come every
+vsync. They are owned by **`FUN_0014C2B8`**, a controller with 30 slots of 0x50
+bytes from `+0x5C0` of its node:
+
+| slot field | what |
+|---|---|
+| `+0x00` | position |
+| `+0x30` | offset fed to the shot's script |
+| `+0x40` | flags (4 = moving, 2 = script variant) |
+| `+0x44` | age, `+1.0` a tick (`0014C438`) |
+| `+0x48` | the shot's blast object |
+
+Once a tick, for each live shot, it runs `FUN_001AF0C8` (the shot's script,
+keyed by age: turn-rate and speed ramps, random wobble), which calls
+`FUN_001AEE98`: aim at the target's bone `0x11`, lead it by its velocity, turn by
+at most `+0x28`, then move `+0x24` along the heading. `FUN_0016AB08` hands the
+position to the shot's blast object, whose update **`FUN_0016A400`** (vtable
+`002C3AD0`, entry 2) copies it to its head, keeps last tick's head as the tail,
+and draws the streak between them (`FUN_001699D0`). The same update counts down
+a start delay (`+0x590`) and a lifetime (`+0x588`) by 1.0 a tick.
+
+The hits are not timed by a script alone: they land when the shots arrive, so
+at 60fps they came early in proportion to distance (6 vsyncs from 225 units, 17
+from 666).
+
+### The fix
+
+`[60FPS - barrage shot rate]`, two wrappers on frame parity:
+
+- `0014C3B8` -> `000F1CB0`: the shot loop runs on even ticks only. The fire
+  events above it (`FUN_0014A8C0` checks, `FUN_0014BDF8`) and the tail call to
+  `FUN_0014C250` still run every vsync.
+- `0016A440` -> `000F1C80`: on odd ticks the blast object goes straight to
+  `0016A5C8` - its attached effects (`FUN_00169F48`) and its draw - skipping
+  movement, the head/tail copy and both countdowns. Without this half the head
+  and tail are equal on odd vsyncs and the streaks flicker.
+
+Gating `FUN_0016A400` alone changes nothing: its head is copied from the
+controller every tick, so it only samples a position that still moves 74 units
+in two vsyncs.
+
+| Hell's Storm from save state 4 | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| hits from 225 units | v106-v224 | v100-v217 | v106-v224 |
+| hits from 417 units | v116-v234 | v106-v223 | - |
+| hits from 666 units | v130-v248 | v113-v230 | v131-v249 |
+| Super 17 back to idle | v277 | v264 | v271 |
+
+Photographed from 650 units at v116-v125, the group shows the 30fps tracer
+clusters on consecutive vsyncs. Goten's `L2`+`Triangle` (save state 8) is the only
+other move in the ten save states that runs either function; it returns to idle
+at v135 / v128 / v130. The remaining 6-vsync lead in Super 17's state is not in
+these two functions.
