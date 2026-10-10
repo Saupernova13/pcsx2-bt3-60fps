@@ -1,16 +1,15 @@
 gametitle=DragonBall Z - Budokai Tenkaichi 3 (USA) SLUS-21678
 
-// 60fps patch for Budokai Tenkaichi 3 - battles.
-// See docs/findings/ for the full derivation.
+// 60fps patch for Budokai Tenkaichi 3 - battles. Derivations: docs/findings/.
 
 // The battle loop at 60fps. Every other group compensates for this one.
 [60FPS - battle]
 description=Run the battle loop at 60fps. Menus and other modes untouched.
 patch=1,EE,0012BCE4,word,24040001 // battle loop stride 2 -> 1
 
-// DEVELOPMENT ONLY - never ship. The older alternative to [60FPS - animation
-// clock]: enable one or the other, never both. Halving the rate setter only
-// catches models something explicitly calls SetAnimRate on.
+// DEVELOPMENT ONLY - never ship. Older alternative to [60FPS - animation clock]: enable one or the
+// other, never both.
+// Halves the rate written by SetAnimRate; misses models that never call it.
 [60FPS - animation rate]
 description=Halve every animation rate written to entity+0xC80.
 patch=1,EE,001C450C,word,0803C010 // swc1 -> j 000F0040
@@ -21,7 +20,7 @@ patch=1,EE,000F004C,word,E4440C80 // swc1 $f4, 0xc80($v0)
 patch=1,EE,000F0050,word,08071145 // j 0x1c4514
 patch=1,EE,000F0054,word,00000000 // nop
 
-// Menu auto-repeat. Its delay and rate are counted in ticks, so both double.
+// Menus scroll at the right speed: doubles the auto-repeat delay and rate, which are counted in ticks.
 [60FPS - input repeat timing]
 description=Double the auto-repeat delay and rate so menus scroll at the right speed.
 patch=1,EE,002577F8,word,0803C020 // lui -> j 000F0080
@@ -31,8 +30,8 @@ patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
 patch=1,EE,000F008C,word,08095E00 // j 0x257800
 patch=1,EE,000F0090,word,00000000 // nop
 
-// The 128 per-button frame counters behind double taps, holds and combo links,
-// counted on even ticks only.
+// Double taps, holds and combo links keep their real-time windows.
+// Counts the 128 per-button frame counters (FUN_001D3C10) on even ticks only.
 [60FPS - input timing]
 description=Halve the rate of the 128 per-button frame counters so double taps, holds and combo links keep their real-time windows.
 patch=1,EE,000F00C0,word,80A20000 // lb $v0, ($a1)          replay displaced
@@ -47,12 +46,10 @@ patch=1,EE,000F00E0,word,08074F0E // j 0x1d3c38             return without count
 patch=1,EE,000F00E4,word,00000000 // nop
 patch=1,EE,001D3C18,word,0803C030 // lb -> j 000F00C0 (FUN_001D3C10 increment path)
 
-// The animation clock. Halving the rate setter only catches models something
-// explicitly calls SetAnimRate on.
-// FUN_0024D410 is where animation time actually advances (time += rate at
-// model+0xB40+0x138), so halving there covers every animated model in the game -
-// including effect entities that never set a rate. The two getter hooks keep the
-// observable rate at its old halved value for the three call sites that read it.
+// Effects and auras animate at the right speed.
+// Halves the time step in FUN_0024D410 (time += rate at model+0xB40+0x138), and the getters that
+// read the rate back.
+// Replaces the older rate-setter hook; never enable both.
 [60FPS - animation clock]
 description=Halve the animation clock itself rather than the rate setter, so effects and auras are covered too.
 patch=1,EE,000F0100,word,C4800140 // lwc1 $f0, 0x140($a0)   replay displaced
@@ -105,11 +102,8 @@ patch=1,EE,000F01D4,word,00000000 // nop
 patch=1,EE,001C4838,word,0803C068 // lwc1 -> j 000F01A0 (FUN_001C47A4 play-once step)
 patch=1,EE,001C49A8,word,0803C070 // lwc1 -> j 000F01C0 (FUN_001C4920 looping step)
 
-// Effect rotation phases: FUN_00251A48 advances three angles per effect slot by
-// a fixed amount per tick and wraps them at +/-pi, so at 60fps every aura, glow
-// and swirl rotates at double real speed. The rates are plain data words and each
-// is read by exactly one instruction in the binary, so halving them is safe and
-// needs no trampoline. Halving a positive float = subtract 0x00800000.
+// Auras, glows and swirls rotate at the right speed.
+// Halves the per-tick rotation rates (plain data words, one reader each) read by FUN_00251A48.
 [60FPS - effect rotation]
 description=Halve the per-tick rotation rates behind auras and effect swirls.
 patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
@@ -117,16 +111,8 @@ patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
 patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
 patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 
-// The ki aura. FUN_00164860 is the aura node's vtable[0] method, and in this
-// engine vtable[0] is update AND draw in one call - which is why gating the
-// call could never work: skipping it deletes a frame of the effect instead of
-// slowing it. The function updates first and ends in a tail call that draws
-// (FUN_00164268, or FUN_001ADA58 when flags&2), both reached from 00164A9C.
-// So the hook lets the prologue establish $s2/$s6, then on odd frames jumps
-// straight to 00164A9C: the aura advances at its authored 30Hz while still
-// being drawn every frame. Found by measurement - a guarded 0-ki vs max-ki
-// activity diff isolated the aura's memory, and a pointer-ownership scan
-// named the node that owns it. See docs/findings/.
+// The ki aura plays at its real-time speed.
+// Hook in FUN_00164860: odd frames jump to 00164A9C (draw only), even frames run the full update.
 [60FPS - aura update rate]
 description=Advance the ki aura every other frame so it plays at its real-time speed, while still drawing it at 60fps.
 patch=1,EE,000F0740,word,8ED20038 // lw    $s2, 0x38($s6)     replay displaced
@@ -142,41 +128,16 @@ patch=1,EE,000F0764,word,080592A7 // j     0x00164A9C         odd frame: draw on
 patch=1,EE,000F0768,word,00000000 // nop
 patch=1,EE,00164888,word,0803C1D0 // lw -> j 000F0740 (FUN_00164860 entry)
 
-// The tween system - every ease, pulse, fade and blend in the game.
-// FUN_00267AC8(obj, seconds, from, to) builds a linear tween by converting a
-// duration in SECONDS into a count of frames:
-//     obj+0x08 = seconds * 30.0        frames remaining
-//     obj+0x0C = (to - from) / frames  step applied per call
-// and FUN_00267B00 advances it exactly one step per tick. The 30.0 is the
-// game's frame rate written into the arithmetic, so at 60fps the stepper is
-// called twice as often against a duration still counted in 30Hz frames and
-// every tween finishes in half its intended real time. One word fixes both
-// halves at once: 60.0 doubles the frame count and halves the step.
-// Found by sweeping RAM for words that REVERSE DIRECTION twice as often rather
-// than words that step twice as far - the airborne idle's tell was a triangle
-// wave with a 12 vsync period at 30fps and 6 at 60fps. See docs/findings/.
+// Eases, pulses, fades and blends take their real time.
+// FUN_00267AC8 converts seconds to frames with a hard-coded 30.0; 60.0 fixes both frame count and step.
 [60FPS - tween duration]
 description=Count tween durations in 60Hz frames so eases, pulses, fades and blends take their intended real time.
 patch=1,EE,00267AC8,word,3C014270 // lui $at, 0x4270   30.0 -> 60.0
 
-// The particle system behind auras, ki wisps and trails. FUN_00168084 is an
-// effect node's vtable[0], and as with the ki aura that one call both updates
-// and draws - it ends in a tail call to the draw (FUN_001ADA58, or FUN_00167E68
-// when flags&4). Its update is FUN_00167258, a loop over 20 entries of stride
-// 0x70 with several per-tick channels and no timestep between them:
-//     lifetime -= 1.0            00167318 supplies the 1.0
-//     alpha ramp -= 0.084
-//     position += direction * rate(+0x5D4)
-//     +0x60C += +0x5D0,  +0x5C8 += +0x5CC
-//     a four-phase counter at +0x5BC, +1 per tick
-// Halving them one constant at a time reaches only the ones that are constants.
-// Gating the update instead fixes every channel together, and the game already
-// has the exact branch for it: at 00168104 a global flag sends it straight to
-// 001681D4, which is past all the update work and before the draw tail call.
-// The hook simply ORs frame parity into that flag test, so the particles
-// advance at their authored 30Hz while still being drawn at 60fps.
-// The hook sits on the ld at 001680FC rather than the andi at 00168100, because
-// the andi's delay slot is the branch itself and a branch cannot sit in one.
+// Aura and trail particles live and fade at their real-time speed.
+// Ors frame parity into the global flag test at 00168104 in FUN_00168084, skipping the update on
+// odd frames but still drawing.
+// The hook sits on the ld at 001680FC because the andi's delay slot is a branch.
 [60FPS - particle update rate]
 description=Advance aura and trail particles every other frame so they live and fade at their real-time speed, while still drawing them at 60fps.
 patch=1,EE,000F0780,word,DC4319F0 // ld   $v1, 0x19F0($v0)   replay displaced
@@ -189,43 +150,14 @@ patch=1,EE,000F0798,word,0805A041 // j    0x00168104
 patch=1,EE,000F079C,word,00000000 // nop
 patch=1,EE,001680FC,word,0803C1E0 // ld -> j 000F0780 (FUN_00168084 update gate)
 
-// The hovering idle bob - the up and down float of a fighter holding station in
-// the air. It is not the body animation: the animation clock is already correct
-// in the air, which is why every measurement aimed at it kept reading 1.000
-// while the hover still looked fast. The bob is generated separately, in
-// FUN_001DFD88's tail:
-//     001DFF44  lwc1  $f0, -0x6DF0($gp)   phase increment
-//     001DFF48  add.s $f0, $f12, $f0      phase += increment, once per tick
-//     001DFF54  swc1  $f0, 0xA8($s0)      the phase, at fighter+0xB8
-//     001DFF6C  jal   0x0011F588          sine of the phase
-//     001DFF74  add.s $f0, $f0, $f0       doubled for amplitude
-//     001DFF78  swc1  $f0, 0x24($s0)      the anchor Y, at fighter+0x34
-// The increment is pi/30 - one full cycle per 60 ticks, which is two seconds at
-// 30Hz and one second at 60. Halving it to pi/60 restores the period and leaves
-// the amplitude alone. World position never moves during the bob; the anchor
-// absorbs it, which is why a position trace looks perfectly still.
-// The constant has four identical copies in the small-data pool and exactly one
-// instruction in the whole code segment reads this one, so the patch is private
-// to the bob. Found by scanning the model in the REAL hover idle - earlier scans
-// sat in the crouched flight pose, where the character does not bob at all.
+// A fighter hovering in the air bobs at its real-time speed.
+// Halves the phase increment (pi/30) read only by FUN_001DFD88 at 001DFF44.
 [60FPS - hover bob]
 description=Halve the hovering idle's bob phase so a fighter holding station in the air rises and falls at its real-time speed.
 patch=1,EE,002FD468,word,3D56774E // pi/30 -> pi/60   hover bob phase increment
 
-// The blast hit cadence, found 2026-09-06. Every attack's hitbox carries a tick
-// counter at H[0x0A] (H = [obj+0x60]) that FUN_001AFE70 advances once a tick,
-// and a hit lands when it reaches the interval D[0x0B], authored IN TICKS in the
-// move's data record (D = [[obj+0x64]+0x24]). The same counter paces the whole
-// attack: it ends once the hits landed, H[0x0B], exceed the maximum D[0x0A].
-// Nothing compensates it, so at 60fps a Kamehameha lands its hits twice as fast
-// and spends its hit budget in half the real time - the reported "cut short,
-// fewer hits". FUN_0012E7C8 is the only thing that increments the counter and
-// 001AFE98 is its only caller, so gating that one call on frame parity fixes the
-// cadence and the duration together. The first hit of an attack is never delayed
-// - the blez at 001AFF08 short-circuits while no hits have landed - so single
-// hit melee is untouched. Verified against the 30fps oracle: same save state,
-// same scripted input, hits every 8 vsyncs and the damage spanning 32, against
-// 4 and 16 unpatched, with damage and hit count identical either way.
+// Multi-hit blasts (Kamehameha) land their hits at the right rate and last their full time.
+// Gates the hitbox counter tick FUN_0012E7C8 (called only at 001AFE98) on even frames.
 [60FPS - blast hit cadence]
 description=Pace multi-hit attacks by real time, so Kamehameha-style blasts land their hits at the right rate and last as long as they should.
 patch=1,EE,000F0200,word,3C080033 // lui  $t0, 0x33
@@ -239,21 +171,10 @@ patch=1,EE,000F021C,word,0806BFA8 // j    0x001AFEA0         rejoin past the del
 patch=1,EE,000F0220,word,00000000 // nop
 patch=1,EE,001AFE98,word,0803C080 // jal 0012E7C8 -> j 000F0200 (hitbox counter tick)
 
-// The blast's visible effects, found 2026-09-06. A ki blast is drawn by effect
-// nodes of two classes - the beam core, class descriptor 002C3EF0, and the
-// flare that follows it, 002C40F0 - and each one's update carries half a dozen
-// coupled per-tick channels: a start delay, an emit countdown, a geometry
-// cadence that calls the segment builders FUN_00182DE0 and FUN_0018322C, a
-// lifetime, a stagger and a fade. Scaling any one of them in isolation does
-// nothing, because they are compared against each other; the whole update has
-// to run at 30Hz, which is the same fix the ki aura and the particle system
-// already use. Both classes open with a call to FUN_0012D1D0 and a branch that
-// skips the entire update while still reaching the draw tail call, so ORing
-// frame parity into that branch reuses a skip the game already has.
-// Measured on screen brightness, the flash goes from 9 vsyncs to 18 against the
-// unpatched game's 21, and recovers its two-humped shape - the charge and the
-// fire - which at 60fps had merged into one. Damage, hit count and hit cadence
-// are untouched, so this composes with the blast hit cadence group.
+// A ki blast's beam and flare effects run at their real-time speed.
+// Ors frame parity into the update-skip branch of the beam core (001866F4) and flare (001961D4)
+// classes; they still draw every frame.
+// Composes with [60FPS - blast hit cadence].
 [60FPS - blast effect rate]
 description=Run a ki blast's beam and flare effects at their real-time speed, so the blast forms and fires over the time it should.
 patch=1,EE,000F0240,word,3C080033 // lui  $t0, 0x33
@@ -281,21 +202,9 @@ patch=1,EE,000F02A8,word,00000000 // nop
 patch=1,EE,001961D4,word,0803C0A0 // bnel -> j 000F0280      flare update gate
 patch=1,EE,001961D8,word,00000000 // nop out the nullified delay slot
 
-// The blast sequence rate, found 2026-09-06. This is the one the player sees:
-// in an ultimate, the energy ball forms at double speed and the camera cuts back
-// to the fight early. Found by bisecting the CODE rather than searching for
-// constants - gate a call on frame parity, ask whether the camera cut moves, and
-// descend into whichever subtree it was. That path runs
-//   0012B700 -> FUN_0012CB60 -> 0012CB84 -> FUN_001AD150
-// which is the scene-graph walker: for every node it loads the class at
-// [node+0x28] and calls vtable[0] through the single indirect call at 001AD188.
-// Gating that call for one class only - vtable 002C3940, update FUN_001587B8 -
-// is the whole fix. That class is an action/state controller, not a renderer, so
-// nothing is drawn from it and gating loses no frame; its per-tick counter at
-// +0x14 (advanced at 001589D0) is what paces the sequence.
-// Measured in REAL TIME with the game running free, from the user's own capture
-// of the ultimate: the camera cuts at 2.1s unpatched, 1.4s patched, and 2.0s
-// with this gate. The normal-battle blast schedule is byte identical either way.
+// Ultimate-attack sequences are paced by real time: the energy ball no longer forms at double speed.
+// Skips vtable[0] on odd frames for the action controller class (vtable 002C3940, FUN_001587B8) in
+// the scene-graph walker at 001AD188.
 [60FPS - blast sequence rate]
 description=Pace ultimate-attack sequences by real time, so a blast charges and fires over the time it should instead of at double speed.
 patch=1,EE,000F0600,word,3C08002C // lui  $t0, 0x2c
@@ -319,26 +228,9 @@ patch=1,EE,000F0644,word,0806B464 // skip: j 0x001AD190
 patch=1,EE,000F0648,word,00000000 // nop
 patch=1,EE,001AD188,word,0803C180 // jalr $v1 -> j 000F0600  scene-graph dispatch
 
-// The blast effect duration, found 2026-09-06 - after a gated version of this
-// broke rendering and had to be withdrawn. A ki blast is drawn by two effect
-// classes, the beam core FUN_001866C0 and the flare FUN_001961A0, and each
-// update steps several coupled per-tick channels by 1.0: a start delay, an emit
-// countdown, a hit-cadence accumulator, a lifetime, a stagger and a fade.
-//
-// These updates also REBUILD THE BEAM'S GEOMETRY every frame, which is why
-// gating them is wrong however tempting it looks: skipping the update does not
-// slow the beam, it leaves nothing to draw. The symptoms were exact - the charge
-// ball never appeared, the output beam never rendered, and a half-built effect
-// stayed stuck to the character's hands because its lifetime never ran out.
-//
-// Halving every step instead keeps the geometry rebuilt on every frame and moves
-// all the channels together, which matters: the channels are compared against
-// each other, so halving any ONE of them does nothing at all - that is why every
-// single-constant test in earlier sessions came back clean.
-//
-// Measured in real time with the game running free: the Super Kamehameha's beam
-// is on screen 0.6s..1.75s unpatched-at-60fps, 0.6s..2.85s with this, against
-// the 30fps game's 0.6s..3.0s. Damage and hit count are byte identical.
+// A ki blast's beam lasts as long as it should.
+// Halves each 1.0 per-tick step in the beam core and flare updates. Never gate these updates
+// instead: they rebuild the beam geometry every frame.
 [60FPS - blast effect duration]
 description=Halve every per-tick step in the blast effect nodes, so a ki blast's beam lasts as long as it should without skipping the geometry it rebuilds each frame.
 patch=1,EE,0018672C,word,3C013F00 // 1.0 -> 0.5 per tick
@@ -361,15 +253,8 @@ patch=1,EE,001966B4,word,3C013F00 // 1.0 -> 0.5 per tick
 patch=1,EE,001966F0,word,3C013F00 // 1.0 -> 0.5 per tick
 patch=1,EE,0019672C,word,3C013F00 // 1.0 -> 0.5 per tick
 
-// The scripted-sequence clock, found 2026-09-07 - the one behind everything the
-// game stages rather than simulates. FUN_00158850 steps one node of a scripted
-// sequence per tick, and a step that is waiting counts a plain integer down by
-// one at 00158914 ([node+4]) and 0015894C ([node+8]). Both waits are authored in
-// 30Hz frames, so at 60fps every scripted beat - a camera cut, a mouth line, a
-// fade, the moment an ultimate lets go of its beam - arrives in half its real
-// time. Counting down on even ticks only restores all of them at once, and
-// unlike gating the node's update it skips nothing: the step still runs, still
-// spawns, still draws, it just waits the right length of time.
+// Scripted beats (camera cuts, mouth lines, fades, beam release) keep their real timing.
+// FUN_00158850 counts its waits ([node+4] at 00158914, [node+8] at 0015894C) down on even ticks only.
 [60FPS - sequence wait]
 description=Count scripted-sequence waits down at 30Hz, so staged beats keep their real timing.
 patch=1,EE,000F0AC0,word,8E020004 // lw $v0, 4($s0)        the wait counter, reloaded
@@ -393,58 +278,11 @@ patch=1,EE,000F0B00,word,08056254 // j 0x158950
 patch=1,EE,000F0B04,word,00000000 // nop
 patch=1,EE,00158948,word,0803C2B9 // lw -> j 000F0AE4
 
-// The fighter state machine's phase timers, found 2026-09-07 - the ones the
-// player feels most. Every attack, charge, block and recovery is a state whose
-// handler keeps a counter in the scratch block the dispatcher zeroes on entry
-// (FUN_001E23D0 memsets fighter+0x3D0), advances it once a tick, and compares it
-// against a count authored in 30Hz frames: how long a Blast 2 charges before it
-// lets go, how long a recovery lasts, when a beam is released, how long a
-// fighter stands idle before it taunts. At 60fps each of those expires in half
-// its real time. The scan finds 28 counters in the scratch block; not all of
-// them are clocks.
-//
-// An integer cannot be halved, and freezing one hangs the state, so each site
-// jumps to a trampoline that adds one on even ticks only. Nothing else changes -
-// the store in the branch's delay slot still runs every tick, so any code
-// reading the timer as a level rather than a clock still sees it every frame.
-// Eleven of the 28 are left alone - these seven, and four more below that were
-// gated until 2026-09-21: 001F1C74, 001F31C0, 001FBF28, 001FCE34,
-// 001FF9A8, 001FFC10 and 001E6F40. Those counters are levels rather than
-// clocks - a combo index, an input window - and gating them costs an ordinary
-// rush its fourth hit or cuts the charge short. The first six were picked out
-// by measurement, one site at a time, against a held Blast 2 and a mashed
-// rush.
-//
-// 001E6F40 is the seventh, removed 2026-09-16, and it was never eligible to be
-// caught that way: it is in FUN_001E6DC8 - state 157, the recovery 15 blast
-// and ultimate states hand over to - which neither grounded oracle enters. It
-// is an index, not a clock, and it reads as one in the binary rather than only
-// in play: there is no compare against an authored frame count anywhere near
-// it. Instead 001E6EF4 loads the entry count with lb [s2+8], the exit test is
-// i >= N-1, and the body does sll i,1 / addu s2 / lh [+6] - it walks a table.
-// Gating an index makes the state consume its table at half rate, and the
-// advance is conditional on FUN_001C48B8, so an entry that completes on an odd
-// tick advances nothing at all. That is the shape of the state 157 trap the
-// whole group was withdrawn for on 2026-09-07: trapped in 157, no pending
-// state, animation still cycling, cleared only by reloading.
-//
-// An audit of the 22 gated sites on 2026-09-16 called 21 of them clocks. Four
-// of those were not, and one of them froze a fighter in v24 (#39): 001E6060,
-// 001F3320, 001F9D48 and 001FBBD0 each add one and branch away with no compare
-// at all. They are phase numbers - state 93 (FUN_001E5CE8) switches on its
-// value 0..3 - and each advances once, on an event, not once a tick. State 93's
-// phase 0 is an 8-tick loop that leaves through 001E6060; gated, a loop that
-// ends on an odd tick resets and runs again, and 8 is even, so every later
-// pass ends on an odd tick too. Phase 0 re-runs forever, re-issuing its pose,
-// and the fighter stands still with his model drawn every other frame.
-//
-// The test that separates the two is mechanical: a clock is compared against
-// its bound straight after the add (slti/slt, then a branch), an index is not.
-// The 17 sites left all pass it. The four lines below write the game's own
-// instruction back, so a save state cut under v24 - which still holds the old
-// hooks in RAM - is freed when it is loaded, not only after a reboot.
-// See docs/findings/state-machine.md.
-// Generated by tools/phasetimer.py | tools/mkgate.py.
+// Charges and recoveries last their authored time.
+// Each state's frame counter gains 1 on even ticks only; the store in the delay slot still runs every tick.
+// Counters that are indexes or levels, not clocks, are left alone. The four restore lines put the
+// game's own instruction back so old save states are freed on load.
+// Generated by tools/phasetimer.py | tools/mkgate.py. See docs/findings/state-machine.md.
 [60FPS - state phase timers]
 description=Advance each fighter state's frame counter at 30Hz, so charges and recoveries last their authored time.
 patch=1,EE,001E6060,word,8E620000 // restore lw v0,(s3): state 93 phase, an index
@@ -622,17 +460,8 @@ patch=1,EE,000F1310,word,0807FAD1 // j 0x1FEB44
 patch=1,EE,000F1314,word,00000000 // nop
 patch=1,EE,001FEB3C,word,0803C4BD // gate -> 000F12F4
 
-// --- EXPERIMENT, not part of the shipped fix: halve ALL root motion ---
-// Movement in BT3 is 100% root motion through the skeleton. With exactly one
-// writer each way (both confirmed by write breakpoint), the per-frame cycle is
-//   model+0x950  = fighter+0x10 + fighter+0x30     FUN_001D7198, 001D71F4
-//   fighter+0x10 = model+0x970 - fighter+0x30      FUN_001D70E8, 001D7118
-// which reduces to  fighter+0x10 += (model+0x970 - model+0x950).  So the whole
-// per-frame displacement is that difference, produced by the skeleton pass.
-// Replacing model+0x970 with the midpoint of the two halves it exactly.
-// EXPECTED: airborne motion becomes correct, GROUND motion becomes half speed.
-// That asymmetry is the point of the test - it proves both that this is the one
-// movement channel and that ground is already compensated while air is not.
+// EXPERIMENT - never ship. Halves all root motion: air becomes correct, ground goes half speed.
+// Replaces model+0x970 with the midpoint of model+0x950 and model+0x970 (scratch at 000F08F0).
 [60FPS - EXPERIMENT halve root motion]
 description=Test only. Halves all root motion; ground should go slow, air should become correct.
 patch=1,EE,000F0800,word,3C04000F // lui   $a0, hi(scratch)
@@ -655,27 +484,9 @@ patch=1,EE,000F0840,word,08075C48 // j     001D7120            back
 patch=1,EE,000F0844,word,00000000 // nop
 patch=1,EE,001D7118,word,0803C200 // jal Vec4Sub -> j 000F0800 (FUN_001D70E8 read-back)
 
-// --- airborne motion ------------------------------------------------------
-// Ground movement is root motion through the skeleton, and the animation
-// clock patch already halves it. Airborne movement does not go through the
-// skeleton at all: measured over a launched opponent, the root bone delta is
-// exactly 0.0000 for every tick of the flight while the fighter still moves
-// 6.4815 units per tick, identically at 30fps and at 60fps. That is why the
-// earlier halve-root-motion experiment changed ground speed and left the air
-// untouched.
-//
-// Two engine routines carry it, both the same shape:
-//   FUN_001DE000   speed(+0xA8) = approach(speed, target, step)
-//                  pos += dir(+0x90) * speed
-//   FUN_001DED78   vy(+0xAC)    = approach(vy, target, step)
-//                  pos.y += vy
-// where approach() is FUN_001DBFF8, a move-toward-by-at-most-step helper.
-//
-// Both halves have to be halved. Halving only the applied displacement gives
-// the right speed but lets the ramp and the decay run at double rate, so the
-// knockback ends in half the time; halving only the approach step leaves the
-// fighter moving at 2x. The stored speed itself is left in its authored
-// 30Hz units, because other code reads it.
+// Flight, dashes and knockback travel at the right speed.
+// Halves both the displacement and the approach step in FUN_001DE000; the stored speed stays in
+// 30Hz units because other code reads it.
 [60FPS - airborne motion]
 description=Halve both the displacement and the ramp of the airborne directed-travel channel (FUN_001DE000): flight, dashes and knockback.
 patch=1,EE,000F0900,word,3C013F00 // lui $at, 0x3F00
@@ -694,7 +505,7 @@ patch=1,EE,000F0930,word,08077812 // j 0x001DE048
 patch=1,EE,000F0934,word,00000000 // nop
 patch=1,EE,001DE02C,word,0803C240 // jal 001DBFF8 -> j trampoline
 
-// The vertical channel of airborne motion, the same fix as the group above.
+// Rising and falling at the right speed. Same fix as [60FPS - airborne motion], for FUN_001DED78.
 [60FPS - airborne vertical]
 description=The same for the vertical channel (FUN_001DED78): rising, falling and gravity.
 patch=1,EE,000F0940,word,3C013F00 // lui $at, 0x3F00
@@ -713,12 +524,8 @@ patch=1,EE,000F0970,word,00000000 // nop
 patch=1,EE,001DEDA4,word,0803C250 // jal 001DBFF8 -> j trampoline
 
 
-// A hit also leaves a decaying slide on the victim: FUN_001DFD88 adds the
-// whole of fighter+0x80 to the position every tick and then shortens that
-// vector by a fixed epsilon until it reaches zero. Measured across a rush,
-// the vector goes 0.9259 -> 0.3086 -> 0 in exactly the same number of ticks
-// at 30fps and at 60fps, so the same push is delivered in half the real time.
-// Halving both the applied displacement and the epsilon restores it.
+// The slide a victim takes after a hit lasts its real time.
+// Halves the applied fighter+0x80 vector and its decay epsilon in FUN_001DFD88.
 [60FPS - airborne residual]
 description=Halve the short slide a fighter takes after a hit, and its decay (FUN_001DFD88).
 patch=1,EE,000F0980,word,3C013F00 // lui $at, 0x3F00
@@ -744,16 +551,9 @@ patch=1,EE,001DFDBC,word,0803C260 // jal Vec4Add -> j trampoline
 patch=1,EE,001DFDD8,word,0803C26D // dmove -> j epsilon trampoline
 
 
-// Gravity proper. FUN_001DED28 is a separate routine from the vertical channel
-// in FUN_001DED78, which is why a breakpoint on the latter never fires during a
-// free fall and why the first airborne fix left falling at 2x:
-//     vy(+0xAC) += g            g = 0.462963 per tick, at $gp-0x6E4C
-//     if (vy > 27.777775) vy = 27.777775                at $gp-0x6E48
-//     pos.y += vy
-// Each constant has exactly one reader in the binary, so the acceleration is
-// halved in data and only the application needs a trampoline. The terminal
-// velocity is deliberately left alone: vy stays in its authored 30Hz units, so
-// the value it clamps to is still correct.
+// Knocked-down fighters fall at the right speed.
+// Halves the gravity constant (one reader) and the vertical step in FUN_001DED28; terminal velocity
+// stays in 30Hz units.
 [60FPS - gravity]
 description=Halve the gravity acceleration and the vertical step it drives, so a knocked-down fighter falls at its real-time speed (FUN_001DED28).
 patch=1,EE,000F0A00,word,C4400004 // replay 001DED58
@@ -769,46 +569,17 @@ patch=1,EE,001DED58,word,0803C280 // lwc1 -> j trampoline
 patch=1,EE,002FD424,word,3E6D0979 // gravity 0.462963 -> 0.231481 per tick
 
 
-// The Hard Knockback, found 2026-09-07. A fighter sent flying by a Full Power
-// Smash enters state 213 (or 214 / 223), and FUN_001E9590 counts a phase timer
-// at fighter+0x3D8 down once a tick from a value chosen per move - 50 for the
-// D5 smash, 15 for D6, 32 for DF. Those are 30Hz frame counts, so at 60fps the
-// victim leaves the constant-speed launch and drops into the gravity tumble in
-// half its real time: measured, state 213 ended at tick 52 in BOTH arms, which
-// is 104 vsyncs at 30fps and 52 at 60. The travel itself is already correct -
-// the victim's position matched the 30fps arm to 0.15 units at the same real
-// time - so only the duration is wrong, and doubling the three authored values
-// restores it. The counter still decrements every tick, so unlike a parity gate
-// this cannot leave a fighter stuck in the state.
+// Full Power Smash victims stay airborne for their real-time span.
+// Doubles the launch timers for states 213/214/223 in FUN_001E9590 (counter at fighter+0x3D8).
 [60FPS - knockback flight]
 description=Double the launch-flight durations behind a Full Power Smash, so a knocked-away fighter stays airborne for its real-time span instead of half of it (FUN_001E9590). The three constants are dispatched on fighter+0x948, the STATE, not on a character or a move - every character launched into 213/214/223 is covered.
 patch=1,EE,001E9614,word,2402001E // fighter STATE 214 launch: 15 -> 30 ticks
 patch=1,EE,001E962C,word,24020064 // fighter STATE 213 launch: 50 -> 100 ticks
 patch=1,EE,001E963C,word,24020040 // fighter STATE 223 launch: 32 -> 64 ticks
 
-// The Lightning Attack, found 2026-09-07 - the Lightning Attack that follows a Full Power Smash.
-// Four separate 30Hz frame counts and one lead prediction, all in the same
-// chain, and every one of them has to be doubled or the Lightning Attack misses:
-//
-//   state 43  FUN_001F30E0  a 6-tick windup before the teleport fires
-//   state 48  FUN_001F3668  the rise: (target - pos) * 0.25, added once a tick,
-//                           exiting after exactly 4 ticks. Halving the step and
-//                           doubling the count keeps the endpoint identical and
-//                           doubles only the duration.
-//   state 155 FUN_001E7408  after 20 ticks of diving, the horizontal speed is
-//                           halved EVERY tick - the dive gives up. At 60fps
-//                           that stall arrived before the dive could close.
-//   FUN_001DE8A8            the intercept: target = foePos + foeVel * param_4,
-//                           where foeVel is PER TICK and param_4 is a lead in
-//                           TICKS. Measured at the call: the raw prediction was
-//                           (87.5, -55.6, 40.0) from the foe at 30fps and
-//                           exactly half that at 60, because the velocity is
-//                           correctly halved while the tick count is not.
-//
-// The lead is doubled inside the solver rather than at the call site, because
-// param_4 is built as fVar7 + 4.0 + fVar5 with a per-move fVar7 - doubling the
-// literal 4.0 only corrects the move whose fVar7 is zero. FUN_001DE8A8 has
-// exactly one caller, so changing the scale it uses touches nothing else.
+// The Lightning Attack connects as it does at 30fps.
+// Doubles the frame counts in states 43, 48 (halved step), 155 and the intercept lead in
+// FUN_001DE8A8 (one caller).
 [60FPS - pursuit timing]
 description=Double the four frame counts and the intercept lead behind the Lightning Attack, so it connects at 60fps as it does at 30.
 patch=1,EE,001F3194,word,28430008 // windup effect onset: 4 -> 8 ticks
@@ -818,30 +589,9 @@ patch=1,EE,001F3798,word,24030008 // rise length 4 -> 8 steps
 patch=1,EE,001E769C,word,28430029 // dive stall after 20 -> 40 ticks
 patch=1,EE,001DE918,word,4614A300 // lead x2: mov.s $f12,$f20 -> add.s $f12,$f20,$f20
 
-// The camera, found 2026-09-08 - and it is one system, not a Cell problem. Every
-// camera in the game is updated by FUN_001C69C8, which builds a target for this
-// tick and then lerps the camera's euler angles toward it: cur += wrap(target -
-// cur) * $f20. Both halves of that are per-tick and neither is compensated.
-//
-//   the chase   $f20 is the blend rate, 0.20 a tick, measured identical in both
-//               arms. At 60fps it is applied twice as often, so the camera
-//               converges in half the real time and then sits still.
-//   the target  a scripted camera move counts fighter+0x558 down once a tick
-//               from a length in fighter+0x55C that is authored in 30Hz frames
-//               - 9 for Cell's Perfect Barrier, 30 for the move before it. The
-//               progress the target is built from is 1 - remaining/total, so
-//               the whole move plays in half its real time.
-//
-// Neither fix works alone: halving the blend alone leaves 12.84 degrees of mean
-// orientation error against the 30fps camera and gating the move alone leaves
-// 14.01, against 22.96 unpatched. Together they leave 1.52. That is the whole
-// visible defect - the camera reaching its mark early and holding while the
-// character is still animating - and it is fixed for every attack and every
-// character at once, because both sites are shared by the entire game.
-//
-// $f20 is halved on the lerp path only, after the branch that chooses between
-// lerping and snapping, so a scripted cut still snaps. It covers the look
-// direction too, which is lerped with the same rate further down.
+// The camera no longer reaches its mark early and sits still.
+// FUN_001C69C8: halves the lerp rate $f20 (after the lerp/snap branch) and counts the scripted move
+// (fighter+0x558) down on even ticks. Both are needed.
 [60FPS - camera pacing]
 description=Pace scripted camera moves and the camera blend by real time, not by tick.
 patch=1,EE,000F1320,word,3C013F00 // 0.5f
@@ -867,37 +617,9 @@ patch=1,EE,001C6C18,word,00000000 // nop
 patch=1,EE,001C5720,word,0803C4D0 // -> 0F1340  gate the camera-move countdown
 patch=1,EE,001C5724,word,00000000 // nop
 
-// Mouth movement, found 2026-09-08. The cut-in speech is not skeletal
-// animation - [60FPS - animation clock] already paces that correctly, and the
-// three "time += rate" sites it hooks really are the only ones on the
-// model+0xB40 controller. This is a SECOND clip player in the same module,
-// with its own clocks, and it was missed because it keys on a different struct.
-//
-// A track object carries a keyframe array at +0x28 whose key times are plain
-// shorts, a key index at +0x40, a key count at +0x42, and two float clocks:
-// +0x34, stepped in the jump-table case at 0024ED20 (FUN_0024ECBC dispatches on
-// the track type at +0x18 through the table at 002F27B0), and +0x44, stepped in
-// FUN_0024F264. Both advance by the track's rate at +0x2C once per tick, and
-// that rate is 2.0 - the same 60Hz authoring as every other BT3 clip. At 60fps
-// the track therefore burns 120 keyframe units a second instead of 60, runs off
-// the end of its key array in half the real time, and holds the last key. That
-// is a mouth that stops mid-sentence.
-//
-// Hook the add itself, not the rate load: 0024F290 branches straight to
-// 0024F3D0, past any hook on the load, and would keep the full rate on that
-// path. Each trampoline then replays what the hook's delay slot got wrong - the
-// compare at 0024ED30 saw the un-added time, and the store at 0024F3D8 wrote the
-// raw rate into +0x44. Nothing reads +0x44 between that store and the re-store.
-//
-// Measured per vsync on Vegeta (Scouter)'s Final Galick Cannon, save state 3,
-// with a deterministic frame-advance film aligned on the first vsync of state
-// 287. The mouth makes 5.00 open/close transitions a second unpatched and
-// exactly 10.00 patched, and dies at vsync 115 instead of 163. With this group
-// it runs to vsync 167 and every one of the ten unpatched beats lands within two
-// vsyncs. Only two track objects exist - 009212F0 and 00921360 - and neither
-// site fires at all in ordinary battle, so nothing outside a scripted cut-in is
-// touched. 009212F0 is the "cycling countdown still at 2x" left unexplained on
-// 2026-09-07; it is a track of this same player.
+// Cut-in mouth and face tracks no longer stop mid-sentence.
+// Halves the keyframe clock add at 0024ED20 and 0024F290 (rate 2.0). Hooks the add, not the rate
+// load; the trampolines replay what the delay slot got wrong.
 [60FPS - mouth clock]
 description=Halve the cut-in keyframe clock, so scripted mouth and face tracks play at their real speed.
 patch=1,EE,000F1380,word,3C083F00 // lui $t0, 0x3f00        0.5f
@@ -917,105 +639,33 @@ patch=1,EE,000F13B8,word,00000000 // nop
 patch=1,EE,0024ED2C,word,0803C4E0 // add.s -> j 000F1380   the +0x34 clock
 patch=1,EE,0024F3D4,word,0803C4E8 // add.s -> j 000F13A0   the +0x44 clock
 
-// Widescreen for the Galaxy S24 Ultra's 3120x1440 panel - 19.5:9, or 2.166667.
-// Adapted 2026-09-08 from the stock [Widescreen 16:9] in PCSX2's own
-// resources/patches.zip, which is three words:
-//
-//   002FE4CC  1.166667 -> 1.555167    a projection scale, 7/6 at 4:3
-//   002FE594  298.6667 -> 398.1227    the same constant x256, second path
-//   00130BF0  lui $at, 0x3F40 -> 0x3F10   an INSTRUCTION: 0.75 -> 0.5625
-//
-// The third one gives the rule away. 0.75 is 3/4 and 0.5625 is 9/16, so that
-// immediate is 1/aspect, and the two data floats are scaled by
-// aspect / (4:3) - the factor by which the horizontal field of view widens.
-//
-// The model reproduces the stock patch from first principles: for 16:9 it
-// yields 3FC71C72 and lui 0x3F10, against the shipped 3FC70FB6 and 0x3F10. The
-// only difference is that the official patch rounded 4/3 to 1.333.
-//
-// For 19.5:9 the widen factor is exactly 1.625:
-//   002FE4CC  7/6      x 1.625 = 1.895833
-//   002FE594  298.6667 x 1.625 = 485.333333
-//   00130BF0  1 / (19.5/9)     = 0.461538
-//
-// lui only sets the top 16 bits, so the last one lands on 0.4609375 rather than
-// 0.4615385 - 0.13% narrow, about a third of a pixel across a 3120-wide panel.
-// Fixing that would cost a trampoline for no visible gain.
-//
-// NEVER RUN THIS TOGETHER WITH THE STOCK [Widescreen 16:9]. Both write the same
-// three addresses every frame and the result is whichever wins the race. Turn
-// the stock one off in the per-game ini's [Patches] section first.
-//
-// PCSX2 has no 19.5:9 display aspect, so set Aspect Ratio to Stretch and give it
-// a 19.5:9 window or fullscreen target. At any other display aspect this patch
-// renders a correctly-wide FOV into the wrong shape.
+// Widescreen for the S24 Ultra's 19.5:9 panel, adapted from PCSX2's stock [Widescreen 16:9].
+// NEVER enable with the stock [Widescreen 16:9]: both write the same three addresses. Set Aspect
+// Ratio to Stretch on a 19.5:9 target.
 [Widescreen 19.5:9 - S24 Ultra]
 description=Widescreen hack retargeted from 16:9 to the S24 Ultra's 19.5:9 panel. Turn the stock Widescreen 16:9 patch OFF.
 patch=1,EE,002FE4CC,word,3FF2AAAB // projection scale  7/6 * 1.625 = 1.895833
 patch=1,EE,002FE594,word,43F2AAAB // the same, x256    = 485.333333
 patch=1,EE,00130BF0,word,3C013EEC // lui $at, 0x3EEC   = 0.4609375, for 1/(19.5/9)
 
-// Two more aspects, added 2026-09-16 for issue #23. Generated by
-// tools/widescreen.py from the same model as the group above:
-//
-//   python tools/widescreen.py --selftest     check it against PCSX2's own patch
-//   python tools/widescreen.py 3440x1440      a panel that is not listed here
-//
-// Everything said above applies to both. Turn the stock [Widescreen 16:9] OFF,
-// and set the display Aspect Ratio to Stretch against a window of the matching
-// shape - PCSX2 offers no 21:9 or 16:10 display aspect.
-//
-// "21:9" is a marketing name rather than a ratio. 2560x1080 and 3840x1620 are
-// 64:27, or 2.370370, which is the aspect the standard actually defines and
-// what this group carries. 3440x1440 is 43:18, or 2.388889; rendering 64:27
-// into it stretches the picture 0.8% horizontally, which is not visible.
-//
-// Both immediates land exactly, unlike 19.5:9's 0.13%: 1/1.6 is 0.625 and
-// 27/64 is 0.421875, and both fit in the top 16 bits of a float with nothing
-// left to round away.
+// Widescreen for 16:10 panels (1920x1200, 2560x1600). Same model as 19.5:9, from tools/widescreen.py.
+// NEVER enable with the stock [Widescreen 16:9]. Set Aspect Ratio to Stretch on a 16:10 target.
 [Widescreen 16:10]
 description=Widescreen hack retargeted from 16:9 to 16:10, for 1920x1200 and 2560x1600 panels. Turn the stock Widescreen 16:9 patch OFF.
 patch=1,EE,002FE4CC,word,3FB33333 // projection scale  7/6 * 1.2 = 1.400000
 patch=1,EE,002FE594,word,43B33333 // the same, x256    = 358.400000
 patch=1,EE,00130BF0,word,3C013F20 // lui $at, 0x3F20   = 0.6250000, for 1/1.6
 
-// The same widescreen hack, retargeted to 21:9.
+// Widescreen for 21:9 (64:27) panels. Same model as 19.5:9, from tools/widescreen.py.
+// NEVER enable with the stock [Widescreen 16:9]. Set Aspect Ratio to Stretch on a matching target.
 [Widescreen 21:9]
 description=Widescreen hack retargeted from 16:9 to 21:9 (64:27), for 2560x1080 and 3840x1620 panels. Turn the stock Widescreen 16:9 patch OFF.
 patch=1,EE,002FE4CC,word,4004BDA1 // projection scale  7/6 * 1.777778 = 2.074074
 patch=1,EE,002FE594,word,4404BDA1 // the same, x256    = 530.962963
 patch=1,EE,00130BF0,word,3C013ED8 // lui $at, 0x3ED8   = 0.4218750, for 1/(64/27)
 
-// Projectile travel, found 2026-09-09. THE bug behind "blasts travel way too
-// fast", and the first one in this project that changes how the game plays
-// rather than how it looks: a blast at 2x speed halves the time you have to
-// dodge it.
-//
-// FUN at 001769xx steps every effect node that moves:
-//
-//   00176A2C  lwc1 $f12, 0x20($s2)   the node class's step, in units PER TICK
-//   00176A34  jal  Vec3Scale         temp = [node+0x30] (velocity) * $f12
-//   00176A44  jal  Vec3Add           [node+0x10] (position) += temp
-//
-// pos += vel * step, once a tick, with no delta-time term anywhere - so at
-// 60fps a projectile covers exactly twice the ground per real second. For a
-// plain ki blast the step is 27.7778 units a tick, identical in both arms,
-// which is the whole bug.
-//
-// Measured by flight time from a passive-CPU training scene, three ranges, the
-// opponent's reaction as the clock. Fitting flight = fixed + gap/speed:
-//
-//   30fps   28.4 vsyncs fixed + 14.02 units/vsync   (841 units/s)
-//   60fps   27.2 vsyncs fixed + 28.05 units/vsync  (1683 units/s)
-//
-// The fixed part is the wind-up before launch and is already correctly paced;
-// the travel term is 2.000x. With this group, flight at gaps 420 / 657 / 842
-// goes 42 / 51 / 57 vsyncs back to 57 / 74 / 87, against an unpatched
-// 58 / 76 / 88 - every range within two vsyncs.
-//
-// The site does not execute at all in an idle battle: a breakpoint on it never
-// fires until something is actually in flight, so nothing outside a live
-// projectile is touched.
+// Ki blasts and beams cross the ground at their real speed.
+// Halves the per-tick step (pos += vel * step) in the effect-node mover at 00176A2C.
 [60FPS - projectile travel]
 description=Halve the effect-node position step, so ki blasts and beams cross the ground at their real speed.
 patch=1,EE,000F13C0,word,C64C0020 // lwc1 $f12, 0x20($s2)   replay displaced
@@ -1026,8 +676,8 @@ patch=1,EE,000F13D0,word,0805DA8D // j 0x176a34
 patch=1,EE,000F13D4,word,00000000 // nop
 patch=1,EE,00176A2C,word,0803C4F0 // lwc1 -> j 000F13C0
 
-// The second projectile mover: spawned objects such as Frieza's rocks. See the
-// projectile travel comment above.
+// Spawned projectiles (Frieza's rocks) cross the gap in real time. The second projectile mover; see
+// [60FPS - projectile travel].
 [60FPS - blast object travel]
 description=Halve the per-tick advance of spawned projectiles - the rocks of Frieza's I Might Die This Time and everything else on the same object class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F13E0,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
@@ -1039,7 +689,8 @@ patch=1,EE,000F13F4,word,080570A5 // j 0x15c294             past the original ad
 patch=1,EE,000F13F8,word,00000000 // nop
 patch=1,EE,0015C28C,word,0803C4F8 // jal Vec3Add -> j 000F13E0
 
-// The third projectile mover: travelling beams such as Buu's Super Kamehameha.
+// Travelling beams (Buu's Super Kamehameha) cross the gap in real time. The third projectile mover;
+// see [60FPS - projectile travel].
 [60FPS - beam object travel]
 description=Halve the per-tick advance of travelling beam objects - Buu's Super Kamehameha and everything else on that class - so they cross the gap in real time rather than twice as fast.
 patch=1,EE,000F1400,word,00C0282D // move $a1, $a2          a1 = the per-tick delta
@@ -1051,36 +702,17 @@ patch=1,EE,000F1414,word,08055803 // j 0x15600c             past the original ad
 patch=1,EE,000F1418,word,00000000 // nop
 patch=1,EE,00156004,word,0803C500 // jal Vec3Add -> j 000F1400
 
-// The fullscreen fade node, found 2026-09-09. FUN_00172810 is the game's fade
-// service: an RGBA at data+0x00, a fade-in counter at +0x10 over +0x34 frames, a
-// hold at +0x44, and a fade-out counter at +0x18 over +0x38 frames, with the
-// blend it hands the renderer at +0x30. Every phase steps once per tick with no
-// timestep, so at 60fps every fade in the game took half its real time.
-// Its init, FUN_00172718, is where callers hand it durations in SECONDS and it
-// multiplies by a hard-coded 30.0 - the same shape as the tween constructor. One
-// word there doubles all three phases and leaves the blend curve exact, because
-// the divisors at +0x34/+0x38 are copies of the same doubled counts. The 180-tick
-// hold cap is a separate literal and needs doubling on its own.
+// Fades to white or black last their real time.
+// FUN_00172718 converts seconds to frames with a hard-coded 30.0; one word doubles all phases. The
+// 180-tick hold cap is a separate literal.
 [60FPS - screen fade]
 description=Convert the fullscreen fade node's phase durations from seconds at 30Hz to seconds at 60Hz, so a fade to white or black lasts the real time it was authored for and still covers what it is there to cover.
 patch=1,EE,00172744,word,3C014270 // lui $at, 0x4270      30.0 -> 60.0, seconds to frames
 patch=1,EE,001728C8,word,28430168 // slti $v1, $v0, 0x168 hold cap 180 -> 360 frames
 
-// The Rush Struggle, found 2026-09-10. Two rush attacks collide, both fighters
-// enter state 250 (FUN_001F47C8) and rotate their sticks; the game counts hits
-// into fighter+0xE50 and at 001D945C simply compares the two counts to pick a
-// winner. Every part of that is authored in ticks: the struggle is exactly 88
-// ticks in both arms, and hits land on fixed tick cadences plus one every-tick
-// path taken while the fighter's rotation bit is up.
-// The player's hands do not speed up with the tick rate, but the AI's do. The
-// CPU has no stick - FUN_001D4370 branches on fighter+0x1278 and feeds an
-// AI-driven fighter synthetic input from +0x127C/+0x1280/+0x1284 instead of the
-// pad - and it steps that synthetic stick through cardinal directions once per
-// tick, so at 60fps it rotates twice as fast in real time. Measured with both
-// sticks turned at a true 5 rotations a second: 30fps ends 66-59 to the player,
-// 60fps ends 53-47 to the CPU. The outcome flips.
-// This gates ONLY the AI's rotation, on the state's own tick counter, using the
-// game's own human/AI flag. The player's input is untouched.
+// The CPU can no longer out-rotate the player twice as fast in a Rush Struggle.
+// In state 250, the AI's synthetic stick (FUN_001D4370, flag fighter+0x1278) is honoured on even
+// ticks only; the player's input is untouched.
 [60FPS - rush struggle]
 description=Honour the CPU's synthetic stick rotation every other tick in a Rush Struggle, so the AI cannot out-rotate the player twice as fast at 60fps as it does at 30.
 patch=1,EE,000F1500,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
@@ -1096,32 +728,9 @@ patch=1,EE,000F1524,word,03E00008 // jr $ra
 patch=1,EE,000F1528,word,0000102D // move $v0, $zero        (delay slot)
 patch=1,EE,001F4938,word,0C03C540 // jal QueryCondition -> jal 000F1500
 
-// The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter
-// state 304 (FUN_001FB660) and rotate their sticks. Rotations are counted into
-// fighter+0xE4C - seeded on entry from the move's power and the character's
-// attributes, so it does not start at zero - and the contest itself is run by
-// an event manager, FUN_001D8E50, dispatched once per tick from FUN_001D9900
-// for modes 1..5. That manager is authored entirely in ticks: 30 ticks of one
-// fighter's introduction, 30 of the other's, then 46 ticks in which a tug at
-// [m+8] moves one step per tick toward whoever leads on +0xE4C, 16 ticks to
-// show the result and a few more to drive the tug out to 71, where the sign of
-// the tug names the winner and sets the outcome flags 0xC1/0xC3 and 0xC2.
-// So at 60fps the whole clash plays in half its real time - 2.17s against
-// 4.34s - while a human's hands do not speed up, and the CPU's do: it steps a
-// synthetic stick through cardinal directions once per tick. Measured from the
-// user's own save state with both sticks turned at a true 5 rotations a second,
-// 30fps ends 91-88 to the player and 60fps ends 61-62 to the CPU. The outcome
-// flips.
-// This halves the manager's clock by doubling every phase length, which puts
-// each phase back on its 30fps real-time duration. The tug still moves one step
-// per tick, so over a window of twice as many ticks it reaches twice the
-// magnitude - which is why the clash point constant halves too, leaving the
-// point exactly where 30fps puts it while updating smoothly every frame rather
-// than in 30Hz steps. The AI's rotation is gated to every other tick using the
-// game's own human/AI flag, as the Rush Struggle does; the player's input is
-// untouched. Against the 30fps game with the 60fps base patch alone, where the
-// AI draws the same random stream, this reproduces it exactly: 72-72 idle and
-// 91-86 at 5 rotations a second, over the same 4.3 seconds.
+// The Beam Struggle lasts as long as at 30fps and is decided the same way.
+// Doubles every phase length of the event manager FUN_001D8E50, halves the clash point constant,
+// and gates the AI's stick rotation as in [60FPS - rush struggle].
 [60FPS - beam clash]
 description=Pace the Beam Struggle in real time at 60fps - every phase of its event manager, the clash point, and the CPU's stick rotation - so the clash lasts as long as it does at 30fps and is decided the same way.
 patch=1,EE,000F1540,word,8C831278 // lw $v1, 0x1278($a0)    AI-driven fighter?
@@ -1147,51 +756,10 @@ patch=1,EE,001D9070,word,28430020 // slti $v1, $v0, 0x20    result shown for 32 
 patch=1,EE,001D90BC,word,2842008E // slti $v0, $v0, 0x8e    tug driven out to 142
 patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug step
 
-// Thrown objects, found 2026-09-16 for issue #5 - "Hercule's ki blasts are
-// sped up". They are, and [60FPS - projectile travel] does not touch them: a
-// breakpoint on the effect-node stepper at 00176A2C never fires once while
-// Hercule's throw is in the air. They are objects with their own update, and
-// Hercule has two classes of them:
-//
-//   tapped ki blast    update FUN_00178A28 -> mover FUN_00178D18
-//   charged ki blast   update FUN_00177968 -> mover FUN_00177CF8
-//
-// Everything either update does is counted in ticks. Measured at 30fps:
-//
-//   both   pos(+0x60) += vel(+0x80), then vel.y += gravity(+0xF0)
-//   both   spin angle = age(+0xF4) * spin(+0xEC), age +1 a tick
-//   tapped on landing, 5 debris fragments that fly ballistically for 15 ticks
-//   charged a 300-tick fuse(+0xF6), three bounces, a 24-tick rest before it
-//          explodes (+0xD4), and 15 ticks of after-life (+0xFA)
-//
-// So at 60fps the whole object runs at double speed, not only its flight.
-//
-// THE FIX RUNS THE UPDATE ON EVEN TICKS, IT DOES NOT HALVE THE STEP. Both
-// updates start by asking the game's own freeze check, FUN_0012CED0, whether to
-// skip this tick - the same check [60FPS - particle update rate] reuses. This
-// makes the answer "yes" on odd ticks too, so the object thinks at 30Hz and is
-// still drawn every frame.
-//
-// Halving was tried first and is WRONG for this class, measurably. A half step
-// samples positions the 30fps game never visits, and collision is tested at the
-// sampled positions. On Rocky Area the charged blast's second bounce clipped a
-// rock lip that the 30fps arc steps over, bounced back, and came to rest 70
-// units from where the original puts it, 31 vsyncs late. Only positions the
-// 30fps game itself samples give the 30fps outcome.
-//
-// Measured from save state 5, Hercule against a standing Ultimate Gohan:
-//
-//   tapped    30fps   spawn v18  lands v53 (-112.28, -2.95, 216.68)  gone v85
-//             60fps   spawn v19  lands v37 (-112.09, -2.95, 216.52)  gone v53
-//             gate    spawn v19  lands v54 (-112.09, -2.95, 216.52)  gone v86
-//   charged   30fps   spawn v50  rests v163 (-384.68, -25.53, 412.13)  boom v211  gone v239
-//             60fps   spawn v50  rests v107 (-384.2, -25.6, 412.1)     boom v131  gone v145
-//             gate    spawn v51  rests v164 (-384.22, -25.55, 412.09)  boom v212  gone v240
-//
-// Every beat lands one vsync after 30fps because the throw leaves the hand one
-// vsync later; the positions differ only by the throw's aim, which unpatched
-// 60fps shares. Debris directions are random, so only their lifetime compares:
-// 30 vsyncs at 30fps, 30 with the gate.
+// Hercule's thrown ki blasts fly, bounce and explode on their real schedule.
+// Ors frame parity into the freeze check FUN_0012CED0 at the start of both updates (FUN_00178A28,
+// FUN_00177968), so they run at 30Hz and still draw at 60. Do not halve the step: collisions
+// change.
 [60FPS - thrown object rate]
 description=Run thrown objects - Hercule's ki blasts, tapped and charged - at the game's own 30Hz, so they fly, bounce, spin and explode on their real schedule while still drawing at 60fps.
 patch=1,EE,000F1600,word,27BDFFF0 // addiu $sp, $sp, -16
@@ -1208,61 +776,15 @@ patch=1,EE,000F1628,word,27BD0010 // addiu $sp, $sp, 16
 patch=1,EE,0017797C,word,0C03C580 // jal 0012CED0 -> jal 000F1600   charged ki blast update
 patch=1,EE,00178A3C,word,0C03C580 // jal 0012CED0 -> jal 000F1600   ki blast update
 
-// The stage's own animation. Separate from everything else in this patch: the
-// fighters, their effects and the camera all live in the battle code, but a
-// stage's moving scenery - the World Tournament blimp, its banners, whatever
-// else a map animates - is a scene graph with keyframe tracks, walked once a
-// tick by FUN_00115478 and evaluated by FUN_00123890:
-//
-//   fVar5 = (time - t0) / (t1 - t0);           // where we are between two keys
-//   param_2[4] = (*pfVar3     - fVar4)     * fVar5 + fVar4;      // position
-//   param_2[8] = (pfVar3[4]   - pfVar3[-4])* fVar5 + pfVar3[-4]; // rotation
-//
-// `time` is object+0x1C, and the step that advances it is a bare immediate:
-//
-//   001153C8  lui  $at, 0x4000      # 2.0f
-//   001153CC  mtc1 $at, f20
-//   00115410  add.s f00, f00, f20   # time += 2.0, once a tick
-//   00115418  swc1  f00, 0x1C(s0)
-//
-// Two units of track a tick is 60 a second at 30Hz and 120 at 60Hz, so every
-// animated prop on the map runs at exactly double speed. Halving the immediate
-// is the whole fix. Measured on World Tournament Stage - Noon, over 80 vsyncs:
-// 30fps +78, the patch +158, this +79.
-//
-// Not every stage uses it. The evaluator never runs at all on Rocky Area, which
-// is why a rate scan of that map found nothing to explain issue #11 - the
-// Rocky Area wind is a different system, still unfound.
+// Stage scenery (the World Tournament blimp and banners) moves at its real speed.
+// Halves the keyframe time step (2.0 -> 1.0) at 001153C8 in FUN_00115478.
 [60FPS - stage animation]
 description=Animate a stage's own scenery at its real-time speed at 60fps, so the World Tournament blimp and banners move as they do on a PS2.
 patch=1,EE,001153C8,word,3C013F80 // lui $at, 0x3F80   stage keyframe step 2.0 -> 1.0
 
-// Solar Flare, found 2026-09-17 for issue #32. SuperCombo says it "causes
-// opponent to lock off" and gives no duration; the 30fps game is the oracle.
-//
-// fighter+0x0FF8 is the victim's blind timer, armed at 001C82F4 from move data.
-// The fighter's per-tick update counts it down and, while it is positive, sets
-// flags 0x93, 0x137 and 0x96 - the lock-off:
-//
-//   001E1F3C  addiu $v0, $v0, -1           once a tick, after a <= 0 test
-//   001E1F44  sw    $v0, 0xFF8($s1)
-//   001E1F74  jal   FUN_001DC030           flash (+0xFFC) moves toward 2 * timer,
-//   001E1F78  li    $a2, 15                  by at most 15 a tick
-//
-// The decrement is hooked on the addiu itself, not on the load: when the
-// victim is not paralysed the load happens in a delay slot at 001E1EB4 and
-// jumps past 001E1F30. The flash blend is given a step of 0 on odd ticks, so it
-// rises at 15 per 30Hz tick. FUN_001DC030 has no other caller.
-//
-// Save state 3, Krillin 66 units from a standing Ultimate Gohan, L2 + Circle,
-// from the pnach:
-//
-//                       timer runs   flash peaks      flash rise per 2 vsyncs
-//   30fps               150 vsyncs   132 at +18       15
-//   60fps, shipped      75 vsyncs    132 at +9        30
-//   60fps, this group   150 vsyncs   132 at +18       15
-//
-// The stagger itself, state 198, is 50 vsyncs in every arm.
+// Solar Flare's lock-off and white flash last their real time.
+// Counts the blind timer (fighter+0xFF8) down on even ticks (001E1F3C) and gives the flash blend
+// step 0 on odd ticks (FUN_001DC030, one caller).
 [60FPS - solar flare]
 description=Keep Solar Flare's lock-off and white flash for their real time, so a 2.5-second blind lasts 2.5 seconds at 60fps instead of 1.25.
 patch=1,EE,000F1780,word,3C080033 // lui $t0, 0x0033
@@ -1280,47 +802,15 @@ patch=1,EE,000F17B4,word,00000000 // nop
 patch=1,EE,001E1F3C,word,0C03C5E0 // addiu $v0, -1 -> jal 000F1780   blind ticks left, after the <= 0 test
 patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 
-// The cinematic camera, found 2026-09-21 for issue #21 - the "second animation
-// clock" that ran transformation cinematics ahead of their poses. The poses were
-// never wrong: the model's animation timer (+0xC78) reads the same in both arms
-// at every vsync. The camera was. During a cinematic the render camera
-// (FUN_0023D510, the controller at gp-0x56A4) plays a camera clip instead of
-// following a fighter, and steps the clip's time by a bare 2.0 a tick:
-//
-//   0023D69C  jal   FUN_0023DB68        the clip's current time
-//   0023D6A4  lui   $at, 0x4000         2.0
-//   0023D6B0  add.s $f20, $f0, $f1      time + 2.0, clamped to the clip length
-//   0023D6E8  jal   FUN_0023DB88        store it
-//
-// Two units a tick is the 60-units-a-second authoring every BT3 clip uses, so at
-// 60fps the camera ran through its shots in half the real time: on the close-up
-// at vsync 28 where the 30fps game is still on the chest, and cut away by 98
-// before the energy ball goes up. 1.0 a tick puts it back.
-//
-// Vegeta (Scouter)'s Great Ape transformation, R3 from the Rocky Area state,
-// pixel drift against the 30fps picture: 24.72 with every shipped group, 14.29
-// with this; at vsync 300 34.1 -> 0.8. The loader wait before the Great Ape
-// appears still ends ~19 vsyncs early - the disc is polled per tick - which is
-// the residual at the tail.
+// Transformation cinematic cameras stay with the action instead of cutting ahead.
+// Halves the camera clip time step (2.0 -> 1.0) at 0023D6A4 in FUN_0023D510.
 [60FPS - cinematic camera]
 description=Play cinematic camera clips at their real speed, so transformation cameras stay with the action instead of cutting ahead.
 patch=1,EE,0023D6A4,word,3C013F80 // lui $at, 0x4000 -> 0x3F80   camera clip step 2.0 -> 1.0
 
-// The transformation loader, found 2026-09-22 for issue #67. A transformation
-// streams the new form's data while the power-up animation plays, and reveals it
-// when the battle loader FUN_001278B0 sees the load finish. Its poll, 00127A70
-// jal FUN_00265298, is a state machine that advances at most one stage per call
-// - open, read, wait, close - and it is called once a tick, so at 60fps the load
-// ends early and so does everything after it. Load time fits a fixed disc time
-// plus N polls: Goten 114 vsyncs + 10, Vegeta (Scouter)'s Great Ape 110 + 19.
-//
-// The wrapper answers "not ready" on odd ticks and otherwise tail-calls the poll,
-// so the loader is polled at the game's 30Hz. Only this call site is hooked:
-// FUN_00265298 has 13 callers, menus among them.
-//
-// Goten's Super Saiyan, R3 from rocky-goten-trunks-team-vs-gohan.p2s: the reveal
-// (animation 0x179) starts at v148 at 30fps, v135 on v24, v145 with this group.
-// Pixel drift against 30fps 67.6 -> 50.3; at v200 38.4 -> 4.8.
+// A transformation reveals the new form at its real time instead of early.
+// Polls the loader (FUN_00265298 at 00127A70) on even ticks only. Only this call site is hooked:
+// the function has 13 callers.
 [60FPS - transformation load]
 description=Poll the transformation loader at the game's own 30Hz, so a transformation reveals the new form at its real time instead of early.
 patch=1,EE,000F19A0,word,3C080033 // lui $t0, 0x0033
@@ -1334,33 +824,10 @@ patch=1,EE,000F19BC,word,03E00008 // jr $ra
 patch=1,EE,000F19C0,word,0000102D // dmove $v0, $zero          (delay) "not ready"
 patch=1,EE,00127A70,word,0C03C668 // jal 00265298 -> jal 000F19A0   transformation loader poll
 
-// The scripted effect tracks, found 2026-09-28 for issue #10. Vegeta (Scouter)'s
-// energy ball, Goten's transformation burst and a hit spark in Great Saiyaman 2's
-// Ultimate are all one effect class: vtable 002C4278, update FUN_0019DB90, draw
-// FUN_0019DD38 (vtable+0x14). An effect carries up to eight tracks of 0x60 bytes,
-// and FUN_001AAB40 advances every one of them once a tick:
-//     track+0x04 += 2 * track+0x18      the track clock: 60Hz frames per 30Hz tick
-//     track+0x20, +0x24 = rand()        jitter, two draws per track
-//     track+0x30 += track+0x40          spin
-//     track+0x14 -= 1.0                 the fade, once the track has run out
-// The class update then counts four more down by 1.0 a tick, all 30Hz ticks:
-// +0x9C the start delay, +0xA0 a hold and +0xA8 the fade (byte counts from the
-// effect command, 0014EDA0-0014EDC8), and +0xAC the lifetime (seconds * 30.0,
-// 0019DAFC). None of it was compensated, so every such effect ran at double
-// speed: Vegeta's big flash comes 10 ticks after the small one in both arms,
-// v89 at 30fps and v77 at 60.
-//
-// FUN_001AAB40 has one caller, 0019DBD4, and the draw is a separate method, so
-// that call goes through a wrapper that runs it on even ticks only: clock,
-// jitter, spin and fade at their authored 30Hz. The four countdowns step 0.5.
-// Each countdown's test is <= 0, so half steps take exactly twice the ticks.
-//
-// Vegeta (Scouter)'s Great Ape, R3 from rocky-vegeta-scouter-standing.p2s: the
-// big flash comes at v88 (v89 at 30fps, v77 without), and every frame from v70 to
-// v130 matches the 30fps frame one vsync later at 1.0-2.3 mean pixel difference
-// (without: 8.4-61.2 at the best offset within 3 vsyncs). A spark in GS2's Ultimate traced tick by tick: lifetime,
-// fade and track clock equal the 30fps values on every even vsync, and it ends
-// on the same vsync, v146.
+// Scripted effects (Vegeta's energy ball, transformation bursts, hit sparks) start, last and fade
+// at their real time.
+// Runs FUN_001AAB40 (caller 0019DBD4) on even ticks and halves the four class countdown steps
+// (+0x9C, +0xA0, +0xA8, +0xAC) of update FUN_0019DB90.
 [60FPS - effect track clock]
 description=Run scripted effects - Vegeta's energy ball, transformation bursts, hit sparks - on the game's own 30Hz schedule, so each flash starts, lasts and fades at its real time while still drawing at 60fps.
 patch=1,EE,000F1A40,word,3C080033 // lui $t0, 0x0033
@@ -1378,51 +845,18 @@ patch=1,EE,0019DC40,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      start delay 
 patch=1,EE,0019DC74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      hold +0xA0
 patch=1,EE,0019DC94,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00      fade +0xA8
 
-// The transformation flash, found 2026-09-28 for issue #10. The white that
-// covers a transformation's model swap is its own effect class: vtable 002C42D8,
-// update FUN_001A0850, created by FUN_001CF890 for every transformation type
-// (fighter+0x12DC). Once the swap starts it holds the white while
-//     obj+0x564 += 1.0 a tick     until it passes obj+0x568 = 10.0 (001A06B8)
-// and a second timer, obj+0x55C += 1.0 a tick, ends the effect at a byte count
-// from its data (obj+0x560). Both count 30Hz ticks, so at 60fps the white held
-// 11 vsyncs instead of 22 and the camera cut to the new form early.
-//
-// Both steps become 0.5. The hold's test is strict (count > limit), so half
-// steps would trip it at 10.5, one step early; the limit becomes 10.5 and the
-// hold ends at 11.0, after 22 ticks - the 30fps 11 exactly. The end timer's
-// test is <=, so halving its step alone is exact.
-//
-// Vegeta (Scouter)'s Great Ape: white v405-v426 and the cut at v427 at 30fps,
-// v403-v413 and v414 without this group, v403-v424 and v425 with it. Goten's
-// Super Saiyan: the hold runs v149-v171 at 30fps, v146-v168 with it - 22 vsyncs
-// each. The 3-vsync lead comes before the hold starts, the same lead the
-// transformation loader fix (PR #68) leaves on the reveal.
+// A transformation's white flash holds for its real time.
+// Halves both steps (obj+0x564, obj+0x55C) in FUN_001A0850 and raises the hold limit 10.0 -> 10.5
+// (its test is strict).
 [60FPS - transformation flash]
 description=Hold a transformation's white flash for its real time, so the camera stays on it as long as at 30fps instead of cutting to the new form early.
 patch=1,EE,001A06B8,word,3C014128 // lui $at, 0x4120 -> 0x4128   hold limit 10.0 -> 10.5
 patch=1,EE,001A0930,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   hold +0x564, 1.0 -> 0.5 a tick
 patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55C
 
-// A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
-// handles fighter states 284-289. While the rush closes on the opponent it
-// steps fighter+0x3DC once a tick (001F9240) and gives up once that passes the
-// blast's limit in seconds (params+0x1C, read by FUN_00210E28) * 30.0. At 60fps
-// the rush got half its time, and as the dash covers ground at its real speed it
-// stopped short of an opponent it reaches at 30fps. The constant becomes 60.0;
-// the counter is not touched.
-//
-// Cell 2nd Form's Drain Life (limit 1.5 s), save state 7, backed away under the
-// 30fps words first, then every open fix on:
-//
-//   start distance   30fps          60fps before                   with this group
-//   309              grab v110      grab v109                      grab v109
-//   510              grab v130      grab v130                      grab v130
-//   609              grab v142      gives up v140, 72 short        grab v141
-//   701              grab v152      gives up v140, 164 short       grab v151
-//   780              grab v160      gives up v140, 243 short       grab v159
-//
-// Left alone: FUN_001F7DE8 (states 275-277) has the same comparison at 001F8398
-// against fighter+0x3D8. No move in the rig's save states enters those states.
+// A rushing Blast 2 (Drain Life) chases for its real time and reaches distant opponents.
+// Doubles the 30.0 seconds-to-frames constant in FUN_001F8C00. FUN_001F7DE8 has the same compare at
+// 001F8398 and is left alone.
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
