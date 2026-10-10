@@ -536,6 +536,18 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the ring shot (#149)
+
+Adds `[60FPS - ring shot]`. Blast 2s that gather a ring of shots before firing
+(Krillin's `L2` + `Up` + `Triangle`) set up at double speed and hit 20 vsyncs
+early. Their four setup clocks are halved.
+
+| Krillin's ring shot | 30fps | 60fps before | with it |
+|---|---|---|---|
+| hits | v163-v217 | 20 vsyncs early | v163-v217 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2

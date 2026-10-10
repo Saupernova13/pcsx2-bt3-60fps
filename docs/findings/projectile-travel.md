@@ -521,3 +521,28 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-10-10 - issue #149: the ring shot (technique effect type 4)
+
+Found by reading BT3-Decompiled (`src/battle/eft_ring_shot.c`). The census of the
+clock audit's unpaced classes (`effcensus.py` with `SET=audit`) showed it running
+in Krillin's `L2` + `Up` + `Triangle`. Variants 0 and 1 place up to 20 shots on
+rings around the opponent or the owner and launch them on the owner's event
+0x40; variant 2 flies a carrier along a three-point spline for 20 frames, then
+fires a volley; variant 3 is a hit volume only. Per update:
+
+| Clock | Function | Word |
+|---|---|---|
+| slide to place, `time += 1.0` vs `distance / speed` | `EftRingShot_UpdateRing` | add `0015D48C`, its 1.0 (`$f20`) also clamps the slide fraction |
+| bob, `phase += 10.8 deg` | `EftRingShot_BobShot` | `002FC860`, one reader |
+| carrier spline, `pathTime += 1.0`, done at 20 | `EftRingShot_UpdatePath` | `0015D868` |
+| end, `timer += 1.0` vs `life` | `EftRingShot_Update` | `0015E2BC` |
+
+`[60FPS - ring shot]` halves all four; the slide goes through a cave at
+`000F2380` entered from the branch after its add. Krillin's ring shot, rig slot 5
+(`specs/ringb2u.json`, `ultcmp.py`):
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| hits | v163, v181, v199, v217 | 20 vsyncs early | v163, v181, v199, v217 |
+| back to idle | v241 | v215 | v235 |

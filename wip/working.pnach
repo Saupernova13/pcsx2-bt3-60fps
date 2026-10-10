@@ -1426,3 +1426,35 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The ring shot, found 2026-10-10 for issue #149 by reading BT3-Decompiled.
+// Technique effect type 4 (src/battle/eft_ring_shot.c, task class 002C39D0)
+// gathers up to 20 shots before firing them. Its setup counted frames once per
+// update and nothing paced it: each shot slides to its place over distance /
+// speed frames (time += 1.0, EftRingShot_UpdateRing) and bobs 10.8 degrees a
+// frame (EftRingShot_BobShot), the carrier flies a 20-frame spline (pathTime
+// += 1.0, EftRingShot_UpdatePath), and the task lingers until timer += 1.0
+// reaches its life. At 60fps every hit came a third of a second early.
+//
+// The four steps are halved: the bob constant in data (one reader), the path
+// and end timers' 1.0, and the slide timer, whose 1.0 also clamps the slide
+// fraction, through a cave after the add (000F2380: subtract 0.5 back). The
+// shots' own launch delays are counted by the blast objects (PR #122).
+//
+// Krillin's L2 + Up + Triangle from rig slot 5 on a standing Ultimate Gohan:
+//
+//                        30fps                  60fps before      with this group
+//   hits                 v163 v181 v199 v217    20 vsyncs early   v163 v181 v199 v217
+//   back to idle         v241                   v215              v235
+[60FPS - ring shot]
+description=Gather, bob and fire ring-shot Blast 2s such as Krillin's at their real speed, so they hit when they do at 30fps.
+patch=1,EE,002FC860,word,3DC104F9 // EftRingShot_BobShot: 10.8 deg -> 5.4 deg a frame (one reader)
+patch=1,EE,0015D868,word,3C013F00 // EftRingShot_UpdatePath: pathTime += 1.0 -> 0.5 (the 20-frame spline)
+patch=1,EE,0015E2BC,word,3C013F00 // EftRingShot_Update: timer += 1.0 -> 0.5 against its life
+patch=1,EE,000F2380,word,3C01BF00 // lui at,0xBF00
+patch=1,EE,000F2384,word,44818800 // mtc1 at,f17
+patch=1,EE,000F2388,word,46110000 // add.s f0,f0,f17          time - 0.5 after the + 1.0
+patch=1,EE,000F238C,word,E600064C // swc1 f0,0x64C(s0)
+patch=1,EE,000F2390,word,0805752A // j 0015D4A8
+patch=1,EE,000F2394,word,00000000 // nop
+patch=1,EE,0015D490,word,0803C8E0 // EftRingShot_UpdateRing: b 0015D4A8 -> j 000F2380   slide time += 0.5
