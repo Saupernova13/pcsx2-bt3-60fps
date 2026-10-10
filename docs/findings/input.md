@@ -282,3 +282,23 @@ counter sits at -30 and relies on dropping to -31 each tick to re-arm; held at
 killed the window. The helper therefore counts every tick when the value is at
 or below rest (`slti at, v0, rest+1; movn t0, zero, at`), and on even ticks
 only inside the window and its cooldown.
+
+## 2026-10-10 - the seventh defence window
+
+BT3-Decompiled (`BtlMove_UpdateDefenseTimers`, `src/battle/btl_char_move.c`)
+lists seven windows in `FUN_001DFFE0`, not six. The seventh, `fighter+0x1080`,
+counts up: for a character with parameter flag `8` (every fighter in the rig's
+saves), a guard press sets it to -15, it climbs once a tick and rests at 1, and
+`BtlDecide_Main` (`src/battle/btl_act_change.c`) allows action 0x24 - vanish and reappear behind the
+opponent, which costs ki - only while it is above 0. So a guard press locks that
+move out for 16 frames, 8 at 60fps.
+
+`[60FPS - defence windows]` now hooks its increment (`001E022C`) with the same
+kind of helper as the six countdowns (`000F2520`: the +1 nets to nothing on odd
+ticks, the `slti` is replayed). Lockout after Circle, rig slot 0 (Goku (Early)):
+
+| | armed | allowed again | lockout |
+|---|---|---|---|
+| 30fps | v3 | v35 | 32 vsyncs |
+| 60fps before | v2 | v18 | 16 |
+| with the helper | v2 | v33 | 31 |

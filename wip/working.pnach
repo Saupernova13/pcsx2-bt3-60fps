@@ -1306,6 +1306,12 @@ patch=1,EE,001E1F74,word,0C03C5E8 // jal 001DC030 -> jal 000F17A0
 //
 // (with the smash charge and meter economy groups, so both arms throw the same
 // level-1 smash; without them v24's smash is stronger).
+//
+// The seventh window, +0x1080 (BT3-Decompiled, BtlMove_UpdateDefenseTimers),
+// counts up instead: a guard press (Circle) sets it to -15 and it climbs once a
+// tick to 1, and the vanish-behind-the-opponent move (action 0x24) needs it above
+// 0. Its increment gets the same treatment (helper 000F2520). Lockout after
+// Circle, rig slot 0: 32 vsyncs at 30fps, 16 before, 31 with it.
 [60FPS - defence windows]
 description=Count the vanish, Z-Counter and other defensive input windows in real time, so they are as wide at 60fps as at 30fps.
 patch=1,EE,000F1910,word,3C080033 // lui $t0, 0x0033
@@ -1332,3 +1338,11 @@ patch=1,EE,001E0100,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1070
 patch=1,EE,001E0158,word,0C03C650 // addiu $v0, -1 -> jal 000F1940   +0x1074 (rest -15)
 patch=1,EE,001E01A4,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1078
 patch=1,EE,001E01CC,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x107C
+patch=1,EE,000F2520,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F2524,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F2528,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F252C,word,24420001 // addiu $v0, $v0, 1        the original increment
+patch=1,EE,000F2530,word,00481023 // subu $v0, $v0, $t0       odd tick: undone
+patch=1,EE,000F2534,word,03E00008 // jr $ra
+patch=1,EE,000F2538,word,28430002 // slti $v1, $v0, 2         (delay) replay the compare
+patch=1,EE,001E022C,word,0C03C948 // addiu $v0, $v0, 1 -> jal 000F2520   +0x1080 teleport lockout
