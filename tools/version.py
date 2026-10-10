@@ -1,10 +1,8 @@
 """Version the patch: decide when a release is due, and scaffold its note.
 
-A release is a version, and a version is owed whenever **what ships** changes.
-The test is the state of `patch/428113C2.pnach` itself: it always holds the last
-exported release, so if the shipped `patch=` lines in `wip/working.pnach` no
-longer match it, a release is pending. Comment prose, docs and tooling do not
-count - only the lines PCSX2 executes.
+A version is owed whenever what ships changes: if the shipped `patch=` lines in
+`wip/working.pnach` no longer match `patch/428113C2.pnach` (the last exported
+release), a release is pending. Comments, docs and tooling do not count.
 
     python tools/version.py status                  what state the repo is in
     python tools/version.py pending                 exit 0 if a release is owed
@@ -15,12 +13,9 @@ count - only the lines PCSX2 executes.
     python tools/version.py phase --head-ref REF    stage, publish, blocked or
                                                     nothing (as key=value lines)
 
-`prepare` writes docs/versions/<tag>.md and appends its row to the version
-history; it does not export. Write the note, then run
-`python tools/export.py --release <tag>`, which refuses to run without it.
-
-`.github/workflows/version.yml` drives all of this on a merge to `main`; the
-commands are here so the same steps can be run and checked by hand.
+`prepare` writes docs/versions/<tag>.md and its history row; it does not export.
+Write the note, then run `python tools/export.py --release <tag>`.
+`.github/workflows/version.yml` drives all of this on a merge to `main`.
 """
 
 from __future__ import annotations
@@ -51,10 +46,9 @@ def git(*args: str) -> str:
 
 
 def shipped(text: str, development_only: list[str]) -> dict[str, list[str]]:
-    """The groups a release would carry, each as its ``patch=`` lines without comments.
+    """The groups a release would carry, as ``patch=`` lines without comments.
 
-    Development-only groups are dropped, exactly as export drops them, so a
-    group that must never ship can be edited without owing a version.
+    Development-only groups are dropped, as export drops them.
     """
     _, blocks = export.split_groups(text)
     return {
@@ -70,7 +64,7 @@ def current() -> dict[str, list[str]]:
 def last_release() -> dict[str, list[str]]:
     if not RELEASED.is_file():
         return {}
-    # The released file was filtered when it was written, so nothing is dropped here.
+    # The released file was filtered when written.
     return shipped(RELEASED.read_text(encoding="utf-8"), [])
 
 
@@ -107,11 +101,7 @@ def tagged() -> set[str]:
 
 
 def next_tag() -> str:
-    """The next number, from git tags alone.
-
-    Tags are the published record. A draft note that is not tagged yet must not
-    bump the number, or a re-run would quietly skip a version.
-    """
+    """The next number, from git tags alone, so an untagged draft does not bump it."""
     highest = 0
     for line in tagged():
         found = NUMBER_RE.match(line)
@@ -135,11 +125,7 @@ def latest_tag() -> str | None:
 def shipping_commits() -> list[str]:
     """The commits that changed the working pnach since the last published tag.
 
-    The scaffold used to be seeded from one PR - whichever merge tripped the
-    check - and that PR is often not the one that owes the version: a run that
-    failed, or a release PR waiting, leaves several patch merges to be carried
-    by the next version. Listing them all is what stops the note describing the
-    wrong change.
+    Several patch merges can be owed to one version, so list them all.
     """
     since = latest_tag()
     span = f"{since}..HEAD" if since else "HEAD"
@@ -249,8 +235,7 @@ def add_history_row(tag: str, path: Path, groups: int, what: str) -> None:
     if rows:
         at = max(rows) + 1
     else:
-        # Before the first version there are no rows, so the new one goes
-        # directly under the table's separator.
+        # No rows yet: the new one goes directly under the table's separator.
         rules = [i for i, l in enumerate(lines) if l.startswith("|---")]
         if not rules:
             raise SystemExit(f"{readme} has no version table to add a row to")
@@ -262,35 +247,23 @@ def add_history_row(tag: str, path: Path, groups: int, what: str) -> None:
 def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
     """What this merge should do, and the tag to publish: ``(phase, tag)``.
 
-    Decided from the merged PR's head branch, which is unambiguous - the release
-    PR this tool opens is always ``release/<tag>``.
+    Decided from the merged PR's head branch (the release PR is ``release/<tag>``):
 
-    - a ``release/`` branch just merged means its note should be final: it is
-      ``publish`` if it verifies and ``blocked`` if it does not, and the tag is
-      the branch name, so it never has to be guessed
-    - otherwise, a release already waiting (an open ``release/`` PR, or a note
-      with no tag) means a human still has to edit it, so a second patch merge
-      must not stage a competing version
+    - a ``release/`` branch just merged: ``publish`` if its note verifies, else ``blocked``
+    - otherwise, a release already waiting (open ``release/`` PR, or a note with no
+      tag): nothing, so a second patch merge does not stage a competing version
     - otherwise, a change to what ships owes a new version
 
-    An empty ``head_ref`` is a manual run, which is the recovery path for a run
-    that failed halfway: publish the newest finished note, else stage. Nothing
-    else can recover a version whose note reached ``main`` with no tag - the
-    ``patch=`` test is satisfied by then, so no later merge will notice it.
-
-    The tag is returned for ``publish`` and ``blocked``; ``stage`` names its own.
+    An empty ``head_ref`` is a manual run, the recovery path: publish the newest
+    finished note, else stage. The tag is returned for ``publish`` and ``blocked``.
     """
     if head_ref.startswith("release/"):
         tag = head_ref[len("release/"):]
-        # A finished run that is re-run replays the same merge event. The tag it
-        # pushed is the record that the version is already out, so the second
-        # pass is a no-op rather than a failure on `git tag`.
+        # A re-run replays the same merge event; the existing tag makes it a no-op.
         if tag in tagged():
             return "nothing", tag
-        # blocked, not nothing: the note is on main, there is no tag, and patch/
-        # already matches the tree, so nothing that runs later sees a version
-        # owed. The caller has to be able to fail on this, or the one state that
-        # never clears itself is the one that looks like a success.
+        # blocked, not nothing: patch/ already matches the tree, so nothing later sees a
+        # version owed, and the caller must be able to fail on this.
         return ("publish", tag) if verify(tag) == 0 else ("blocked", tag)
     if not head_ref:
         found = untagged()
@@ -299,10 +272,8 @@ def phase(head_ref: str, open_release: bool = False) -> tuple[str, str]:
         return ("stage" if pending() else "nothing"), ""
     waiting = untagged()
     if waiting:
-        # Said out loud because this is the one state nothing recovers on its
-        # own: a note that reached main with no tag leaves patch/ matching the
-        # tree, so no later merge sees a version owed, and every run after it is
-        # a quiet "nothing". Finish the note and run this workflow by hand.
+        # The one state nothing recovers on its own: a note on main with no tag. Finish
+        # the note and run this workflow by hand.
         print(f"{waiting[1]} is staged and not published; nothing else is staged "
               "while it waits")
         return "nothing", ""
@@ -321,11 +292,7 @@ def out(pairs: dict[str, str], github_output: str | None) -> None:
 
 
 def verify(tag: str) -> int:
-    """Refuse to publish a note still carrying its scaffold.
-
-    The scaffold is written before a human rewrites it, so this is what stops a
-    DRAFT from becoming the release notes people read.
-    """
+    """Refuse to publish a note still carrying its scaffold (DRAFT)."""
     path = VERSIONS / f"{tag}.md"
     if not path.is_file():
         print(f"no note at {path.relative_to(REPO)}")

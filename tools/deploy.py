@@ -77,12 +77,11 @@ def main() -> int:
     groups = args.only if args.only else [g.name for g in source.groups
                                           if g.name not in config.OPTIONAL]
 
-    # Handing this the WORKING pnach enables every group in it, five of which
-    # must never be on in a real install: two withdrawn blast groups, the state
-    # 157 trap, an experiment that breaks ground movement, and `animation rate`,
-    # which together with `animation clock` gives quarter-speed animation. That
-    # is how an install ends up "broken beyond belief", and it is silent -
-    # everything looks deployed. Deploy patch/428113C2.pnach instead.
+    # Handing this the WORKING pnach enables every group in it, including ones that
+    # must never be on in a real install (withdrawn blast groups, the state 157 trap,
+    # a ground-movement experiment, and `animation rate`, which with `animation clock`
+    # gives quarter-speed animation), and nothing looks wrong. Deploy
+    # patch/428113C2.pnach instead.
     poison = [n for n in groups if n in config.NEVER_SHIP]
     if poison and not args.force_development:
         print(f"{args.pnach}")
@@ -108,7 +107,7 @@ def main() -> int:
         print("\n(dry run - nothing written)")
         return 0
 
-    # Keep whatever was previously installed; these are cheap and easy to lose.
+    # Keep whatever was previously installed.
     dest = config.cheats_dir() / f"{config.CRC}.pnach"
     if dest.exists():
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -117,20 +116,16 @@ def main() -> int:
         shutil.copy2(dest, backup)
         print(f"\n  previous cheat file backed up to {backup}")
 
-    # Not ps2ee.pnach.deploy(): it validates again without config.EXCLUSIVE, so
-    # the widescreen groups - alternatives that write the same three words -
-    # read as overlapping and every release was refused after the dry run above
-    # passed. The file was validated once, with the alternatives, at the top.
+    # Not ps2ee.pnach.deploy(): it validates again without config.EXCLUSIVE, so the
+    # widescreen alternatives read as overlapping. The file was validated once, above.
     source.save(dest)
     _set_enabled_cheats(config.game_ini(), groups)
     print(f"  installed  {dest}")
     print(f"  enabled    {', '.join(groups) if groups else '(none)'}")
     print(f"  ini        {config.game_ini()}")
 
-    # PCSX2 reads the cheat file and the per-game ini once, at boot. Deploying
-    # under a running emulator therefore changes nothing the player can see,
-    # and the next test reports "no difference" for a patch that was never
-    # loaded. Say so loudly rather than let that be found by playing.
+    # PCSX2 reads the cheat file and per-game ini once, at boot, so deploying under a
+    # running emulator changes nothing the player sees. Say so loudly.
     if emulator_running():
         print("")
         print("  !! PCSX2 IS RUNNING - it will not see any of this.")

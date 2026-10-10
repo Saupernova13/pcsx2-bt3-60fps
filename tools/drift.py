@@ -1,24 +1,18 @@
 """Score a group set by how far its picture drifts from the 30fps arm.
 
-A desynchronised cinematic cannot be scored by duration - both arms can enter
-and leave the same state on the same vsync and still show different frames in
-between. What differs is WHAT IS ON SCREEN at a given real time, so this turns
-that into one number: the mean absolute pixel difference against the first
-preset, at a few fixed vsyncs, with each arm frame-stepped from the same state.
+Both arms can enter and leave the same state on the same vsync and still show
+different frames in between, so this scores what is on screen: the mean absolute
+pixel difference against the first preset at a few fixed vsyncs, each arm
+frame-stepped from the same state.
 
-It is exactly reproducible. Pass the reference preset twice and the second copy
-must score 0.00; if it does not, something in the setup is not deterministic
-and no other number in the run means anything.
+It is exactly reproducible: pass the reference preset twice and the second copy
+must score 0.00, or the setup is not deterministic and no other number means anything.
 
-`--band` crops to a horizontal slice before scoring, which matters more than it
-sounds: a whole frame is dominated by two fighters and a stadium crowd, so a
-blimp moving at the wrong speed moves the score by almost nothing until the
-fighters are cropped out of it.
+`--band` crops to a horizontal slice first; a whole frame is dominated by the
+fighters and crowd, so a slow blimp barely moves the score.
 
-    python tools/drift.py --slot 3 --press R3 --marks 39,65,91,130 \
-        --presets off off "60FPS - battle" shipped full
-    python tools/drift.py --slot 4 --marks 90,180,270 --band 0.07,0.42 \
-        --presets off full "full+60FPS - stage animation"
+    python tools/drift.py --slot 3 --press R3 --marks 39,65,91,130 --presets off off "60FPS - battle" shipped full
+    python tools/drift.py --slot 4 --marks 90,180,270 --band 0.07,0.42 --presets off full "full+60FPS - stage animation"
 """
 
 from __future__ import annotations
@@ -26,8 +20,7 @@ from __future__ import annotations
 import argparse
 import time
 
-# Before numpy and PIL: until this has run, tools/ is at the front of
-# sys.path and shadows the stdlib. See tools/_bootstrap.py.
+# Before numpy and PIL; see tools/_bootstrap.py.
 import _bootstrap  # noqa: F401
 
 import numpy as np
@@ -101,8 +94,7 @@ def main() -> int:
             roo.input_press(args.press, frames=args.frames)
         shots, at = [], 0
         for mark in marks:
-            # frame_advance(0) is not a no-op: it advances one frame. Sent
-            # between consecutive marks, it made the second capture a frame late.
+            # frame_advance(0) is not a no-op: it advances one frame.
             if mark - at > 1:
                 roo.frame_advance(mark - at - 1)
             shots.append(grab(roo, raw, band))

@@ -1,14 +1,10 @@
 """The acceptance test: how far does a fighter travel in a fixed real time?
 
-One number per situation, measured the only way that means anything - against
-the same situation on the unpatched 30fps game. 1.00 is correct. 2.00 is the
-bug this project exists to remove.
+One number per situation, against the same situation on the unpatched 30fps game.
+1.00 is correct; 2.00 is the bug this project exists to remove.
 
-Everything is measured over bulk frame-advances rather than single steps,
-because PCSXROO does not apply injected input on the final frame of an advance:
-holding a button through 120 single steps holds it for zero frames. In one bulk
-call of 120 it holds for 119, which is close enough to a held button that the
-comparison is fair - both sides lose the same frame.
+Measured over bulk frame-advances: PCSXROO does not apply injected input on the
+final frame of an advance, so single steps would hold a button for zero frames.
 
     python tools/speedtest.py
     python tools/speedtest.py --configs off air --cases fly dash
@@ -39,17 +35,12 @@ CASES: dict[str, tuple] = {
 def run(roo: Roo, case: str, config: str) -> tuple[float, float]:
     """Return (total travelled, travelled during the second half).
 
-    The second half is the number that means "speed". Total distance also
-    carries how far the fighter got through a state machine - a 60fps game
-    reaching the fast part of a takeoff sooner covers more ground for reasons
-    that are not a rate bug - and that swamps the comparison on any case with
-    a wind-up. Measuring a window that both runs enter already moving reports
-    cruising speed instead.
+    The second half is the "speed"; total distance also carries how far the fighter
+    got through a wind-up, which swamps the comparison.
     """
     slot, who, buttons, stick, frames = CASES[case]
-    # Before the load, not after: a button still held from the previous case
-    # is read by the game on the first frame after a restore, and one stray
-    # punch there changes everything that follows.
+    # Before the load: a button still held from the previous case is read on the first
+    # frame after a restore.
     roo.flush_input()
     roo.loadstate(slot)
     patchctl.apply(roo, patchctl.PRESETS[config], quiet=True)

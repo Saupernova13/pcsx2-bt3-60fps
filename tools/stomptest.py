@@ -1,15 +1,11 @@
 """The Full Power Smash and its Lightning Attack, played in REAL time.
 
-The Lightning Attack is the one bug in this project that cannot be judged from a numeric
-trace alone: the question is whether Goku's dive lands on the victim or sails
-past behind them, and the answer is a picture. So this drives the pad on the
-wall clock with the VM running free - a hold on Square and Up until the charge
-releases itself, then Circle a fixed real-time delay after the hit lands - and
-photographs the result. Frame-advancing instead would be worse than useless
-here, because a screenshot needs a running VM and every sample would leak ticks.
-
-The hit is read from the victim's HP at fighter+0x9E4: one drop for the smash,
-a second one if the Lightning Attack connects.
+Whether Goku's dive lands on the victim or sails past is a picture, not a numeric
+trace. So this drives the pad on the wall clock with the VM running free (hold
+Square and Up until the charge releases, then Circle a fixed delay after the hit
+lands) and photographs the result; frame-advancing would leak ticks into every
+screenshot. The hit is read from the victim's HP at fighter+0x9E4: one drop for
+the smash, a second if the Lightning Attack connects.
 
     python tools/stomptest.py --presets off nopursuit full
     python tools/stomptest.py --presets full --sheet work/stomp-full.png
@@ -36,9 +32,8 @@ def play(roo: Roo, preset: str, slot: int, delay_s: float, tap_s: float,
     roo.flush_input()
     roo.loadstate(slot)
     time.sleep(1.0)
-    # Apply LAST and never load again. Some save states were captured while
-    # patched, so a reload after apply writes the patched words straight back
-    # and the "unpatched" arm silently runs at 60fps. Slot 4 does exactly that.
+    # Apply LAST and never load again: some save states were captured while patched, so
+    # a reload writes the patched words back and the "unpatched" arm runs at 60fps.
     patchctl.apply(roo, patchctl.PRESETS[preset], quiet=True)
     time.sleep(0.3)
     pair = B.resolve(roo)
@@ -54,9 +49,8 @@ def play(roo: Roo, preset: str, slot: int, delay_s: float, tap_s: float,
             except OSError:
                 pass
 
-    # Settle first. The save state is mid-combo, and the mode regenerates the
-    # victim to full within about a second of the load - so an HP baseline read
-    # before that rises rather than falls, and the smash looks like it missed.
+    # Settle first: the mode regenerates the victim to full within about a second of
+    # the load, so an early HP baseline would rise rather than fall.
     roo.resume()
     time.sleep(settle_s)
     hp0 = roo.read(foe + HP)
@@ -71,9 +65,8 @@ def play(roo: Roo, preset: str, slot: int, delay_s: float, tap_s: float,
             time.sleep(0.002)
         roo.screenshot(path)
         hp = roo.read(foe + HP)
-        # The Lightning Attack has to be caught while it happens. This mode regenerates the
-        # victim to full within about a second, so a single read after the dive
-        # reports 40000 whether the Lightning Attack connected or sailed past.
+        # Catch it while it happens: the victim regenerates within about a second, so a
+        # single read after the dive reports 40000 either way.
         if impact_hp is not None and stomp_t is None and hp < impact_hp:
             stomp_t = time.monotonic() - impact_t
         if impact_t is None and hp < hp0:

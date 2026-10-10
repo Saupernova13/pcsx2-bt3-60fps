@@ -1,13 +1,7 @@
 """Record a fighter and its model while it moves, then find what integrates.
 
-Everything in this game is 2x unless it has been halved by hand, so the way to
-fix a motion symptom is to find the field that carries it and the constant that
-drives it. Guessing from static analysis has a poor record here; this measures
-instead.
-
-Capture arms on real movement so the window belongs to the player rather than
-to a timer, and the raw samples are saved so a new hypothesis does not cost
-another play session.
+Capture arms on real movement so the window belongs to the player, and the raw
+samples are saved so a new hypothesis does not cost another play session.
 
     python tools/motion.py --capture work/captures/airborne.npz --seconds 25
     python tools/motion.py --analyse work/captures/airborne.npz
@@ -98,8 +92,7 @@ def report(path: pathlib.Path, limit: int):
         j = i - n_fighter
         return f"model+{j*4:04X}    {model + j*4:08X}"
 
-    # A ramp: same sign every frame and a near-constant size. Velocity, a phase
-    # angle, or a timer counting in floats.
+    # A ramp: same sign every frame and a near-constant size (velocity, phase angle, float timer).
     print("## steady ramps (constant delta, one sign)")
     hits = []
     for i in np.nonzero(finite & (moved.mean(axis=0) > 0.8))[0]:
@@ -113,7 +106,7 @@ def report(path: pathlib.Path, limit: int):
         print(f"  {label(i)}  delta {d:+.6f}/frame   {a:.4f} -> {b:.4f}")
     print(f"  ({len(hits)} total)\n")
 
-    # An oscillator: crosses its own mean repeatedly. A hover bob or a spin.
+    # An oscillator: crosses its own mean repeatedly (hover bob, spin).
     print("## oscillators (repeated mean crossings)")
     hits = []
     for i in np.nonzero(finite & (moved.mean(axis=0) > 0.5))[0]:

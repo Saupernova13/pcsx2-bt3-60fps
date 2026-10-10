@@ -1,8 +1,8 @@
 """Decompile BT3 functions through Ghidra headless.
 
 Runs DumpFunction.java against the analysed project and prints the C pseudocode
-plus listing for each address. Results are cached under work/decomp/ because a
-headless round trip costs about half a minute.
+plus listing for each address. Results are cached under work/decomp/ (a round
+trip costs about half a minute).
 
     python tools/decomp.py 264D98
     python tools/decomp.py 102034 --xrefs
@@ -67,9 +67,9 @@ def run_headless(addrs: list[str], xrefs: bool) -> str:
     return result.stdout
 
 
-# Headless wraps each println as 'INFO  <script>.java> <text> (GhidraScript)'. A
-# multi-line println only gets the prefix on its first line and the suffix on its
-# last, so both have to be stripped independently, line by line.
+# Headless wraps each println as 'INFO  <script>.java> <text> (GhidraScript)'; a
+# multi-line println gets the prefix only on its first line and the suffix on its
+# last, so strip both independently.
 _PREFIX = re.compile(r"^INFO\s+\S+\.java>\s?")
 _SUFFIX = re.compile(r"\s*\(GhidraScript\)\s*$")
 

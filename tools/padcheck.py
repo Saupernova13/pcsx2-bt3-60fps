@@ -1,9 +1,7 @@
 """Does injected pad input actually reach the game?
 
-Position is a bad detector for this: a fighter that does not move might have
-ignored the button, or might have been in an animation that cannot be
-interrupted. The game's own libpad word cannot be ambiguous - it is active low,
-so a held button is a zero bit.
+Position is ambiguous (the fighter may have been in an uninterruptible
+animation); the game's own libpad word is active low, so a held button is a zero bit.
 
     python tools/padcheck.py
     python tools/padcheck.py --buttons R1 R2 --frames 30

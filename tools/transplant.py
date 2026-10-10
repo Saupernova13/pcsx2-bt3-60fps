@@ -1,22 +1,14 @@
 """Carry a save state into PCSXROO from a PCSX2 build whose format it refuses.
 
-PCSXROO tracks a newer savestate format than the user's install (0x9A59 against
-0x9A55 - SPU decode buffers, then the EE and VU cycle counters widening to 64
-bit), so it rejects those files outright, and rewriting the version stamp only
-gets as far as "corruption in internal structures". Converting the internal
-structures properly would mean re-serialising sections across four format
-bumps, and a subtly wrong VM is worse than no VM at all.
+PCSXROO's savestate format is newer than the user's install (0x9A59 against
+0x9A55) and rejects those files, so the state is carried as raw memory instead:
+the fight lives in EE main memory, the ELF is identical in both builds, and every
+pointer is an absolute EE address. Pause the target at a frame boundary, write
+the source's EE RAM and scratchpad over it, and resume.
 
-None of those bumps touch what matters for this project. The fight lives in EE
-main memory, the ELF is byte-identical in both builds, and every pointer in it
-is an absolute EE address - so the state can be carried across as raw memory
-rather than as a file. Pause the target at a frame boundary, where the game's
-main loop is where it was when the source state was written, write the source's
-EE RAM and scratchpad over it, and resume.
-
-The target must already be running the same game in a comparable scene: this
-replaces memory, not CPU registers, so the EE resumes from wherever the target
-was. A battle save state is the right thing to load first.
+The target must already be running the same game in a comparable scene (this
+replaces memory, not CPU registers); a battle save state is the right thing to
+load first.
 
     python tools/transplant.py work/state-backups/some-fight.p2s
     python tools/transplant.py some-fight.p2s --save-slot 3
@@ -36,8 +28,7 @@ from ps2ee.savestate import SaveState
 CHUNK = 256 * 1024
 SCRATCHPAD = 0x70000000
 
-# The debug server guards EE addresses below this, and it is the same PS2 kernel
-# in both builds anyway - the game's own memory starts well above it.
+# The debug server guards EE addresses below this; the game's memory starts well above it.
 EE_START = 0x00080000
 
 MANAGER_PTR = 0x002FEB14

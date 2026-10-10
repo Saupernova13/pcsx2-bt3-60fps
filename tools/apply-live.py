@@ -1,8 +1,7 @@
 """Re-apply the current patch into a running PCSX2 over PINE.
 
-Loading a save state restores EE RAM wholesale and wipes any live writes, and
-a freshly deployed cheat file is only read at boot. This puts the patch back
-without restarting.
+Loading a save state wipes live writes, and a freshly deployed cheat file is only
+read at boot; this puts the patch back without restarting.
 
     python tools/apply-live.py                    # apply wip/working.pnach
     python tools/apply-live.py --check            # report only
@@ -39,9 +38,8 @@ def main() -> int:
         print(exc)
         return 2
 
-    # Trampoline bodies before the hooks that jump to them. Applying in file
-    # order arms a jump into whatever the safe zone happened to contain, which
-    # is a crash rather than a failed experiment.
+    # Trampoline bodies before the hooks that jump to them; file order would arm a jump
+    # into whatever the safe zone held.
     todo = [(g.name, line) for g in pnach.groups for line in g.lines
             if not line.is_condition and line.cpu == "EE"]
     todo.sort(key=lambda item: not in_safe_zone(item[1].target))

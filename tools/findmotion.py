@@ -1,16 +1,15 @@
 """Locate a moving object anywhere in EE RAM, in two stages.
 
-Effects and projectiles are not in the model table and not inside the fighter
-struct, so they have to be found by the memory they move. Scanning all of RAM
-at frame precision is far too slow, so this does it in two passes:
+Effects and projectiles are not in the model table or the fighter struct, so
+find them by the memory they move:
 
-  1. sweep RAM reading each chunk twice back to back, a few milliseconds apart,
-     and keep only the words that changed - that is per-frame state, not drift
+  1. sweep RAM reading each chunk twice, one frame apart, and keep only the
+     words that changed (per-frame state, not drift)
   2. re-sample just those words at frame precision and report which ones ramp,
      oscillate or count
 
-Run it while the thing you care about is happening and does not stop: a held
-ki charge, a sustained beam, repeated blasts.
+Run it while the thing you care about does not stop: a held ki charge, a
+sustained beam, repeated blasts.
 
     python tools/findmotion.py
     python tools/findmotion.py --seconds 6 --lo 340000 --hi 2000000
@@ -30,14 +29,8 @@ from ps2ee.pine import Pine, PineNotRunning
 def sweep(pine: Pine, lo: int, hi: int, chunk: int) -> list[int]:
     """Words that changed across exactly one game frame.
 
-    The two reads must straddle a frame boundary. Back to back they do not:
-    a chunk read takes microseconds and a frame is 16.7 ms, so both samples
-    land inside the same frame and almost nothing looks like it moved - until
-    a boundary happens to fall between them and everything does. That made
-    the sweep report anywhere from 169 to 38,571 changing words at one moment,
-    and made set intersections across passes come out empty every time.
-    Waiting for the frame counter to tick costs one frame per chunk and makes
-    the answer deterministic.
+    The two reads must straddle a frame boundary; back to back they land in the same
+    frame. Waiting for the frame counter costs one frame per chunk and is deterministic.
     """
     hits = []
     for base in range(lo, hi, chunk * 4):
