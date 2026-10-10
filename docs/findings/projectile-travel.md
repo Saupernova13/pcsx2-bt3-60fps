@@ -521,3 +521,27 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-10-10 - issue #147: discs (EftDisc, class `002C3B38`)
+
+Found by reading BT3-Decompiled (`src/battle/eft_body_fx.c`, `eft_disc.c`). Kinds
+0, 1, 3 are ki blast discs, 2 and 4 technique pieces (Krillin's Ultimate throws
+kind 2). Per update the disc moves `pos += dir * speed`, `EftDisc_Home` turns it
+by at most `turn` (spreading the turn over the frames left once more than 2,
+leading the target by its per-frame move for at most 15 frames), spins by `spin`,
+bobs by `cos(timer * 0.04 * pi)`, and its age, grow, roll and fade count frames
+set at init as seconds x 30.0 (one register, `0016B76C`).
+
+The disc is read through a probe (`work/tools-scratch/discprobe.lines` stores the
+first updating disc's task at `000F23F0`; `disctl.py`). Krillin's Ultimate, rig
+slot 5:
+
+| | 30fps | 60fps before | with `[60FPS - disc travel]` |
+|---|---|---|---|
+| first disc's life | 60 frames | 60 | 120 (per vsync) |
+| step | 27.78 a tick | 27.78 a vsync | 13.89 a vsync |
+| flight | 8 vsyncs | 4 | 8 |
+| hits vs 30fps (`ultcmp.py`) | - | 5-6 early | 1-2 early |
+
+The 1-2 vsyncs left are the throw's launch, which follows the fighter's
+animation event (#127's hand-off class).

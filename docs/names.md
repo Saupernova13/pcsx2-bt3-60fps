@@ -27,6 +27,7 @@ from SuperCombo's names to this repo's old terms.
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
+| Krillin's discs, Destructo Disc, the saw blades | The disc object, `EftDisc` (class `002C3B38`) | `disc travel`, issue #147 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |

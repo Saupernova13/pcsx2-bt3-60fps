@@ -536,6 +536,19 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - discs (#147)
+
+Adds `[60FPS - disc travel]`. The disc object (Krillin's Ultimate and other disc
+attacks) moved, homed, spun and aged once per update and flew at double speed.
+Its frames now count at 60 and its per-update steps are halved.
+
+| Krillin's Ultimate | 30fps | 60fps before | with it |
+|---|---|---|---|
+| first disc's flight | 8 vsyncs | 4 | 8 |
+| hits vs 30fps | - | 5-6 early | 1-2 early |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
