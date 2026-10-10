@@ -1426,3 +1426,32 @@ patch=1,EE,001A0A74,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   end timer +0x55
 [60FPS - rushing Blast 2 time limit]
 description=Let a rushing Blast 2 chase for its real time, so Drain Life and the other Blast 2s that dash at the opponent reach one far away at 60fps as they do at 30fps.
 patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds * 60
+
+// The freeze on guard counters, push-stop guards and smash clashes, found
+// 2026-10-10 for issue #143 by reading BT3-Decompiled. When a contact resolves
+// to one of these, the fighters get a pending freeze in ticks (fighter+0x1324,
+// after a delay at +0x1328): BtlHit_ApplyGuard (FUN_001C7C88) for guard results
+// 7 and 8, BtlHit_CheckClash (FUN_001C9010) for two smashes colliding.
+// BtlChars_UpdateFreeze (FUN_001C0CB8) counts the delay, then the freeze at
+// +0x1320, down once a tick, and every phase skips a fighter while it is
+// positive. So at 60fps every one of these freezes lasted half as long.
+//
+// The six lengths and delays are doubled where they are set; the countdown
+// then takes the 30fps time a vsync at a time. The per-request freeze of
+// cinematics (freezeNext = 1 every tick, inside BtlChars_UpdateFreeze) is a
+// separate path and is untouched. Nothing else writes +0x1324 or +0x1328.
+//
+// A Z-Counter (guard result 8) from rig slot 7, P2 smashing, P1 pressing
+// Up + Square in the window:
+//
+//                    30fps          60fps before    with this group
+//   P1 frozen        6 vsyncs       3               6
+//   P2 frozen        4 after 2      2 after 1       4 after 2
+[60FPS - hit-stop]
+description=Hold the freeze on guard counters, push-stop guards and colliding smashes for its real time, so those impacts land as heavily as at 30fps.
+patch=1,EE,001C7E08,word,24020004 // li v0,2 -> 4   guard results 7/8: attacker freeze
+patch=1,EE,001C7E0C,word,24030002 // li v1,1 -> 2   guard results 7/8: attacker delay
+patch=1,EE,001C7F2C,word,24020006 // li v0,3 -> 6   guard result 7: defender freeze
+patch=1,EE,001C7F3C,word,24020006 // li v0,3 -> 6   guard result 8: defender freeze
+patch=1,EE,001C9144,word,2402000C // li v0,6 -> 12  same-kind smash clash: both freeze
+patch=1,EE,001C9190,word,24020004 // li v0,2 -> 4   mixed smash clash: both freeze
