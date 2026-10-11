@@ -536,6 +536,18 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the recovery windows (#158)
+
+Adds `[60FPS - recovery windows]`, two words. A launched or blown-away fighter
+could recover after 9 ticks instead of 9 frames.
+
+| window opens after | 30fps | 60fps before | with it |
+|---|---|---|---|
+| blow-away | 18 vsyncs | 9 | 18 |
+| launched | 18 vsyncs | 9 | 18 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
