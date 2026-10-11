@@ -23,7 +23,7 @@ The owner decides; you do everything else.
 2. **Comment on the issue as you go**: what you found, and how confident you
    are that it is the cause.
 3. **Open a PR when you are confident the problem is fixed**, ending in
-   `Closes #N`.
+   `Closes #N`, with its confidence score (see Pull requests below).
 4. **The owner play-tests the PR.** If it is solid they merge it; if not they
    hand it back, and you pick it up again from their comment.
 
@@ -44,6 +44,22 @@ the thing they would actually see, and put it before anything else.
 Not "gates FUN_001C69C8's per-tick accumulator". That belongs further down, and
 there should be plenty of it - the rest of the body stays as technical as the
 change deserves.
+
+**Every PR carries a confidence score.** The second line of the body, right
+after the player line, is `**Confidence: NN%**` - how sure you are that the PR
+fixes the issue and breaks nothing else - followed by one short line on what
+still keeps it from 100%. **The owner only play-tests a PR at 99% or more.**
+
+| Score | Means |
+|---|---|
+| 99% | the mechanism is read in the BT3-Decompiled C, the issue's own case measures equal to 30fps in the rig, and the full test build shows no side effect; only a play test is left |
+| 95-98% | measured equal to 30fps, but one of those three is missing or a small residual remains |
+| below 95% | a known gap, a partial fix, or a mechanism not understood |
+
+Below 99%, keep working the PR. Each time the score changes, post a comment on
+the PR with the new score, what moved it and what still holds it below 99%,
+and update the body's line to match. When it reaches 99%, the comment says it
+is ready for a play test. `/trim-pr-body` keeps the confidence line.
 
 **Run `/trim-pr-body` on the PR after opening it.**
 
