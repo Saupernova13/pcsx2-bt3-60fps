@@ -1,15 +1,12 @@
 """Turn pnach groups on and off in a running game, with no reboot.
 
-PCSXROO's ``patch.reload`` re-reads the pnach files but takes the *enabled*
-list from the settings it loaded at boot, so editing the ini achieves nothing
-mid-session. Renaming a group in the pnach does: a group whose header no longer
-matches an enabled name is simply not applied.
+PCSXROO's ``patch.reload`` takes the *enabled* list from the settings loaded at
+boot, so this renames groups in the pnach: one whose header no longer matches an
+enabled name is not applied.
 
-Removing a patch does not undo it. ``patch=1`` lines are rewritten every frame
-while active, and when the group stops being active PCSX2 just stops writing -
-the last value it wrote stays in RAM. So disabling also has to put the original
-words back, taken from the boot ELF. Addresses outside any ELF segment are the
-trampoline scratch zone, whose original content is zero.
+Removing a patch does not undo it: ``patch=1`` lines are rewritten every frame, so
+the last value stays in RAM. Disabling therefore also restores the original words
+from the boot ELF (zero outside any ELF segment, i.e. the trampoline zone).
 
     python tools/patchctl.py --status
     python tools/patchctl.py --off                 # stock 60fps, no compensation
@@ -30,7 +27,7 @@ from ps2ee.eemem import ElfImage
 from ps2ee.pnach import Pnach
 from ps2ee.roo import Roo
 
-# The five groups that were already proven and are in the user's own PCSX2.
+# The five proven groups already in the user's PCSX2.
 SHIPPED = [
     "60FPS - battle",
     "60FPS - animation clock",
@@ -47,196 +44,90 @@ AIRBORNE = [
     "60FPS - gravity",
 ]
 
-# Reinstated 2026-09-05. A 2026-08-24 test froze these phases and reported no
-# visible change, so the group was written off as compensating something
-# invisible - but that test was run on the ground. In an airborne hover these
-# are the only cleanly uncompensated per-tick quantities left in the fighter's
-# model, stepping 0.10/0.23/0.27 per tick at both rates, and the group halves
-# exactly those.
+# Fighter-model effect rotation, halved in an airborne hover.
 EFFECTS = ["60FPS - effect rotation"]
 
-# The tween system, found 2026-09-05. FUN_00267AC8 converts a duration in
-# seconds into frames at a hard-coded 30.0, and FUN_00267B00 steps it once per
-# tick, so at 60fps every ease, pulse and blend in the game finishes in half its
-# intended real time. One word - 30.0 becomes 60.0 - doubles the frame count and
-# halves the step together.
+# Tween system: the 30.0 seconds-to-frames constant becomes 60.0.
 TWEENS = ["60FPS - tween duration"]
 
-# The particle system, found 2026-09-05. FUN_00167258 ages aura and trail
-# particles with half a dozen per-tick channels and no timestep; gating its
-# caller's update on frame parity - reusing the skip the game already has for
-# its own hidden flag - fixes all of them at once and still draws every frame.
+# Particle system: caller's update gated on frame parity.
 PARTICLES = ["60FPS - particle update rate"]
 
-# The hovering idle bob, found 2026-09-05. A sine whose phase advances pi/30 a
-# tick - one cycle per 60 ticks - added to the fighter's anchor, entirely
-# separate from the animation clock. Only one instruction in the game reads the
-# constant, so halving it touches nothing else.
+# Hovering idle bob: halved phase step.
 HOVER = ["60FPS - hover bob"]
 
-# The blast hit cadence, found 2026-09-06. A hitbox's tick counter H[0x0A] is
-# advanced once a tick and a hit lands when it reaches an interval authored in
-# ticks, so multi-hit attacks land twice as fast at 60fps and burn through their
-# hit budget - and so their duration - in half the real time. Gating the single
-# call that advances it on frame parity fixes cadence and duration together.
+# Blast hit cadence: hitbox tick counter gated on frame parity.
 BLAST = ["60FPS - blast hit cadence"]
 
-# The blast's visible effects, found 2026-09-06. A ki blast is drawn by two
-# effect-node classes whose updates each carry half a dozen coupled per-tick
-# channels, so no single constant fixes them; gating both updates on frame
-# parity - reusing the skip each one already has, so the draw still runs - is
-# the same fix the ki aura and the particle system use.
+# Blast visual effects: both effect-node updates gated on frame parity.
 BLASTFX = ["60FPS - blast effect rate"]
 
-# The blast sequence rate, found 2026-09-06 - the one the player actually sees.
-# The scene graph dispatches every node's vtable[0] through one indirect call;
-# gating that call for a single class (vtable 002C3940, FUN_001587B8, an action
-# controller with a per-tick counter) paces ultimate sequences by real time.
+# Blast sequence rate: the action controller's dispatch gated for one class.
 SEQ = ["60FPS - blast sequence rate"]
 
-# The blast effect duration, found 2026-09-06. The two effect classes that draw a
-# ki blast step several coupled per-tick channels by 1.0 AND rebuild the beam
-# geometry every frame - so they cannot be gated, only slowed. Halving all
-# nineteen steps together moves the channels in step; halving any one does
-# nothing, because they are compared against each other.
+# Blast effect duration. These steps cannot be gated, only slowed, and all
+# nineteen must be halved together.
 BLASTDUR = ["60FPS - blast effect duration"]
 
-# The scripted-sequence clock, found 2026-09-07. A sequence step that is waiting
-# counts an integer down once a tick, and those waits are authored in 30Hz
-# frames, so every staged beat - camera cuts, mouth lines, fades, the instant an
-# ultimate releases its beam - lands in half its real time. Counting down on
-# even ticks only fixes the whole class at once without skipping any work.
+# Scripted-sequence clock: waits count down on even ticks only.
 SEQWAIT = ["60FPS - sequence wait"]
 
-# The fighter state machine's phase timers, found 2026-09-07. Every attack,
-# charge, block, recovery and idle is a state whose handler counts ticks in the
-# scratch block and compares that count against a number authored in 30Hz
-# frames, so at 60fps each one expires in half its real time. 17 of the 28 sites
-# are gated to even ticks; found by tools/phasetimer.py, generated by
-# tools/mkgate.py.
-#
-# Reinstated 2026-09-16, after being withdrawn on 2026-09-07 over the state 157
-# trap. The 22nd gated site, 001E6F40, was an index into a table rather than a
-# count of frames - it sits inside FUN_001E6DC8, which IS state 157. Gating an
-# index makes that state walk its table at half rate and, because the advance is
-# conditional, skip it entirely on an odd tick. It has been removed from the group.
-#
-# It was not the only one. v24 shipped with four more phase numbers gated, and
-# 001E6060 froze a fighter in state 93 (#39, reproduced 2026-09-21). All four are
-# out: a site is a clock only if the instruction after its add compares it.
+# Fighter state-machine phase timers (generated by tools/mkgate.py). A site is a
+# clock only if the instruction after its add compares it; gating an index into a
+# table freezes a fighter in its state.
 PHASE = ["60FPS - state phase timers"]
 
-# The Hard Knockback and the Lightning Attack, found 2026-09-07. A heavy
-# smash launches the victim on a phase timer authored in 30Hz frames, and the
-# Circle pursuit that follows is a chain of four more frame counts plus an
-# intercept that leads the target by a fixed number of TICKS against a velocity
-# that is (correctly) per-tick. At 60fps every one of them lands in half its
-# real time, so Goku rises less far, arrives behind the victim instead of ahead,
-# and his dive stalls before it can close. Measured over a nine-point sweep of
-# the press delay the Lightning Attack missed 9 times out of 9; with these it hits 9 out of
-# 9, within 1-3 vsyncs of the 30fps arm at every delay.
+# Hard Knockback and Lightning Attack: phase timers and the pursuit intercept.
 PURSUIT = ["60FPS - knockback flight", "60FPS - pursuit timing"]
 
-# The camera, found 2026-09-08. FUN_001C69C8 updates every camera in the game by
-# lerping its euler angles toward a target built for this tick, and both halves
-# are per-tick: the blend rate $f20 (0.20 a tick) is applied twice as often, and
-# a scripted camera move counts fighter+0x558 down once a tick from a length
-# authored in 30Hz frames. Halving the blend alone leaves 12.84 degrees of mean
-# orientation error against the 30fps camera, gating the move alone 14.01,
-# against 22.96 unpatched - together, 1.52. One group, because neither half is
-# correct on its own.
+# Camera: blend rate and scripted-move countdown. One group, because neither half
+# is correct alone.
 CAMERA = ["60FPS - camera pacing"]
 
-# The cinematic camera, found 2026-09-21 for issue #21. In a cinematic the render
-# camera plays a camera clip (FUN_0023D510) whose time steps a bare 2.0 a tick at
-# 0023D6A4, so transformation cameras ran their shots in half the real time while
-# the poses kept time. One word makes it 1.0.
+# Cinematic camera clip time step 2.0 becomes 1.0.
 CINECAM = ["60FPS - cinematic camera"]
 
-# The transformation loader, found 2026-09-22 for issue #67. Its poll advances
-# one load stage per call, once a tick, so a transformation's reveal came early.
-# The battle loader's call is answered "not ready" on odd ticks.
+# Transformation loader: answered "not ready" on odd ticks.
 TRANSLOAD = ["60FPS - transformation load"]
 
-# Names for groups that do not exist yet. The ini's enabled list is only read at
-# boot, so a name that is not in it cannot be tested without restarting the
-# emulator; carrying spares means the next experiment does not cost a restart.
+# Spare names for future groups; the ini's enabled list is only read at boot.
 SPARES = ["60FPS - spare 1", "60FPS - spare 2", "60FPS - spare 3"]
 
-# What the ini enables. A group must carry one of these names to apply at all,
-# and this list can only be changed by restarting the emulator - so it holds
-# the names of groups that do not exist yet, to save a restart later.
-# The cut-in keyframe clock, found 2026-09-08. A second clip player, separate
-# from the model+0xB40 controller that [60FPS - animation clock] already paces.
-# Its track objects step a float clock by the track's rate at +0x2C once per
-# tick, and that rate is 2.0, so at 60fps a track burns its keyframe array in
-# half the real time and holds the last key - a mouth that stops mid-sentence.
+# What the ini enables. A group must carry one of these names to apply at all, and
+# the list changes only by restarting the emulator.
+# Cut-in keyframe clock: track clock rate 2.0 becomes 1.0.
 MOUTH = ["60FPS - mouth clock"]
 
-# Projectile travel, found 2026-09-09. The effect-node position integrator steps
-# pos += vel * step once a tick with no delta-time term, so every ki blast and
-# beam covers twice the ground per real second at 60fps. The first defect fixed
-# here that changes how the game PLAYS - it halves the time to dodge.
+# Projectile travel: effect-node position integrator step halved. Changes how the
+# game plays (time to dodge).
 PROJECTILE = ["60FPS - projectile travel"]
 OBJFLIGHT = ["60FPS - blast object travel"]
 BEAMFLIGHT = ["60FPS - beam object travel"]
 
-# The fullscreen fade node, found 2026-09-09. FUN_00172810 fades a colour in,
-# holds it, and fades it out, counting all three phases one frame per tick. At
-# 60fps every fade in the game runs in half its real time - which is why the
-# Galick Cannon's white flash lifted before the transition it exists to cover.
+# Fullscreen fade node: all three phases counted per tick.
 SCREENFADE = ["60FPS - screen fade"]
 
-# Thrown objects, found 2026-09-16. Hercule's tapped and charged ki blasts are
-# objects with their own update, separate from the effect node stepper that
-# [60FPS - projectile travel] halves, and everything in it is per tick: flight,
-# gravity, spin, debris, fuse and explosion. Halving the step changes where a
-# bouncing bomb lands, because collision is tested at positions 30fps never
-# visits, so this runs the whole update on even ticks instead.
+# Thrown objects (Hercule's blasts): whole update on even ticks.
 THROWN = ["60FPS - thrown object rate"]
 
-# Solar Flare, found 2026-09-17. The victim's blind timer, fighter+0xFF8, holds
-# the lock-off flags while positive and drives the white flash; both counted
-# per tick. 2.50s at 30fps, 1.25s at 60fps. This decrements it on even ticks
-# and steps the flash on even ticks.
+# Solar Flare: the victim's blind timer and flash step on even ticks.
 SOLARFLARE = ["60FPS - solar flare"]
 
-# The Rush Struggle, found 2026-09-10. Two rush attacks collide and both players
-# rotate their sticks; the game counts hits into fighter+0xE50 and picks whoever
-# has more. The CPU's stick is synthetic and steps once per tick, so at 60fps the
-# AI rotates twice as fast in real time while a human's hands do not - measured
-# at a true 5 rotations a second, the winner flips. This gates only the AI side.
+# Rush Struggle: only the AI's synthetic stick is gated.
 STRUGGLE = ["60FPS - rush struggle"]
 
-# The Beam Struggle, found 2026-09-12. Two beams collide, both fighters enter state
-# 304 and rotate; rotations count into fighter+0xE4C and an event manager,
-# FUN_001D8E50, runs the contest on a tick clock - introductions, a per-tick tug
-# toward whoever leads, then the result. At 60fps that whole clash plays in half
-# its real time while a human's hands do not speed up, and the CPU's synthetic
-# stick does. This puts the manager's phases back on real time, keeps the clash
-# point where 30fps puts it, and gates only the AI's rotation.
+# Beam Struggle: event-manager phases back on real time; only the AI rotation is gated.
 BEAMCLASH = ["60FPS - beam clash"]
 
-# The stage's own scenery, found 2026-09-16 chasing the World Tournament report.
-# FUN_00115478 walks the map's scene graph once a tick and FUN_00123890 lerps
-# each node between two keyframes by a time at node+0x1C. That time is advanced
-# by a bare 2.0 immediate at 001153C8, so every animated prop covers twice its
-# track per second at 60fps. Not every map has one: the evaluator never runs on
-# Rocky Area.
+# Stage scenery: keyframe time advance 2.0 becomes 1.0 (not every map has any).
 STAGE = ["60FPS - stage animation"]
 
-# Two effect classes that count 30Hz ticks, found 2026-09-28 for issue #10. The
-# scripted effect tracks (vtable 002C4278) step a track clock by 2 * rate, jitter,
-# spin and four countdowns once a tick, so Vegeta's energy ball flashed early; the
-# tracks now advance on even ticks and the countdowns by 0.5. The transformation
-# flash (vtable 002C42D8) held its white for 11 ticks counted per tick, so the
-# camera cut to the new form early; its two timers now step 0.5.
+# Two effect classes counting 30Hz ticks: scripted effect tracks and the
+# transformation flash.
 FXTRACK = ["60FPS - effect track clock"]
 TRANSFLASH = ["60FPS - transformation flash"]
 
-# A rushing Blast 2's time limit, found 2026-09-30 for issue #115. FUN_001F8C00
-# (states 284-289) gives up the chase once a per-tick counter passes the blast's
-# limit in seconds * 30.0. The constant becomes 60.0.
+# Rushing Blast 2 time limit: the 30.0 constant becomes 60.0.
 RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
@@ -386,12 +277,9 @@ def status() -> None:
 def warn_unenabled(pnach=None) -> list[str]:
     """Groups the emulator will ignore however correct the pnach is.
 
-    PCSXROO reads its [Cheats] Enable list from its OWN per-game ini - not the
-    installed PCSX2's, which is what config.game_ini() and deploy.py write - and
-    it reads it at BOOT. A group whose name is missing there applies nothing and
-    says nothing: patchctl reports it ON, the words never appear in RAM, and the
-    measurement quietly scores the unpatched game. That cost an hour on
-    2026-09-08. This is the check that would have caught it.
+    PCSXROO reads its [Cheats] Enable list at boot from its OWN per-game ini, not the
+    installed PCSX2's. A group missing there applies nothing and says nothing, so the
+    measurement quietly scores the unpatched game.
     """
     try:
         enabled = config.roo_enabled_cheats()
@@ -421,15 +309,9 @@ def original_word(elf: ElfImage, addr: int) -> int:
 def apply(roo: Roo, wanted: list[str], quiet: bool = False) -> None:
     """Make exactly ``wanted`` active, and restore what the rest overwrote.
 
-    **An enabled group is not in RAM when this returns.** Disabling writes the
-    original words here, but the cheat engine writes an *enabled* group's words
-    at a frame boundary, so the patch only lands once the VM runs a frame.
-
-    Advance a few frames before reading a patched address or arming a
-    breakpoint on patched code. Skipping that does not raise: every arm quietly
-    measures the unpatched game and agrees with every other arm, which reads
-    exactly like a fix that does nothing. Reading one patched address back and
-    checking it changed is the cheap guard.
+    **An enabled group is not in RAM when this returns**: the cheat engine writes it
+    at a frame boundary. Advance a few frames before reading a patched address or
+    arming a breakpoint, or every arm silently measures the unpatched game.
     """
     path, pnach = read_pnach()
     elf = ElfImage.load(config.elf_path())
@@ -444,9 +326,8 @@ def apply(roo: Roo, wanted: list[str], quiet: bool = False) -> None:
                     restore[line.target] = original_word(elf, line.target)
     path.write_text(pnach.render(), encoding="utf-8")
 
-    # Order matters. Reload first, so the cheat engine stops rewriting these
-    # words, and only then put the originals back - otherwise the next frame
-    # simply re-applies the patch over the restore.
+    # Reload first so the cheat engine stops rewriting these words, then restore the
+    # originals; otherwise the next frame re-applies the patch.
     roo.patch_reload()
 
     failed = []
