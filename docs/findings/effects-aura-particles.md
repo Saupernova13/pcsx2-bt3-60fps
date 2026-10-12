@@ -848,3 +848,23 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-10-10 - issue #153: the power-up glow
+
+Found by reading BT3-Decompiled (`src/battle/eft_glow.c`, `eft_trail.c`). The
+census of the clock audit's unpaced classes showed `EftGlow_StepParts` in Goku
+(Early)'s, Cell's and Devilman's moves. `EftGlowTask_Update` runs the emitter
+(`EftGlow_Step`, up to 14 quads a frame from 70 per character) and
+`EftGlow_StepParts` once per update unless the battle is paused; each quad's
+`life` (`+0x10`, frames) falls by one, its width and length move toward the
+stage targets by per-frame deltas computed from the life left, it fades by its
+life, steps `animTimer` and lags the fighter's turn by up to 4 frames.
+
+`[60FPS - power-up glow rate]` makes the pause test (`00170F9C`) also skip odd
+vsyncs. Every quad of the pool per vsync (`work/tools-scratch/glowtl.py`), Goku
+(Early), `L2` + `Up` + `Triangle`:
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| quads spawned | 837 | 1447 (pool-capped) | 841 |
+| mean quad life | 20.4 vsyncs | 11.2 | 20.1 |
