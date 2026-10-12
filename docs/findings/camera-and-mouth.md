@@ -590,3 +590,52 @@ because `FUN_00265298` has 13 callers including the menus.
 
 Vegeta's picture does not change: his cinematic waits for a later signal
 (`+0x264` = 4 at v397/398 in every arm), so his early load was invisible.
+
+## 2026-10-09 - the body-erasing death camera, checked
+
+The oldest unchecked item on the user's list (item 2 in
+`state-of-play.md`): the camera after a body-erasing KO, reported as too fast
+and cutting oddly. Rig scenes are training mode, where health refills and
+nobody can be KO'd, so this used the timed Duel (`rocky-goku-early-timed60-vs-com.p2s`)
+with the COM made passive by clearing its AI flag (`fighter+0x1278`), its health
+written to 1, Goku given Ki and a full Blast Stock (`+0x9F8` = 400000). Then `L2`
+for 230 vsyncs into Max Power Mode and the Spirit Bomb (`L2`+`Down`+`Triangle`).
+
+Gohan is KO'd at the end of the cinematic, his body gone, and goes to state 235;
+a plain Kamehameha KO leaves him lying in state 216 instead. The camera object
+(`*(002FEBD0)`, eye at `+0x30`) is null until state 235 and is then created at
+the same place in both arms, and sways the same path at the same real-time
+speed:
+
+| vsyncs after state 235 | 30fps eye y | full test build eye y | speed per vsync, 30fps / full |
+|---|---|---|---|
+| +0 | 195.2 | 195.3 | - |
+| +50 | 194.1 | 194.1 | 0.03 / 0.02 |
+| +100 | 194.1 | 194.1 | 0.03 / 0.01 |
+| +150 | 195.3 | 195.2 | 0.06 every other vsync / 0.03 every vsync |
+
+The shots (whiteout, K.O.!, Goku from behind) match when photographed. The
+only difference is when it starts: state 235 at v785 against v794, the
+Ultimate's end lead of issue #127. The item is closed on this measurement; the
+plain Kamehameha KO matched as well.
+
+## 2026-10-09 - the pre-fight intro against the camera, checked
+
+The other half of the user's item 6 ("some intro animations are too fast or too
+slow for the camera"), never addressed after the mouths were fixed. A match's
+opening cannot be timed from a state cut at the match start, so each arm started
+a fresh Duel through the menus (from `rocky-goku-early-timed60-vs-com.p2s`:
+pause, Return to Character Select, defaults for Goku (Early) and Ultimate Gohan,
+Rocky Area), with the arm applied before the first menu press. The pause menu is
+confirmed open by the game's pause flag, bit `0x100` of `003337B8`
+(`00331DC8+0x19F0`); the battle's frame counter keeps running under it.
+
+Photographed at fixed vsyncs from the battle manager's first frame: the stage
+fly-over to about v600, Goku's close-up v680-v780, Gohan's v800-v880, the
+two-shot, "Ready!" at v1000 and "Fight!" at v1100. Every 20 vsyncs through both
+close-ups, the shot and the pose match the 30fps arm, in the full test build and
+on the released v26 alike. The item is closed on this measurement for this
+pair; it went with v26's cinematic camera (#21), which paced exactly these poses
+and cameras.
+
+Tools: `work/tools-scratch/intro_shots.py`.
