@@ -580,3 +580,24 @@ A trap met on the way: in this scene two identical 60fps runs photograph
 differently at the same vsync although their RAM is identical, so the ring
 could not be isolated by photographs at 60fps. The 30fps arm photographs
 reproducibly. The comparison above is read from RAM.
+
+### 2026-10-12: exact to the tick
+
+Two residuals were left, and both were discrete-step effects, not float rounding.
+
+| | cause | fix (`000F2700`, hooked at `00245820` after the speed and width maths, battle only) |
+|---|---|---|
+| ring alive 47 vsyncs, not 46 | the step that frees the ring shows nothing: a life of `L` shows `ceil(L) - 1` steps, 2 vsyncs each at 30fps, but `ceil(2L) - 1` vsyncs at 60fps | life = `2 * ceil(L) - 1` (Goku's ring: L = 0.8 * 30 = 23.99999, life 47) |
+| radius 0.7 short at the end | the slow-down summed per half step: after `2k` steps the radius loses `a*k/4` against `k` steps at 30fps | starting speed = `v/2 - a'/2` (`a'` the quartered slow-down): exact for every `k` |
+
+Goku (Early) Max Power, read after every 30fps tick (every second vsync at 60fps):
+
+| | 30fps | with the group |
+|---|---|---|
+| ring alive | v163-v208, 46 vsyncs | v164-v209, 46 vsyncs |
+| radius | 20.0, 29.9 ... 201.1, 208.4 | the same 23 values |
+| width | 56.7, 63.3 ... 203.3 | the same |
+| alpha in the fade | 0.418, 0.335, 0.251, 0.167, 0.084, 0 | the same, with half-steps between |
+
+The 1-vsync later birth is the hand-off of #127. The Shenron wish screen's ring
+is untouched (129 vsyncs, `gBtlChars` is 0 there).

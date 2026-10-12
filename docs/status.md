@@ -557,8 +557,8 @@ made for 60 ticks a second.
 
 | Goku (Early) | 30fps | 60fps before | with it |
 |---|---|---|---|
-| ring alive | 46 vsyncs | 23 | 47 |
-| radius 10 vsyncs in | 68 | 113 | 63 |
+| ring alive | 46 vsyncs | 23 | 46 |
+| radius, width and alpha after each 30fps tick | - | - | equal to 30fps |
 
 **Not confirmed in play.**
 
