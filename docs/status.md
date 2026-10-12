@@ -548,6 +548,19 @@ could recover after 9 ticks instead of 9 frames.
 
 **Not confirmed in play.**
 
+## Proposed - the freeze on guard counters and smash clashes (#143)
+
+Adds `[60FPS - hit-stop]`. The freeze when a Z-Counter, a push-stop guard or
+two colliding smashes land was counted in ticks and lasted half as long at
+60fps. Its six lengths are doubled where they are set.
+
+| Z-Counter freeze | 30fps | 60fps before | with it |
+|---|---|---|---|
+| attacker (the countered fighter) | 6 vsyncs | 3 | 6 |
+| defender | 4 after 2 | 2 after 1 | 4 after 2 |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
