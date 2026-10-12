@@ -1,26 +1,22 @@
 """Generate a widescreen group for any display aspect.
 
-BT3's field of view lives in three words, and the third gives the rule away:
+BT3's field of view lives in three words:
 
     002FE4CC   1.166667   projection scale, 7/6 at 4:3
     002FE594   298.6667   the same constant x256
     00130BF0   lui $at, 0x3F40   an INSTRUCTION - the immediate is 0.75
 
-0.75 is 3/4, which is 1/aspect at 4:3, and PCSX2's own [Widescreen 16:9] sets
-that immediate to 0x3F10 - 0.5625, which is 9/16. So the instruction carries
-1/aspect and the two floats scale by aspect / (4/3), the factor by which the
-horizontal field of view widens.
+The instruction carries 1/aspect (0.75 at 4:3; PCSX2's [Widescreen 16:9] sets
+0x3F10 = 9/16); the two floats scale by aspect / (4/3).
 
     python tools/widescreen.py 21:9
     python tools/widescreen.py 3440x1440 --name "Widescreen 43:18 - 3440x1440"
     python tools/widescreen.py --selftest
 
-`lui` writes only the top 16 bits of the register, so 1/aspect is rounded to a
-half-precision-sized mantissa. The tool prints that error; below about 0.2% it
-is a fraction of a pixel across the screen and a trampoline to fix it would buy
-nothing visible.
+`lui` writes only the top 16 bits, so 1/aspect is rounded; the tool prints the
+error (below about 0.2% is sub-pixel).
 
-This does not talk to the emulator - it is arithmetic, and it runs anywhere.
+This does not talk to the emulator.
 """
 
 from __future__ import annotations
@@ -107,17 +103,9 @@ def group(ws: Widescreen, name: str) -> str:
     ])
 
 
-# The two aspects whose words are already known: BT3's stock 4:3, and PCSX2's
-# own shipped [Widescreen 16:9] from resources/patches.zip.
-#
-# The 16:9 scale is 1.5551670 where the model says 1.5555556, and the reason is
-# visible in the arithmetic: 7/6 * 1.333 is 1.5551667. The official patch typed
-# the widen factor as 1.333 rather than 4/3. That is a 0.025% narrower field of
-# view, about half a pixel across 1920, so the tolerance here is relative and
-# loose enough to accept it while still catching a real mistake.
-#
-# The lui immediate is the part that actually carries the aspect, and it must
-# match bit for bit.
+# The two aspects whose words are already known: BT3's stock 4:3 and PCSX2's
+# [Widescreen 16:9]. The latter's scale is 0.025% narrower (it typed 1.333 for
+# 4/3), so the tolerance is relative; the lui immediate must match bit for bit.
 SCALE_TOLERANCE = 0.0005  # 0.05%, twice the official patch's own rounding
 
 REFERENCES = [
