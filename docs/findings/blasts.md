@@ -813,7 +813,7 @@ about half a second early. Four Ultimate Blasts timed tonight against a standing
 Ultimate Gohan (hold `L2` 220 vsyncs into Max Power Mode, then
 `L2`+`Down`+`Triangle`, every arm from the same save), against 30fps:
 
-| Ultimate (save) | first hit, released v26 | first hit, full test build | back to idle, full test build |
+| Ultimate (save) | first hit, released v26 | first hit, test build of 2026-10-09 | back to idle, test build of 2026-10-09 |
 |---|---|---|---|
 | Goku (Early)'s Spirit Bomb (0) | 2 vsyncs early | 2 early | 6 early |
 | Super 17's Shocking Death Ball (4) | 3 early | 3 early | 9 early |
@@ -828,5 +828,8 @@ numbers. What is left is the hand-off shortfall of issue #127: the state driver
 30fps, and a move is a chain of such steps. On Krillin's, the disc's data is
 cleared at v496 against v502 at 30fps, its last hit, and his pose then ends at
 v516 against v527.
+
+With `[60FPS - disc travel]` (#148, open on 2026-10-09) Krillin's disc flies at its real speed and his first
+hit comes 1-2 vsyncs early instead of 5; the rest is the same hand-off.
 
 The Angry Kamehameha itself was not re-timed: no rig scene has its owner.
