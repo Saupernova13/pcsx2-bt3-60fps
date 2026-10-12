@@ -28,6 +28,7 @@ from SuperCombo's names to this repo's old terms.
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
 | recovering after being launched or blown away | The recovery windows of states 206 and 213 / 214 / 223 | `recovery windows`, issue #158 |
+| vanish dash, dashing with Circle in Max Power | Action 0x35, direction + `Circle` in Max Power Mode (no wiki name found; "vanish dash" is this repo's label) | `vanish dash`, issue #162 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
