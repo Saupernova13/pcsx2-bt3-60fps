@@ -868,3 +868,77 @@ patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds 
 description=Let a launched or blown-away fighter recover after its real 9 frames, not half that.
 patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
 patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
+
+// Ground dust, found 2026-10-10 for issue #151 by reading BT3-Decompiled. The
+// dust of dashes, slides, landings and impacts (src/battle/eft_ground_dust.c)
+// steps every particle once per update - life, grow, spin, drag, velocity,
+// fade (EftGndDust_UpdateParts, shared by all six kinds) - and the slide and
+// dash emitters spawn a puff every 5th update. At 60fps a dash raised twice the
+// puffs and every puff lived half as long.
+//
+// The class runs at 30Hz, as the other effect-rate groups do: the particle step
+// returns on odd vsyncs (000F2440), and the two emitters treat their emit flag
+// as clear on odd vsyncs (000F2470, 000F2490), so they neither tick nor spawn.
+// Drawing is untouched.
+//
+// Live particles (gEftGndDust + 0x62B4), rig slot 7:
+//
+//                                  30fps        60fps before    with this group
+//   Down + Cross dash: puffs       14           28              14
+//                      mean life   36.0 v       18.0 v          36.0 v
+//   rush string: mean life         50.6 v       25.6 v          51.1 v
+//
+// The skid dust of a fighter pushed along the ground (guarding, action 0x39, a
+// hit stagger) is the foot dust bit 0x32, set every tick while the fighter's last
+// frame's move exceeds 200 km/h (BTL_KMH, a per-30fps-frame unit). At 60fps that
+// move is half as long, so it never fired: the threshold words halve (one reader
+// each), and the three calls go through 000F2540, which sets the bit on even
+// vsyncs only. Guarding Cell's charged smash, slot 7: 30fps 3 ticks / 6 puffs,
+// before 0 / 0, with it 2 / 4 (the push stays over the line 5 vsyncs, not 6).
+[60FPS - ground dust rate]
+description=Raise and fade the dust of dashes, slides and landings at 30Hz, so it is as thick and lasts as long as at 30fps.
+patch=1,EE,000F2440,word,3C010033 // lui at,0x33
+patch=1,EE,000F2444,word,8C211D64 // lw at,0x1D64(at)         frame counter
+patch=1,EE,000F2448,word,30210001 // andi at,at,1
+patch=1,EE,000F244C,word,10200003 // beqz at, even
+patch=1,EE,000F2450,word,00000000 // nop
+patch=1,EE,000F2454,word,03E00008 // jr ra                    odd: no particle step
+patch=1,EE,000F2458,word,00000000 // nop
+patch=1,EE,000F245C,word,27BDFFC0 // addiu sp,sp,-0x40        (displaced)
+patch=1,EE,000F2460,word,080666CA // j 00199B28
+patch=1,EE,000F2464,word,FFB40020 // sd s4,0x20(sp)           (displaced)
+patch=1,EE,00199B20,word,0803C910 // EftGndDust_UpdateParts entry -> j 000F2440
+patch=1,EE,00199B24,word,00000000 // (moved into 000F2440)
+patch=1,EE,000F2470,word,8E0200B4 // lw v0,0xB4(s0)           flags (displaced)
+patch=1,EE,000F2474,word,30420002 // andi v0,v0,2             EMIT (displaced)
+patch=1,EE,000F2478,word,3C010033 // lui at,0x33
+patch=1,EE,000F247C,word,8C211D64 // lw at,0x1D64(at)
+patch=1,EE,000F2480,word,30210001 // andi at,at,1
+patch=1,EE,000F2484,word,0806605E // j 00198178
+patch=1,EE,000F2488,word,0001100B // movn v0,zero,at          odd vsync: no tick, no spawn
+patch=1,EE,00198170,word,0803C91C // EftGndDustSlide_Update: lw v0,0xB4(s0) -> j 000F2470
+patch=1,EE,00198174,word,00000000 // (andi moved into 000F2470)
+patch=1,EE,000F2490,word,8E0200B4 // lw v0,0xB4(s0)           flags (displaced)
+patch=1,EE,000F2494,word,30420002 // andi v0,v0,2             EMIT (displaced)
+patch=1,EE,000F2498,word,3C010033 // lui at,0x33
+patch=1,EE,000F249C,word,8C211D64 // lw at,0x1D64(at)
+patch=1,EE,000F24A0,word,30210001 // andi at,at,1
+patch=1,EE,000F24A4,word,08066194 // j 00198650
+patch=1,EE,000F24A8,word,0001100B // movn v0,zero,at          odd vsync: no tick, no spawn
+patch=1,EE,00198648,word,0803C924 // EftGndDustDash_Update: lw v0,0xB4(s0) -> j 000F2490
+patch=1,EE,0019864C,word,00000000 // (andi moved into 000F2490)
+patch=1,EE,002FD878,word,3F6D0979 // 200 -> 100 km/h a frame   guard push skid (BtlAct guard 0x38, one reader 001EBE04)
+patch=1,EE,002FD884,word,3F6D0979 // 200 -> 100 km/h a frame   action 0x39 skid (one reader 001EC128)
+patch=1,EE,002FD700,word,3F6D0979 // 200 -> 100 km/h a frame   hit stagger skid (one reader 001E8348)
+patch=1,EE,000F2540,word,3C010033 // lui  $at, 0x0033
+patch=1,EE,000F2544,word,8C211D64 // lw   $at, 0x1D64($at)   frame counter
+patch=1,EE,000F2548,word,30210001 // andi $at, $at, 1
+patch=1,EE,000F254C,word,14200003 // bnez $at, 000F255C      odd tick: no skid dust
+patch=1,EE,000F2550,word,00000000 // nop
+patch=1,EE,000F2554,word,08073D5E // j    BtlChar_SetFxBit   even tick: set it (a0, a1 from the caller)
+patch=1,EE,000F2558,word,00000000 // nop
+patch=1,EE,000F255C,word,03E00008 // jr   $ra
+patch=1,EE,000F2560,word,00000000 // nop
+patch=1,EE,001EBE14,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   guard skid dust
+patch=1,EE,001EC138,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   action 0x39 skid dust
+patch=1,EE,001E835C,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   hit stagger skid dust
