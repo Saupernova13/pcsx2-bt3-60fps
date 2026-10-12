@@ -1,16 +1,8 @@
 # Pre-merge gate: what ships must export and validate, and every tool must run.
 #
-# This is the check the release pipeline was missing. `tools/export.py` builds
-# the shared copy of the patch, validates the file it writes and refuses a
-# shipping preset that names a group the pnach no longer has, so running it is
-# the test of a patch PR - a malformed group or a renamed one fails here rather
-# than in the middle of a release.
-#
-# The smoke step runs every tool with --help. That is what catches the breakage
-# that stopped the first release run: `tools/` shadowing a stdlib module is
-# invisible on a Windows interpreter that has already loaded it, and fatal on
-# Linux. Running each tool the way a person runs it is the only thing that sees
-# it. A tool that will not start is a defect whether or not a release needs it.
+# export.py validates the patch, so a malformed or renamed group fails here, not
+# mid-release. The smoke step runs every tool with --help; a tool shadowing a
+# stdlib module is invisible on Windows and fatal on Linux.
 name: Check
 
 on:
@@ -49,9 +41,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      # keystone, capstone, numpy and zstandard are what ps2ee needs; pillow is
-      # what the screenshot tools need. A tool that grows a new dependency fails
-      # the smoke step below until it is added here.
+      # ps2ee needs keystone, capstone, numpy and zstandard; the screenshot tools need pillow.
       - name: Install the tools' dependencies
         run: pip install --quiet keystone-engine capstone numpy zstandard pillow
 
@@ -68,9 +58,7 @@ jobs:
           for tool in tools/*.py; do
             # _bootstrap is imported by the others, never run on its own.
             [ "$(basename "$tool")" = "_bootstrap.py" ] && continue
-            # Bounded, because a tool that opens a socket or waits on the
-            # emulator before argparse sees --help would otherwise hold the
-            # runner until the job times out, with nothing said about which one.
+            # Bounded, so a tool that waits on the emulator before --help cannot hold the runner.
             if ! out="$(timeout 60 python "$tool" --help 2>&1)"; then
               echo "::error file=${tool}::${tool} does not start"
               echo "$out" | tail -n 20
