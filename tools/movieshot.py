@@ -1,21 +1,16 @@
 """Charge, fire a scripted move, and photograph its cinematic in real time.
 
-The ultimates and transformations are the part of this game a numeric trace is
-worst at. Their defects are things like "the camera arrives too early and sits
-there" or "the sky snaps instead of turning" - visible instantly, invisible in a
-column of state indices. So this drives the pad on the wall clock with the VM
-running free and takes one screenshot every `--cadence` seconds from the moment
-the move actually starts, which makes a 30fps sheet and a 60fps sheet directly
-comparable tile for tile: the same real instant is the same tile index.
+Cinematic defects (a camera arriving early, a sky that snaps) are invisible in a
+numeric trace. This drives the pad on the wall clock with the VM running free and
+takes one screenshot every `--cadence` seconds from the moment the move starts, so
+a 30fps and a 60fps sheet are comparable tile for tile.
 
-The charge is held for a fixed number of real seconds and is deliberately
-OUTSIDE the photographed window, along with the command press. Nothing is
-pressed once the window opens, so the tick-versus-vsync asymmetry of a button
-hold cannot bias the comparison.
+The charge and the command press are OUTSIDE the photographed window, and nothing
+is pressed once it opens, so the tick-versus-vsync asymmetry of a button hold
+cannot bias the comparison.
 
     # Cell's Perfect Barrier, both arms
-    python tools/movieshot.py --slot 4 --presets off full \
-        --charge 6 --command L2,Down,Triangle --state 264 --sheet work/cell.png
+    python tools/movieshot.py --slot 4 --presets off full --charge 6 --command L2,Down,Triangle --state 264 --sheet work/cell.png
 
     # whatever the fighter is already able to do, no charge
     python tools/movieshot.py --slot 8 --charge 0 --command L2,Triangle --state 264
@@ -42,9 +37,8 @@ def perform(roo: Roo, preset: str, slot: int, charge_s: float, command: list[str
     roo.flush_input()
     roo.loadstate(slot)
     time.sleep(1.0)
-    # Apply LAST and never load again. Some save states were captured while
-    # patched, so a reload after apply writes the patched words straight back
-    # and the "unpatched" arm silently runs at 60fps. Slot 4 does exactly that.
+    # Apply LAST and never load again: some save states were captured while patched, so
+    # a reload writes the patched words back and the "unpatched" arm runs at 60fps.
     patchctl.apply(roo, patchctl.PRESETS[preset], quiet=True)
     time.sleep(0.3)
     me = B.resolve(roo)[0].fighter
@@ -66,8 +60,8 @@ def perform(roo: Roo, preset: str, slot: int, charge_s: float, command: list[str
         time.sleep(charge_s)
     roo.input_set(*command)
 
-    # Wait for the move to actually start. Timing the window from the press
-    # instead would fold the command's own recognition delay into the comparison.
+    # Wait for the move to actually start; timing from the press would fold in the
+    # command's recognition delay.
     deadline = time.monotonic() + 6.0
     started = False
     while time.monotonic() < deadline:

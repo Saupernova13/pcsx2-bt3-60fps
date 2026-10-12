@@ -1,19 +1,13 @@
 """Enumerate every instruction that writes to an address range.
 
-The single most reliable technique this project has: a write watchpoint answers
-"who changes this?" with an address, where reading disassembly answers it with a
-guess. Every link in the position chain that was confirmed this way held up
-under test; the one link inferred by reading code is the one that broke a fix.
-
-Distinct PCs matter more than hit counts, so this keeps collecting until it has
-seen ``--hits`` stops and reports the set. ``ra`` comes with each one - these
-are leaf calls into a vector library, so the caller is the interesting half.
+A write watchpoint answers "who changes this?" with an address, where reading
+disassembly answers with a guess. Distinct PCs matter more than hit counts, so
+this collects ``--hits`` stops and reports the set; ``ra`` comes with each one
+(leaf calls into a vector library, so the caller is the interesting half).
 
     python tools/writers.py 0x01871CD0 --size 16 --slot 2 --hits 40
 
 PCSX2's memchecks do not observe every write path, so silence is not proof.
-A range that stays quiet while the value provably changes means the write is
-going through a path memchecks miss, not that the address is wrong.
 """
 
 from __future__ import annotations
