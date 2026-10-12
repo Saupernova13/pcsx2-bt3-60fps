@@ -23,6 +23,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 1 |
 | [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 1 |
 | [Effect classes and their clocks](effect-classes.md) | The 28 effect-node classes that share the freeze check, and which of them count 30Hz ticks. | 1 |
+| [Scripted effect commands](effect-commands.md) | The runner that plays a move's scripted effects, and the parameter ramps it steps once a tick. | 1 |
 
 ## The original introduction
 
