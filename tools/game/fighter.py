@@ -1,10 +1,5 @@
 """The battle's fighter objects, resolved live.
 
-Everything the combat code does is a method on one of these. The animation
-rate this project already patches is a field inside one (``+0xC80``), and the
-move-timing windows are frame counters inside one too, so being able to read a
-whole fighter out of a running game is what makes those findable.
-
 Layout recovered from ``FUN_001DC168`` / ``FUN_001DC178``:
 
     manager    = *(u32*)MANAGER_PTR
@@ -28,9 +23,8 @@ PAD_INDEX = 0x0004       # which controller slot drives this fighter
 SLOT_ID = 0x0008         # the id FUN_001DC210 searches on
 MODEL_ID = 0x000C        # an index, not a pointer: FUN_002499B0 maps it to the model
 
-# The fighter's own input block, maintained by FUN_001D4A70/FUN_001D4A00.
-# Combat keeps edge state here rather than reading the shared globals at
-# 0x00333988, which is why the shared ones have no gameplay readers.
+# The fighter's own input block (FUN_001D4A70/FUN_001D4A00). Combat keeps edge
+# state here, not in the shared globals at 0x00333988.
 INPUT = 0x0570
 RAW_BUTTONS = INPUT + 0x000
 CUR_A = INPUT + 0x1CC
@@ -42,9 +36,8 @@ PREV_B = INPUT + 0x1E0
 NEWPRESS_B = INPUT + 0x1E4
 RELEASED_B = INPUT + 0x1E8
 
-# The animation rate the 60fps patch halves is +0xC80 on the object
-# FUN_001DC280 returns, NOT on the fighter - resolving it needs FUN_002499B0,
-# so it cannot be read by offsetting the fighter base.
+# The animation rate the 60fps patch halves is +0xC80 on the object FUN_001DC280
+# returns, NOT on the fighter; resolve it via FUN_002499B0.
 ANIM_RATE_ON_MODEL = 0x0C80
 
 FRAME_COUNTER = 0x00331D64   # advances once per FrameStep
@@ -89,11 +82,7 @@ def bases(pine: Pine) -> list[int]:
 
 def read(pine: Pine, base: int, index: int = 0, size: int = SIZE,
          chunk: int = 512) -> Fighter:
-    """One fighter's whole struct.
-
-    Chunked because a single PINE packet carrying 1400 read commands is large
-    enough to be worth not finding out about the hard way.
-    """
+    """One fighter's whole struct, chunked to keep PINE packets small."""
     words: list[int] = []
     for start in range(0, size // 4, chunk):
         n = min(chunk, size // 4 - start)
