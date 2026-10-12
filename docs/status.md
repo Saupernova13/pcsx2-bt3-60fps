@@ -558,6 +558,7 @@ Its frames now count at 60 and its per-update steps are halved.
 |---|---|---|---|
 | first disc's flight | 8 vsyncs | 4 | 8 |
 | hits vs 30fps | - | 5-6 early | 1-2 early |
+| Android 18's Destructo Disc hits | v98, v114 | v90, v107 | v97, v114 |
 
 **Not confirmed in play.**
 

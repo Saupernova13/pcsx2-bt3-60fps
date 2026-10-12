@@ -899,6 +899,7 @@ description=Fly, home, spin and fade discs such as Krillin's Ultimate at their r
 patch=1,EE,0016B76C,word,3C014270 // EftDisc_Init: lui at,0x41F0 -> 0x4270   30.0 -> 60.0: life, grow, roll and fade in frames
 patch=1,EE,002FCAE4,word,3FC90FDA // EftDisc_Init spin: pi -> pi/2 (one reader)
 patch=1,EE,002FCB00,word,3CA3D70A // EftDisc_Update bob: 0.04 -> 0.02 (one reader)
+patch=1,EE,002FC78C,word,BFC90FDA // technique 0x202 piece spin (EftMulti_FirePiece -> EftDisc_SetSpin): -pi -> -pi/2 (one reader 001537C4)
 patch=1,EE,0016CB54,word,3C0141F0 // EftDisc_Home: lead clamp 15 -> 30 frames
 patch=1,EE,0016CC10,word,3C014080 // EftDisc_Home: turn spread from 2 -> 4 frames
 patch=1,EE,000F2340,word,C64C0034 // lwc1 f12,0x34(s2)        speed (displaced)
