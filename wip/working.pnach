@@ -868,3 +868,67 @@ patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds 
 description=Let a launched or blown-away fighter recover after its real 9 frames, not half that.
 patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
 patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
+
+// Devilman's Fork Attack, found 2026-09-21 for issue #54 - "the thrown fork is
+// faster". The fork is a spawned object on a class of its own: none of the
+// movers the other travel groups hook ever runs for it. Its update is
+// FUN_00154DE8, laid out like the rock class's FUN_0015BFB8 (the same freeze
+// check, script poll and phase byte), and it moves by
+//
+//   001550A8  jal Vec3Scale     vel(+0x70) = dir * speed(+0x04), on one path
+//   001550C4  jal Vec3Add       pos += vel, reached by both paths
+//   001550C8  dmove a1, a0      (delay slot)
+//
+// once a tick, so at 60fps the fork covers its path in half the real time. The
+// hook is the same shape as [60FPS - blast object travel]: the add becomes a jump
+// to a helper that calls the fused scale-add FUN_001225D0(dst, a1, a2) =
+// [a2] + [a1] * $f12 with $f12 = 0.5, then returns past the original call.
+//
+// Measured from save state 6, Devilman 227 units from a standing Ultimate Gohan,
+// L2 + Triangle, the fork's model (index 2) x per vsync after it appears:
+//
+//   30fps   47 47 47 47 27 27 8 8 -11 -11 ...   hits on v75, 16 vsyncs after it appears
+//   v24     47 47 27 8 -11 -30 -50 -69          hits on v64, 8 vsyncs after
+//   this    47 47 37 27 18 8 -1 -11 -21 ...     hits on v69, 13 vsyncs after
+//
+// What is left is before the flight: the throw animation starts about 3 vsyncs
+// early and the fork waits 2 vsyncs at its spawn point where 30fps waits 4 - the
+// same pre-launch overshoot the shipped header already lists for Frieza's rocks.
+// The blast script clock group (PR #31) does not reach it.
+//
+// Between the fire event and its first move the shot spends one update in state 1
+// (eft_shot_tech.c: state 1 only advances), one 30fps tick: 4 vsyncs from the fire to
+// the first move at 30fps, 2 at 60fps. 000F2590 counts state 1's visits in the shot's
+// timer (+0x18, used only after a hit and zero until then) and advances on the third.
+// Devilman's fork, rig slot 6: hit at v78 at 30fps, v75 before, v77 with it; the 1
+// left is the throw's own hand-off (#127).
+[60FPS - weapon object travel]
+description=Halve the per-tick flight of thrown-weapon objects such as Devilman's fork, so they cross the gap in real time rather than twice as fast.
+patch=1,EE,000F18F0,word,00C0282D // move $a1, $a2          a1 = the velocity
+patch=1,EE,000F18F4,word,0080302D // move $a2, $a0          a2 = the position
+patch=1,EE,000F18F8,word,3C013F00 // lui $at, 0x3f00        0.5f
+patch=1,EE,000F18FC,word,0C048974 // jal 0x1225d0           dst = a2 + a1 * $f12
+patch=1,EE,000F1900,word,44816000 // mtc1 $at, $f12         (delay slot)
+patch=1,EE,000F1904,word,08055433 // j 0x1550cc             past the original add
+patch=1,EE,000F1908,word,00000000 // nop
+patch=1,EE,001550C4,word,0803C63C // jal Vec3Add -> j 000F18F0
+patch=1,EE,000F2590,word,92A80001 // lbu   t0,1(s5)            task state
+patch=1,EE,000F2594,word,24090001 // li    t1,1
+patch=1,EE,000F2598,word,1509000B // bne   t0,t1,000F25C8      state 3: advance as before
+patch=1,EE,000F259C,word,00000000 // nop
+patch=1,EE,000F25A0,word,3C093F80 // lui   t1,0x3F80
+patch=1,EE,000F25A4,word,44890800 // mtc1  t1,f1
+patch=1,EE,000F25A8,word,C6600018 // lwc1  f0,0x18(s3)        timer (unused before a hit) as a visit count
+patch=1,EE,000F25AC,word,46010000 // add.s f0,f0,f1
+patch=1,EE,000F25B0,word,3C094040 // lui   t1,0x4040            3.0
+patch=1,EE,000F25B4,word,44891000 // mtc1  t1,f2
+patch=1,EE,000F25B8,word,46020034 // c.olt.s f0,f2
+patch=1,EE,000F25BC,word,45010005 // bc1t  000F25D4            visits 1 and 2: wait
+patch=1,EE,000F25C0,word,E6600018 // swc1  f0,0x18(s3)
+patch=1,EE,000F25C4,word,AE600018 // sw    zero,0x18(s3)       visit 3: reset, advance
+patch=1,EE,000F25C8,word,24170001 // li    s7,1                advance = 1
+patch=1,EE,000F25CC,word,08055444 // j     00155110
+patch=1,EE,000F25D0,word,00000000 // nop
+patch=1,EE,000F25D4,word,08055444 // j     00155110            advance stays 0
+patch=1,EE,000F25D8,word,00000000 // nop
+patch=1,EE,00155108,word,0803C964 // li s7,1 -> j 000F2590     EftPropShot state 1: 4 vsyncs, as one 30fps tick each side
