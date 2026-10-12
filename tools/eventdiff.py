@@ -1,18 +1,14 @@
 """Stop both arms at the same EVENT instead of the same time, and diff there.
 
-Whatever a scripted sequence keeps time by has to read the same at a given
-point of the script in both arms, because it is the same point. Everything
-else - real time, tick count, every correctly compensated quantity - differs.
-So: snapshot at the start and at the event in each arm, and keep the words that
-started equal, moved, and arrived at the event equal again.
+Whatever a scripted sequence keeps time by reads the same at a given point of the
+script in both arms; real time and compensated quantities differ. So snapshot at
+the start and at the event in each arm, and keep the words that started equal,
+moved, and arrived at the event equal again.
 
-The event is a watched address changing by more than a threshold. The
-opponent's HP dropping is the usual one; pick a threshold above whatever the
-mode's health regeneration writes, or it will trigger on that instead.
+The event is a watched address changing by more than a threshold, usually the
+opponent's HP dropping; set it above the mode's health regeneration.
 
-This rarely names the answer on its own. It is worth running because it says
-what the answer is *not*, which is how the search that found this game's two
-scripted clocks narrowed from floats to integers.
+This rarely names the answer, but it says what the answer is *not*.
 
     python tools/eventdiff.py 8 work/ev.npz
     python tools/eventdiff.py 1 work/ev.npz --hold L2,Triangle --leads 137,134
