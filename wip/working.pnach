@@ -720,6 +720,16 @@ patch=1,EE,000F2570,word,AE40000C // sw zero,0xC(s2)          rotOfs.w = 0, as C
 patch=1,EE,000F2574,word,3C0C3F80 // lui t4,0x3F80
 patch=1,EE,000F2578,word,0803C7A6 // j 000F1E98
 patch=1,EE,000F257C,word,AE2C000C // sw t4,0xC(s1)            posOfs.w = 1.0
+patch=1,EE,000F26E0,word,3C080030 // lui t0,0x30
+patch=1,EE,000F26E4,word,8D08EB14 // lw t0,-0x14EC(t0)       gBtlChars 002FEB14: 0 outside a battle
+patch=1,EE,000F26E8,word,11000003 // beq t0,zero,000F26F8
+patch=1,EE,000F26EC,word,00000000 // nop
+patch=1,EE,000F26F0,word,0803C764 // j 000F1D90               battle: the held-offset wrapper
+patch=1,EE,000F26F4,word,00000000 // nop
+patch=1,EE,000F26F8,word,0808FD1E // j 0023F478               wish screen: CamShake_Calc as before
+patch=1,EE,000F26FC,word,00000000 // nop
+patch=1,EE,0023D5D0,word,0C03C9B8 // jal 000F26E0 (DemoCam_Update fixed pose)
+patch=1,EE,0023D788,word,0C03C9B8 // jal 000F26E0 (DemoCam_Update animated)
 
 // Cut-in mouth and face tracks no longer stop mid-sentence.
 // Halves the keyframe clock add at 0024ED20 and 0024F290 (rate 2.0). Hooks the add, not the rate

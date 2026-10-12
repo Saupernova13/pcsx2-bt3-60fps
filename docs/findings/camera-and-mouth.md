@@ -628,3 +628,25 @@ the table fills on the battle's first tick, because the function runs every
 tick. Seven smoke moves give the same state timelines with and without the
 group. Odd ticks also draw no random numbers now, so the shake uses the shared
 random sequence at its 30fps rate.
+
+### 2026-10-12: the cinematic camera's shake
+
+`DemoCam_Update` (the cinematic and story-script camera) makes its own
+`CamShake_Calc` call, one per path: `0023D5D0` for a fixed pose, `0023D788` for
+an animated one. A story script shakes this camera (`BtlScriptCmd_ShakeCamera`,
+command 1204, and the kept-up `gBtlScript.shakeTime`), so those shakes still
+redrew every vsync. Both calls now go through a guard at `000F26E0` into the
+same wrapper; the demo camera's shake slots are a new key in the table. The
+guard sends the call straight to `CamShake_Calc` when `gBtlChars` (`002FEB14`) is
+0, because the Shenron wish screen runs this camera in its own 30fps loop.
+
+| Raditz intro (Saiyan saga, Common Enemy), script shake held at 2.0 for 120 vsyncs | 30fps | without | with |
+|---|---|---|---|
+| new offsets | 60 | 120 | 60 |
+| vsyncs each is held | 2 | 1 | 2 |
+| largest position offset | 6.40 | 6.40 | 6.40 |
+
+| Check | Result |
+|---|---|
+| Shenron wish screen | 30 offsets over a 59-vsync shake, as without; guard took the outside-battle path 681 of 681 calls |
+| Spirit Bomb cinematic (the animated path, shake 0) | 273 calls, no offset, as without |

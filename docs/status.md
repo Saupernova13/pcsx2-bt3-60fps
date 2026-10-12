@@ -552,12 +552,14 @@ could recover after 9 ticks instead of 9 frames.
 
 Adds `[60FPS - camera shake jitter]`. The shake draws a new random camera offset
 once a tick, so at 60fps the camera jumped every frame. A wrapper on its battle
-call site holds each camera's offset for two ticks.
+call site holds each camera's offset for two ticks. The cinematic camera's two
+calls (story-script shakes) go through it too, in battle only.
 
 | Goku's Kamehameha hit, per camera | 30fps | 60fps before | 60fps with it |
 |---|---|---|---|
 | new offsets during the shake | 11 | 21 | 11 |
 | vsyncs each is held | 2 | 1 | 2 |
+| story-script shake (Raditz intro), new offsets in 120 vsyncs | 60 | 120 | 60 |
 
 **Not confirmed in play.**
 
