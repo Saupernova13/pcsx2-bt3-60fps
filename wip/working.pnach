@@ -770,7 +770,8 @@ patch=1,EE,002FD330,word,3CCCCCCC // 0.05 -> 0.025          clash point per tug 
 //   - a fighter's state differs from the one the AI last saw, so it never acts
 //     a tick on a decision made for a state that has ended, as at 30fps where
 //     it always sees a new state on the next tick
-//   - a fighter is in state 250 or 304, the Rush Struggle and the Beam Struggle,
+//   - a fighter is in state 250 or 304-306, the Rush Struggle and the Beam Struggle
+//     (0x130-0x132, one per blast slot: 0x12E + slot),
 //     whose groups already pace the CPU's stick by letting its rotation count
 //     only on even ticks; gated twice, the CPU stopped scoring altogether
 // Its last-run frame and the states it saw (up to four fighters) live at
@@ -816,8 +817,8 @@ patch=1,EE,000F2058,word,258DFF06 // addiu t5,t4,-0xFA
 patch=1,EE,000F205C,word,240F0001 // addiu t7,zero,0x1
 patch=1,EE,000F2060,word,11A00007 // beq t5,zero,0xf2080
 patch=1,EE,000F2064,word,258DFED0 // addiu t5,t4,-0x130
-patch=1,EE,000F2068,word,11A00005 // beq t5,zero,0xf2080
-patch=1,EE,000F206C,word,00000000 // nop
+patch=1,EE,000F2068,word,2DAD0003 // sltiu t5,t5,3          0x130-0x132: the Beam Struggle, any blast slot
+patch=1,EE,000F206C,word,15A00004 // bne t5,zero,0xf2080
 patch=1,EE,000F2070,word,254AFFFF // addiu t2,t2,-0x1
 patch=1,EE,000F2074,word,256B1600 // addiu t3,t3,0x1600
 patch=1,EE,000F2078,word,1000FFF2 // beq zero,zero,0xf2044
