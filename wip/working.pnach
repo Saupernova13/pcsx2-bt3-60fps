@@ -636,6 +636,11 @@ patch=1,EE,001C5724,word,00000000 // nop
 //                          30fps       60fps before   with this group
 //   new offsets in shake   11          21             11
 //   vsyncs each is held    2           1              2
+//
+// On an odd tick the held offsets are copied back, x/y/z and x/y; CamShake_Calc
+// also zeroes the rotation's z/w and sets the position's w to 1.0 (Vec4_SetZero /
+// SetZeroW1). Left out, the camera roll added stack leftovers on every odd tick
+// (90 of 180 updates, slot 7); 000F2570 writes them too.
 [60FPS - camera shake jitter]
 description=Hold each new screen-shake offset for two frames, so the camera shakes as often as on a PS2 instead of jumping every frame.
 patch=1,EE,001C6B48,word,0C03C764 // jal 0023F478 -> jal 000F1D90
@@ -672,8 +677,8 @@ patch=1,EE,000F1E04,word,8D4C0010 // lw t4,0x10(t2)
 patch=1,EE,000F1E08,word,AE4C0000 // sw t4,0x0(s2)
 patch=1,EE,000F1E0C,word,8D4C0014 // lw t4,0x14(t2)
 patch=1,EE,000F1E10,word,AE4C0004 // sw t4,0x4(s2)
-patch=1,EE,000F1E14,word,10000020 // beq zero,zero,0xf1e98
-patch=1,EE,000F1E18,word,00000000 // nop
+patch=1,EE,000F1E14,word,0803C95C // j 000F2570               odd tick: finish the held offsets
+patch=1,EE,000F1E18,word,AE400008 // sw zero,0x8(s2)          rotOfs.z = 0
 patch=1,EE,000F1E1C,word,0C08FD1E // jal 0x23F478
 patch=1,EE,000F1E20,word,00000000 // nop
 patch=1,EE,000F1E24,word,3C0A000F // lui t2,0xF
@@ -711,6 +716,10 @@ patch=1,EE,000F1EA0,word,DFB10010 // ld s1,0x10(sp)
 patch=1,EE,000F1EA4,word,DFB20018 // ld s2,0x18(sp)
 patch=1,EE,000F1EA8,word,03E00008 // jr ra
 patch=1,EE,000F1EAC,word,27BD0020 // addiu sp,sp,0x20
+patch=1,EE,000F2570,word,AE40000C // sw zero,0xC(s2)          rotOfs.w = 0, as CamShake_Calc leaves them
+patch=1,EE,000F2574,word,3C0C3F80 // lui t4,0x3F80
+patch=1,EE,000F2578,word,0803C7A6 // j 000F1E98
+patch=1,EE,000F257C,word,AE2C000C // sw t4,0xC(s1)            posOfs.w = 1.0
 
 // Cut-in mouth and face tracks no longer stop mid-sentence.
 // Halves the keyframe clock add at 0024ED20 and 0024F290 (rate 2.0). Hooks the add, not the rate
