@@ -1,12 +1,11 @@
 """Split docs/findings.md into topic files under docs/findings/, losing nothing.
 
-Every `## ` section of the log is assigned to exactly one topic by its heading.
-Sections keep their original order inside each topic, and the lines before the
-first section become the index's introduction. A heading that matches no topic,
-or more than one, stops the run, so a new section can never be dropped silently.
+Every `## ` section is assigned to exactly one topic by its heading, keeping its
+order; the lines before the first section become the index's introduction. A
+heading that matches no topic, or more than one, stops the run.
 
 Fix PRs still append to docs/findings.md. After merging them, restore the file
-from git, add a rule for any new heading below, and run this again:
+from the VCS, add a rule for any new heading below, and run this again:
 
     python tools/split_findings.py            # writes docs/findings/*.md
     python tools/split_findings.py --check    # verifies, writes nothing
@@ -24,10 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "docs" / "findings.md"
 OUT = ROOT / "docs" / "findings"
 
-# The log lives in docs/ and every file it is split into lives in docs/findings/,
-# one level deeper, so a relative link written for the log points one directory
-# short once it is moved. Rewrite those; leave absolute URLs, anchors, and links
-# that already climb out alone, so a re-run cannot double-prefix them.
+# The files move one directory deeper, so relative links are rewritten; absolute
+# URLs, anchors and links that already climb out are left alone, so a re-run
+# cannot double-prefix them.
 RELATIVE_LINK = re.compile(r"\]\((?!https?:|mailto:|#|\.\./)([^)\s]+?)\.md(#[^)]*)?\)")
 RELATIVE_LINK_ANY = re.compile(r"\]\((?!https?:|mailto:|#)([^)\s]+?\.md)(#[^)]*)?\)")
 
@@ -35,8 +33,7 @@ RELATIVE_LINK_ANY = re.compile(r"\]\((?!https?:|mailto:|#)([^)\s]+?\.md)(#[^)]*)
 def repath(line: str) -> str:
     return RELATIVE_LINK.sub(r"](../\1.md\2)", line)
 
-# (file, title, scope, heading patterns). First match wins is NOT used: a
-# heading must match exactly one topic.
+# (file, title, scope, heading patterns). A heading must match exactly one topic.
 TOPICS = [
     ("state-of-play.md", "State of play and the user's reports",
      "The running summary, the user's defect lists and every play-test.",
@@ -194,8 +191,7 @@ def main() -> int:
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     text = SOURCE.read_text(encoding="utf-8")
-    # Every line ends up one directory deeper, so relative links are rewritten
-    # before the split, and verify() then compares against what is written.
+    # Relative links are rewritten before the split; verify() compares against what is written.
     text = "\n".join(repath(ln) for ln in text.split("\n"))
     files = build(text)
     verify(text, files)
