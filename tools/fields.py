@@ -1,9 +1,7 @@
 """Watch a window of a fighter's struct tick by tick, as floats.
 
-Once a watchpoint has named the fields a routine reads, the question becomes
-which of them actually carries the motion this frame. Printing the window as
-floats next to the position delta answers that by inspection: the one whose
-magnitude matches the step is the channel in use.
+Printed next to the position delta, the field whose magnitude matches the step is
+the channel in use.
 
     python tools/fields.py --who 1 --slot 2 --from 0x70 --to 0xC0 --ticks 8
 """
