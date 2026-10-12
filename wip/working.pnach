@@ -887,6 +887,14 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 //   Down + Cross dash: puffs       14           28              14
 //                      mean life   36.0 v       18.0 v          36.0 v
 //   rush string: mean life         50.6 v       25.6 v          51.1 v
+//
+// The skid dust of a fighter pushed along the ground (guarding, action 0x39, a
+// hit stagger) is the foot dust bit 0x32, set every tick while the fighter's last
+// frame's move exceeds 200 km/h (BTL_KMH, a per-30fps-frame unit). At 60fps that
+// move is half as long, so it never fired: the threshold words halve (one reader
+// each), and the three calls go through 000F2540, which sets the bit on even
+// vsyncs only. Guarding Cell's charged smash, slot 7: 30fps 3 ticks / 6 puffs,
+// before 0 / 0, with it 2 / 4 (the push stays over the line 5 vsyncs, not 6).
 [60FPS - ground dust rate]
 description=Raise and fade the dust of dashes, slides and landings at 30Hz, so it is as thick and lasts as long as at 30fps.
 patch=1,EE,000F2440,word,3C010033 // lui at,0x33
@@ -919,3 +927,18 @@ patch=1,EE,000F24A4,word,08066194 // j 00198650
 patch=1,EE,000F24A8,word,0001100B // movn v0,zero,at          odd vsync: no tick, no spawn
 patch=1,EE,00198648,word,0803C924 // EftGndDustDash_Update: lw v0,0xB4(s0) -> j 000F2490
 patch=1,EE,0019864C,word,00000000 // (andi moved into 000F2490)
+patch=1,EE,002FD878,word,3F6D0979 // 200 -> 100 km/h a frame   guard push skid (BtlAct guard 0x38, one reader 001EBE04)
+patch=1,EE,002FD884,word,3F6D0979 // 200 -> 100 km/h a frame   action 0x39 skid (one reader 001EC128)
+patch=1,EE,002FD700,word,3F6D0979 // 200 -> 100 km/h a frame   hit stagger skid (one reader 001E8348)
+patch=1,EE,000F2540,word,3C010033 // lui  $at, 0x0033
+patch=1,EE,000F2544,word,8C211D64 // lw   $at, 0x1D64($at)   frame counter
+patch=1,EE,000F2548,word,30210001 // andi $at, $at, 1
+patch=1,EE,000F254C,word,14200003 // bnez $at, 000F255C      odd tick: no skid dust
+patch=1,EE,000F2550,word,00000000 // nop
+patch=1,EE,000F2554,word,08073D5E // j    BtlChar_SetFxBit   even tick: set it (a0, a1 from the caller)
+patch=1,EE,000F2558,word,00000000 // nop
+patch=1,EE,000F255C,word,03E00008 // jr   $ra
+patch=1,EE,000F2560,word,00000000 // nop
+patch=1,EE,001EBE14,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   guard skid dust
+patch=1,EE,001EC138,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   action 0x39 skid dust
+patch=1,EE,001E835C,word,0C03C950 // jal BtlChar_SetFxBit -> jal 000F2540   hit stagger skid dust
