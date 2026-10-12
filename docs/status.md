@@ -548,6 +548,20 @@ could recover after 9 ticks instead of 9 frames.
 
 **Not confirmed in play.**
 
+## Proposed - the Max Power shockwave (#137)
+
+Adds `[60FPS - max power shockwave]`. The ring that warps the background when a
+fighter reaches Max Power Mode was made with a life of seconds * 30 ticks and
+per-tick steps, so at 60fps it spread and faded in half its time. It is now
+made for 60 ticks a second.
+
+| Goku (Early) | 30fps | 60fps before | with it |
+|---|---|---|---|
+| ring alive | 46 vsyncs | 23 | 46 |
+| radius, width and alpha after each 30fps tick | - | - | equal to 30fps |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
