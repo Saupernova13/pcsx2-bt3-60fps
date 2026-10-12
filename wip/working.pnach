@@ -882,9 +882,23 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 // Not covered: the shake's random offsets are drawn once a tick, so at 60fps
 // the camera jitters twice as often; matching that would mean caching the
 // draws of all three cameras.
+//
+// The Shenron wish screen runs its own 30fps loop and also ticks this shake
+// (DemoCam_Update from shen_scene.c). 000F2610 doubles the step back to 1/30
+// when no battle is loaded (gBtlChars null); in battle the doubling never runs
+// (0 of 454 calls, Hercule's Blast 2).
 [60FPS - camera shake]
 description=Count the camera shake down in real time, so the screen shakes on a hit for as long as at 30fps.
 patch=1,EE,002FE544,word,3C888888 // 1/30 -> 1/60 s a tick   the shake's countdown step
+patch=1,EE,000F2610,word,C782A2D4 // lwc1 f2,-0x5D2C(gp)      shake step, 1/60 a tick
+patch=1,EE,000F2614,word,3C010030 // lui  at,0x30
+patch=1,EE,000F2618,word,8C21EB14 // lw   at,-0x14EC(at)      gBtlChars: a battle is loaded
+patch=1,EE,000F261C,word,14200002 // bne  at,zero,000F2628
+patch=1,EE,000F2620,word,00000000 // nop
+patch=1,EE,000F2624,word,46021080 // add.s f2,f2,f2           no battle (the Shenron wish screen runs at 30fps): 1/30
+patch=1,EE,000F2628,word,0808FD0F // j    0023F43C
+patch=1,EE,000F262C,word,00000000 // nop
+patch=1,EE,0023F438,word,0803C984 // CamShake_Tick: lwc1 f2 -> j 000F2610
 
 // Controller rumble, found 2026-09-28 for issue #80. FUN_001DC5E0 runs each
 // fighter's rumble (fighter+0x15D0) once a tick:
