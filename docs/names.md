@@ -28,6 +28,7 @@ from SuperCombo's names to this repo's old terms.
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
 | recovering after being launched or blown away | The recovery windows of states 206 and 213 / 214 / 223 | `recovery windows`, issue #158 |
+| Krillin's ring of shots, the shots that gather round the opponent | The ring shot, technique effect type 4 (my label) | `ring shot`, issue #149 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
