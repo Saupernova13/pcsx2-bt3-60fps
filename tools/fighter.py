@@ -1,10 +1,7 @@
 """Read live fighters, and find the frame counters inside them.
 
-At 60fps every timer that counts loop iterations expires in half the real time
-it used to, which is what breaks combo windows and double-taps. ``--timers``
-finds those directly: sample a fighter repeatedly, and report every field that
-moves by exactly one per game frame. That is the definition of a frame counter,
-so the list it prints is the list of things the patch has to compensate for.
+``--timers`` samples a fighter repeatedly and reports every field that moves by
+exactly one per game frame: the timers the patch has to compensate for.
 
     python tools/fighter.py --info
     python tools/fighter.py --timers --seconds 4
@@ -33,9 +30,7 @@ def plausible_counter(values: list[int]) -> bool:
 def find_timers(pine: Pine, index: int, seconds: float, threshold: float):
     """Fields that move one per frame, and how reliably.
 
-    Scored over consecutive sample pairs rather than by fitting the whole run,
-    because a timer that resets mid-capture is still a timer - it just breaks
-    a global fit.
+    Scored over consecutive sample pairs, so a timer that resets mid-capture still counts.
     """
     base = fx.bases(pine)[index]
     samples: list[tuple[int, list[int]]] = []
@@ -84,10 +79,7 @@ def by_frame(samples):
 def find_countdowns(samples, min_run: int):
     """Fields that step down one per frame and then reset.
 
-    That is the shape of a timing window: something sets it to N on an event
-    and it ticks to zero. The peak value is the window length in frames, which
-    at 60fps is half the real time it was authored for - so the peaks this
-    prints are the numbers a fix has to double.
+    The shape of a timing window; the peak is its length in frames, the number a fix has to double.
     """
     frames, order = by_frame(samples)
     if len(frames) < min_run + 1:
@@ -188,9 +180,7 @@ def main() -> int:
                   f"(fighter +{lo:03X}..+{hi:03X}) for {args.seconds}s")
 
             if args.armed:
-                # Recording on a fixed timer means the capture is already half
-                # over by the time anyone has read the instructions. Wait for a
-                # real press instead, so the window belongs to the player.
+                # Wait for a real press rather than a fixed timer, so the window belongs to the player.
                 print(f"  armed - waiting up to {args.arm_timeout:.0f}s for a "
                       f"button press ...", flush=True)
                 give_up = time.monotonic() + args.arm_timeout
@@ -237,9 +227,8 @@ def main() -> int:
         if args.watch:
             base = fx.bases(pine)[args.fighter]
             spec = [x.strip() for x in args.watch.split(",")]
-            # An absolute address lets the physical pad be watched next to the
-            # fighter's copy of it, which separates "the press never arrived"
-            # from "it arrived and nothing opened".
+            # An absolute address lets the physical pad be watched next to the fighter's copy,
+            # separating "the press never arrived" from "it arrived and nothing opened".
             addrs = [int(x[1:], 16) if x.startswith("@") else base + int(x, 16)
                      for x in spec]
             labels = [x if x.startswith("@") else f"+{int(x, 16):04X}" for x in spec]
