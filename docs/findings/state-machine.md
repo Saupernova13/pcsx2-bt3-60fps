@@ -551,12 +551,12 @@ animation; from `actionFrame` >= 7 (`001F4780`) the fighter may act.
 | | 30fps | 60fps before | with the group |
 |---|---|---|---|
 | state 0x35 lasts | 38 vsyncs | 25 | 38 |
-| travel | 257.8 units | 148.5 | 268.9 |
+| travel | 257.8 units | 148.5 | 260.3 |
 | may act after | 14 vsyncs | 7 | 14 |
 
-`Left` instead of `Right`: 247.9 at 30fps, 258.4 with the group. Both arms reach
-222 units at the end of the dash. The 11 extra units come from the dash's first
-tick: anim 0xC's first frame does not move (`BtlAnim_IsNew`), which costs 2
-vsyncs at 30fps and 1 at 60fps, so the dash takes one more half-step.
+`Left` instead of `Right`: 247.9 at 30fps, 250.7 with the group. The dash's first
+frame does not move (`BtlAnim_IsNew`, `001F4578`): 2 vsyncs at 30fps, 1 at 60fps,
+which added a half-step (268.9 units); `000F26C0` also holds it while
+`actionFrame` < 2. The 2.5 units left come from the stop slide's deceleration.
 
 `BtlAct_Action67to69` (`slti 10`) is still without a scene.

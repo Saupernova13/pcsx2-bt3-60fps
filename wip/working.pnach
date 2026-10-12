@@ -872,7 +872,18 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 // The Max Power vanish dash (direction + Circle) runs its real 13 frames.
 // BtlAct_VanishDashHandler counts actionFrame (fighter+0x964) once a tick: the dash runs while it is
 // < 13 and the fighter may act from 7. Both compares double.
+// The dash does not move on its first frame (BtlAnim_IsNew): 2 vsyncs at 30fps,
+// 1 at 60fps, which added a half-step (+4%). 000F26C0 also holds it while
+// actionFrame < 2.
 [60FPS - vanish dash]
 description=Let the Max Power vanish dash run its full length and distance, not about half.
 patch=1,EE,001F4714,word,2842001A // slti $v0, $v0, 13 -> 26    dash ends (BtlAct_VanishDashHandler)
 patch=1,EE,001F4780,word,2842000E // slti $v0, $v0, 7 -> 14     may act from frame 7
+patch=1,EE,000F26C0,word,8E080964 // lw   t0,0x964(s0)          actionFrame
+patch=1,EE,000F26C4,word,29080002 // slti t0,t0,2
+patch=1,EE,000F26C8,word,01024025 // or   t0,t0,v0              or the animation is new
+patch=1,EE,000F26CC,word,0008402B // sltu t0,zero,t0
+patch=1,EE,000F26D0,word,39110001 // xori s1,t0,1               no move on the dash's first 30fps frame (2 vsyncs)
+patch=1,EE,000F26D4,word,0807D183 // j    001F460C
+patch=1,EE,000F26D8,word,00000000 // nop
+patch=1,EE,001F4578,word,0803C9B0 // beqz v0 (IsNew) -> j 000F26C0
