@@ -1,32 +1,20 @@
 """Write a shareable copy of the patch, with the development-only groups removed.
 
-The repo pnach is a working document: it carries an experiment that deliberately
-breaks ground movement and a superseded alternative to the animation clock, both
-switched off. Anyone handed that file sees a list of checkboxes with no way to
-know which ones are the fix, and ticking them all breaks the game. This writes
-out only the groups that are part of the fix, keeps each one's explanatory
-comment with it, and puts the list of what to enable at the top.
+The repo pnach is a working document: it carries groups that break the game,
+switched off. This writes out only the groups that are part of the fix, keeps
+each one's description with it, and puts the list of what to enable at the top.
+The file must be named 428113C2.pnach (PCSX2 finds a pnach by CRC).
 
-The name matters: PCSX2 finds a pnach by the game's CRC, so the file has to be
-called 428113C2.pnach wherever it ends up.
-
-The working pnach has one layout rule this depends on: a group's description is
-the comment block directly above its header, with no blank line between them,
-and a blank line separates one group from the next. A description that is not
-touching its header is carried with the wrong group.
+Layout rule: a group's description is the comment block directly above its
+header with no blank line between; a blank line separates groups. A description
+not touching its header is carried with the wrong group.
 
     python tools/export.py --release v23-something
     python tools/export.py --to build/
 
-With --release it refreshes patch/ at the repo top level, which is always the
-newest stable patch and the file to install. Named 428113C2.pnach, because
-PCSX2 finds a pnach by CRC and will ignore any other name. The version history
-is the git tags: tag the commit to match the release name, so a tag and what
-patch/ held at that commit always agree.
-
-Every release also carries a version note, docs/versions/NAME.md, saying what
-the version changes over the one before it and what was discovered on the way.
---release refuses to run without it, so the history cannot quietly lapse.
+--release refreshes patch/, the newest stable patch and the file to install; tag
+the commit to match the release name. It refuses to run without a version note,
+docs/versions/NAME.md.
 """
 
 from __future__ import annotations
@@ -46,7 +34,7 @@ from ps2ee.pnach import Pnach
 # deploy.py has to refuse the same names.
 DEVELOPMENT_ONLY = config.NEVER_SHIP
 
-# Stated plainly at the top of the shared file rather than left to be discovered.
+# Stated plainly at the top of the shared file.
 KNOWN_BROKEN: list[str] = [
     "an ultimate's beam lands its first hit about half a second early. The "
     "cinematic up to the launch is now correct to within two vsyncs; what is "
@@ -73,11 +61,8 @@ KNOWN_BROKEN: list[str] = [
 def split_groups(text: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
     """Slice into a file header and (name, lines) blocks.
 
-    A group's description is the contiguous run of comment lines directly above
-    its header, and it travels with that group. Everything before that run -
-    the blank line that separates groups included - stays with the group above,
-    or with the file header for the first group. So dropping a group drops its
-    own description and nobody else's.
+    A group's description is the comment run directly above its header and travels
+    with it; everything before that run stays with the group above.
     """
     header: list[str] = []
     blocks: list[tuple[str, list[str]]] = []
@@ -101,16 +86,14 @@ def split_groups(text: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
     return header, blocks
 
 
-# Named in descriptions on purpose, and not ours: PCSX2's own patch database
-# ships the stock widescreen hack, which every aspect group says to turn off.
+# Not ours: PCSX2's patch database ships the stock widescreen hack, which every
+# aspect group says to turn off.
 EXTERNAL_GROUPS = {"Widescreen 16:9"}
 
 
 def stray_names(blocks: list[tuple[str, list[str]]]) -> list[str]:
-    """Groups named in a kept group's description that the output does not have.
-
-    A description that names a missing group is almost always one that has come
-    loose from its own group, which is the defect split_groups() exists to stop.
+    """Groups named in a kept group's description that the output does not have, usually
+    a description that came loose from its group.
     """
     shipped = {name for name, _ in blocks} | EXTERNAL_GROUPS
     problems = []
@@ -193,8 +176,7 @@ def main() -> int:
     for out_dir in targets:
         out_dir.mkdir(parents=True, exist_ok=True)
         dest = out_dir / f"{config.CRC}.pnach"
-        # LF, as .gitattributes stores every pnach. CRLF made a release export of an
-        # unchanged patch show patch/ as modified on Windows. PCSX2 reads either.
+        # LF, as the attributes file stores every pnach (CRLF made patch/ look modified on Windows).
         dest.write_text(text, encoding="utf-8", newline="\n")
         problems = Pnach.load(dest).validate(exclusive=config.EXCLUSIVE)
         if problems:
