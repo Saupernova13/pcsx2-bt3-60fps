@@ -884,10 +884,16 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 // Two wrappers, both even ticks only. 0014C3B8 -> 000F1CB0: the controller's shot
 // loop is skipped on odd ticks; the fire events above it still run every vsync.
 // 0016A440 -> 000F1C80: on odd ticks the blast object skips its movement and
-// countdowns and goes straight to its attached effects and its draw
-// (0016A5C8), which keeps the 37-unit streak on screen on both vsyncs instead
-// of a zero-length one on the odd one. The draw's size ramp FUN_001518D8 still
-// runs every vsync, as before.
+// countdowns, which keeps the 37-unit streak on screen on both vsyncs instead
+// of a zero-length one on the odd one. The odd tick (000F2280) only latches the
+// one-tick fired (bit 4) and abort (0x400) events, runs the attached effects and
+// returns: the stop -> dying -> dead steps, the size ramp (FUN_001518D8, also the
+// hit radius) and the hit volume run on even ticks, as at 30fps. Run every vsync,
+// a dying shot cleared in 2 vsyncs, not 4, and its volley ended early.
+//
+// EftVolleyAim_Steer (001AEF74) leads a moving target by its last frame's move
+// x shot steps x 0.5. Shot steps are 30Hz ticks here, but the move is one vsync's,
+// half a 30fps frame's (5.19 -> 2.59 units walking), so the 0.5 becomes 1.0.
 //
 // Hell's Storm, save state 4, Super 17 walked back under the 30fps words, 30 hits
 // in every arm:
@@ -896,8 +902,8 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 //   225 units       v106-v224      v100-v217        v106-v224
 //   666 units       v130-v248      v113-v230        v131-v249
 //
-// Super 17 returns to idle at v277 at 30fps, v264 before, v271 with it. Goten's
-// volley (save state 8, L2+Triangle) runs the same controller: v135, v128, v130.
+// All 30 hits land on the 30fps vsyncs. Super 17 returns to idle at v277 at
+// 30fps, v271 before, v273 with it; the 4 left are the one-tick hand-offs of #127.
 [60FPS - barrage shot rate]
 description=Fly the shots of Barrage Blast 2s such as Super 17's Hell's Storm at their real speed, so they land when they do at 30fps and their tracers look the same.
 patch=1,EE,000F1C80,word,3C080033 // lui  $t0, 0x0033
@@ -907,7 +913,7 @@ patch=1,EE,000F1C8C,word,15000003 // bnez $t0, +3            odd tick: draw only
 patch=1,EE,000F1C90,word,00000000 // nop
 patch=1,EE,000F1C94,word,0805A911 // j    0x0016A444         even tick: the whole update
 patch=1,EE,000F1C98,word,8E220580 // lw   $v0, 0x580($s1)    (delay) replay displaced
-patch=1,EE,000F1C9C,word,0805A972 // j    0x0016A5C8         attached effects, then the draw
+patch=1,EE,000F1C9C,word,0803C8A0 // j    0x000F2280         odd tick: events, attached effects, return
 patch=1,EE,000F1CA0,word,00000000 // nop
 patch=1,EE,0016A440,word,0803C720 // lw $v0,0x580($s1) -> j 000F1C80   blast object update
 patch=1,EE,000F1CB0,word,3C080033 // lui  $t0, 0x0033
@@ -920,3 +926,31 @@ patch=1,EE,000F1CC8,word,3C013F80 // lui  $at, 0x3F80        (delay) replay disp
 patch=1,EE,000F1CCC,word,08053113 // j    0x0014C44C         past the loop
 patch=1,EE,000F1CD0,word,00000000 // nop
 patch=1,EE,0014C3B8,word,0803C72C // lui $at,0x3F80 -> j 000F1CB0   shot controller loop
+patch=1,EE,000F2280,word,8E220580 // lw   $v0, 0x580($s1)    odd tick: catch the one-tick events
+patch=1,EE,000F2284,word,30422000 // andi $v0, $v0, 0x2000   animated shot?
+patch=1,EE,000F2288,word,10400009 // beqz $v0, 000F22B0
+patch=1,EE,000F228C,word,00000000 // nop
+patch=1,EE,000F2290,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F2294,word,0C052A30 // jal  EftShot_TestBits
+patch=1,EE,000F2298,word,24050004 // li   $a1, 4             fired
+patch=1,EE,000F229C,word,10400004 // beqz $v0, 000F22B0
+patch=1,EE,000F22A0,word,00000000 // nop
+patch=1,EE,000F22A4,word,8E220580 // lw   $v0, 0x580($s1)
+patch=1,EE,000F22A8,word,34424000 // ori  $v0, $v0, 0x4000   FIRED
+patch=1,EE,000F22AC,word,AE220580 // sw   $v0, 0x580($s1)
+patch=1,EE,000F22B0,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F22B4,word,0C052A30 // jal  EftShot_TestBits
+patch=1,EE,000F22B8,word,24050400 // li   $a1, 0x400         abort
+patch=1,EE,000F22BC,word,10400004 // beqz $v0, 000F22D0
+patch=1,EE,000F22C0,word,00000000 // nop
+patch=1,EE,000F22C4,word,8E220580 // lw   $v0, 0x580($s1)
+patch=1,EE,000F22C8,word,34420002 // ori  $v0, $v0, 2        STOP
+patch=1,EE,000F22CC,word,AE220580 // sw   $v0, 0x580($s1)
+patch=1,EE,000F22D0,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F22D4,word,02A0282D // move $a1, $s5
+patch=1,EE,000F22D8,word,8E260030 // lw   $a2, 0x30($s1)
+patch=1,EE,000F22DC,word,0C05A7D2 // jal  EftBlastObj_UpdateParts
+patch=1,EE,000F22E0,word,0000382D // move $a3, $zero
+patch=1,EE,000F22E4,word,0805A98C // j    0016A630           return: no dying step, no hit volume
+patch=1,EE,000F22E8,word,00000000 // nop
+patch=1,EE,001AEF74,word,3C013F80 // lui $at,0x3F00 -> 0x3F80     aim lead x 1.0 (EftVolleyAim_Steer)
