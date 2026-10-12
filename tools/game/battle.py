@@ -1,12 +1,8 @@
 """The live battle, resolved over PCSXROO: fighters, models, and their fields.
 
-``game.fighter`` does the same job over PINE and is kept for the scripts that
-already use it. This one exists because the debugger client can also stop the
-CPU, so everything built on top of it - watchpoints, frame-precise capture -
-needs the same resolution without a second dependency.
-
-Offsets recovered by write watchpoint rather than by reading disassembly; see
-docs/findings/ for which routine writes which field.
+``game.fighter`` does the same over PINE. This one uses the debugger client,
+which can also stop the CPU (watchpoints, frame-precise capture). Offsets were
+recovered by write watchpoint; see docs/findings/.
 """
 
 from __future__ import annotations
