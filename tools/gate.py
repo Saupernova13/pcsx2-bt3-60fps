@@ -1,10 +1,8 @@
 """Run chosen call sites on even frames only, to see what drives a symptom.
 
-Gating beats nopping as a probe. Nopping asks "does this subsystem exist?" and
-usually answers by breaking something; gating asks "does this subsystem drive
-the SPEED of what I am looking at?", which is the actual question for a 60fps
-patch. The failure modes are informative too: a subtree that *flickers* when
-gated is render submission, one that *slows down* is simulation.
+Gating beats nopping as a probe: it asks whether a subsystem drives the SPEED of
+what you are looking at. A subtree that *flickers* when gated is render
+submission, one that *slows down* is simulation.
 
 Each gate is a 9-word trampoline in the safe zone. The call sites must not have
 their return value consumed - tools/bisect.call_sites already filters those.
@@ -23,9 +21,8 @@ import _bootstrap  # noqa: F401
 from game import config
 from ps2ee.pine import Pine, PineNotRunning
 
-# bisect.py is loaded by path, not imported, because its name is the stdlib's -
-# see tools/_bootstrap.py. The path is taken from this file so it does not
-# depend on which directory the tool is run from.
+# bisect.py is loaded by path, not imported, because its name is the stdlib's (see
+# tools/_bootstrap.py).
 _BISECT = Path(__file__).resolve().parent / "bisect.py"
 spec = importlib.util.spec_from_file_location("bm", _BISECT)
 bm = importlib.util.module_from_spec(spec)
