@@ -287,6 +287,19 @@ fix takes all four out and writes the game's own instruction back. Loading
 the user's frozen state under the fix frees the fighter within 69 ticks. See
 [`findings/state-machine.md`](findings/state-machine.md).
 
+## Proposed - the Sonic Sway window (#167)
+
+Adds `[60FPS - sonic sway window]`, one word. The Auto-Counter stance gives a Sonic
+Sway to a rush landing in its first 10 frames; at 60fps that was 10 vsyncs.
+
+| P1 rush starts at (1P vs 2P scene) | 30fps | 60fps before | with it |
+|---|---|---|---|
+| v70 | Sonic Sway | Sonic Sway | Sonic Sway |
+| v72 - v80 | Sonic Sway | guard + Auto-Counter | Sonic Sway |
+| v81 on | guard + Auto-Counter | the same | the same |
+
+**Not confirmed in play.**
+
 ## v26 - the cinematic camera (#21)
 
 Adds `[60FPS - cinematic camera]`, one word. In a cinematic the render camera

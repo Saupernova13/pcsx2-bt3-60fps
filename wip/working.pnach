@@ -868,3 +868,11 @@ patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds 
 description=Let a launched or blown-away fighter recover after its real 9 frames, not half that.
 patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
 patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
+
+// The Sonic Sway window. Holding Circle and tapping Triangle enters the Auto-Counter
+// stance (action 0x67, BtlAct_Action67to69); a Rush Attack landing in its first 10
+// frames (actionFrame < 10, flag 0x4E) plays a Sonic Sway. Counted once a tick, so
+// at 60fps the window was half as long; it now runs 20 ticks.
+[60FPS - sonic sway window]
+description=Keep the Sonic Sway window of the Auto-Counter stance as long as at 30fps, instead of half.
+patch=1,EE,001E7210,word,28420014 // slti $v0, $v0, 10 -> 20    action 0x67: flag 0x4E in its first 10 frames

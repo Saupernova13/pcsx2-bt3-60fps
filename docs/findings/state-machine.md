@@ -532,3 +532,20 @@ Covered elsewhere: the lie-down get-up (`slti 91`, #70) and the beam struggle's
 mash start (`slti 16`, `[60FPS - beam clash]`). Left for later, no rig scene yet:
 `BtlAct_VanishDashHandler` (action 0x35, `slti 13` and `slti 7`) and
 `BtlAct_Action67to69` (`slti 10`).
+
+## 2026-10-12 - issue #167: the Sonic Sway window
+
+`BtlAct_Action67to69` runs the Auto-Counter stance (action 0x67: `Circle` held,
+`Triangle` tapped; SuperCombo's Defense page). For the stance's first 10 frames
+(`actionFrame` < 10, `001E7210`) it raises flag 0x4E, and a Rush Attack landing
+then plays a Sonic Sway (action 0x41) instead of the push-stop guard (guard
+result 7) and the Auto-Counter (0x6A). `[60FPS - sonic sway window]` makes it
+`slti 20`.
+
+Measured in a 1P vs 2P scene cut for this (`work/state-backups/rocky-s17-vs-gohan-1p2p.p2s`,
+Super 17 against Ultimate Gohan, both pads human): P2 holds `Circle` and taps
+`Triangle` at v66, P1 homing-dashes in and starts a rush at T
+(`work/tools-scratch/swaysweep.py`). Sonic Sway for T up to v80 and guard from
+v81 at 30fps and with the group; only T = v70 before it.
+
+This was the last `actionFrame` threshold from the 2026-10-10 list.
