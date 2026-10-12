@@ -506,3 +506,29 @@ Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
 `00195FB4`, `00196070`, `0019A9C4`; the 64 unpatched sites that never ran in a
 rig scene; and `FUN_001DC4C0`, which adds seconds * 30 to a battle counter
 (`battle+0x1C`) only in game modes 4 and 0x1B.
+
+## 2026-10-10 - issue #158: the recovery windows count frames in the action
+
+BT3-Decompiled lists every `actionFrame` threshold (`fighter+0x964`, frames in the
+current action, counted once a tick). `[60FPS - state phase timers]` patches
+per-state work counters, never `actionFrame`, so each such threshold runs in half
+the time at 60fps. Two gate recoveries:
+
+| handler | state | gate | compare |
+|---|---|---|---|
+| `BtlAct_LaunchedHandler` | 206 (0xCE) | recovery input `0x2F` -> 0xE6 | `001E8D00` `slti 9` |
+| `BtlAct_BlowAwayHandler` | 213 / 214 / 223 | air recoveries (input conditions `0x28` / `0x29`) | `001E9994` `slti 9` |
+
+`[60FPS - recovery windows]` makes both `slti 18`. A breakpoint on the first
+instruction inside each block, counted from P2 entering the state, rig slot 1
+(`work/tools-scratch/recwin.py`):
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| blow-away (a charged smash) | 18 vsyncs | 9 | 18 |
+| launched (Square x3, Up + Triangle, 2-vsync presses) | 18 | 9 | 18 |
+
+Covered elsewhere: the lie-down get-up (`slti 91`, #70) and the beam struggle's
+mash start (`slti 16`, `[60FPS - beam clash]`). Left for later, no rig scene yet:
+`BtlAct_VanishDashHandler` (action 0x35, `slti 13` and `slti 7`) and
+`BtlAct_Action67to69` (`slti 10`).

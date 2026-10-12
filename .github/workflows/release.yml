@@ -1,10 +1,8 @@
-# Publishes a version tag as a GitHub Release with the patch attached, so the
-# Releases page is where people download it. See docs/releases.md.
+# Publishes a version tag as a GitHub Release with the patch attached.
+# See docs/releases.md.
 #
-# Normally dispatched by version.yml the moment it pushes a tag. It is also the
-# recovery route on its own: given a tag that exists, running it by hand from
-# the Actions tab publishes or re-publishes that version, so a run that failed
-# after the tag was pushed costs nothing but a re-run.
+# Dispatched by version.yml after it pushes a tag; also the recovery route: run it
+# by hand with an existing tag to publish or re-publish that version.
 name: Release
 
 on:
@@ -20,8 +18,7 @@ on:
 permissions:
   contents: write
 
-# One run per tag. A tag pushed by hand fires the push trigger while version.yml
-# dispatches the same tag, and two runs would race on the same release.
+# One run per tag: the push trigger and version.yml's dispatch would race.
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
@@ -51,9 +48,7 @@ jobs:
             echo "::error::${TAG} has no ${note}; every release carries a version note"
             exit 1
           fi
-          # The same test tools/version.py verify applies before tagging, applied
-          # again here because a tag pushed by hand never went through that, and
-          # what this step writes is what players read.
+          # Same test as tools/version.py verify; a hand-pushed tag skipped it.
           if grep -q 'DRAFT' "$note"; then
             echo "::error::${note} still says DRAFT. Rewrite it for a player, then move the tag."
             exit 1
@@ -92,15 +87,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # A re-run is never a failure. version.yml can push a tag and then
-          # fail to dispatch this workflow, which leaves a tag with no Release;
-          # running it by hand is the fix, and running it again on a version
-          # that is already out must be harmless.
-          #
-          # An existing release keeps its notes. The page may have been edited
-          # by hand since - a video, a screenshot, a correction - and rewriting
-          # it from the repo would erase that silently. Re-attaching the patch
-          # is the part a re-run actually needs.
+          # A re-run is never a failure. An existing release keeps its notes (they
+          # may have been edited by hand); only the patch is re-attached.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" patch/428113C2.pnach \
               --repo "$GITHUB_REPOSITORY" --clobber
