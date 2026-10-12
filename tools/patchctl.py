@@ -133,12 +133,16 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# The lock-on search, found 2026-10-09 for issue #135. State 54 widens a search
+# cone and range once a tick in FUN_001EB2D0; a trampoline halves both steps.
+SEARCH = ["60FPS - lock-on search"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + SEARCH
                   + SPARES)
 
 PRESETS = {
@@ -198,13 +202,19 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + SEARCH),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
                    + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
+    # "full" without the lock-on search, so that group has a named baseline.
+    "nosearch": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                 + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

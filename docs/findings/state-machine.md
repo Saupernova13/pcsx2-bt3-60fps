@@ -532,3 +532,35 @@ Covered elsewhere: the lie-down get-up (`slti 91`, #70) and the beam struggle's
 mash start (`slti 16`, `[60FPS - beam clash]`). Left for later, no rig scene yet:
 `BtlAct_VanishDashHandler` (action 0x35, `slti 13` and `slti 7`) and
 `BtlAct_Action67to69` (`slti 10`).
+
+## 2026-10-09 - issue #135: the lock-on search, state 54
+
+Found while timing Ultimate Blasts against a standing Ultimate Gohan. After the
+knockdown and the get-up, Gohan stood in state 54 for 40 vsyncs at 30fps and 20
+in the full test build.
+
+State 54 is `FUN_001EB4A8`, the search for an opponent the fighter has lost the
+lock-on to. It plays animation `0x17E` (or `0x17F`, picked by `FUN_0020E818`), and
+once a tick calls `FUN_001EB2D0` from `001EB57C`, its only caller:
+
+| field | step a tick | cap | reset on leaving (phase 3) |
+|---|---|---|---|
+| `fighter+0xD58`, the search cone | `FUN_0020E648(fighter)`, 0.0166 rad for Gohan | pi (`gp-0x6A5C`) | 0.5 |
+| `fighter+0xD5C`, the search range | `FUN_0020E6F0(fighter)`, 19.4 units for Gohan | 1000000 (`gp-0x6A54`) | 500.0 |
+
+Both steps are multiplied by 0.6 (`gp-0x6A58`) when bit 7 of `FUN_001DB730` is
+set. `FUN_001EB3A0` is the find test: the opponent's angle within the cone and
+its distance within the range scaled by the angle. `FUN_001EB2D0` also returns 1
+on the tick the cone passes pi/2, and `FUN_001EB4A8` then calls `FUN_001DC738(fighter, 0x26)`.
+
+The steps were identical per tick in both arms, so the search ended in half its
+real time. `[60FPS - lock-on search]` jumps from `001EB30C` to a trampoline at
+`000F2170` that halves both before they are added:
+
+| Gohan's state 54 | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| after Super 17's Shocking Death Ball (slot 4) | 40 vsyncs | 20 | 39 |
+| after Devilman's Devilmite Beam (slot 6) | 20 vsyncs | 10 | 19 |
+
+Solar Flare's lock-off does not use this state: from Krillin's scene the blinded
+Gohan stays in state 11 for the whole blind in every arm.
