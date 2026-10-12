@@ -1,26 +1,20 @@
 """Drive the game's menus, so any scene can be built rather than only reloaded.
 
-Until this existed, an A/B could only use a character and stage that somebody
-had already saved. The menus answer to pad injection like anything
-else, so the roster, Custom Select and Map Select are all reachable from a
-script - which is how the Vegeta (Scouter) and World Tournament states were
-made.
+The roster, Custom Select and Map Select answer to pad injection, so they are
+reachable from a script.
 
-Two traps are baked in. A menu press must be HELD about eight frames or the
-menu simply does not see it, and the pad needs roughly three quarters of a
-second between presses. And browsing a long list one screenshot at a time is
-the expensive way, so `strip` presses a button N times and returns only the
-label band from each, as one tall image.
+Traps: a menu press must be HELD about eight frames, and the pad needs roughly
+three quarters of a second between presses. `strip` presses a button N times and
+returns only the label band from each, as one tall image.
 
     python tools/menu.py press Start Down Down Cross --shot pause
     python tools/menu.py strip Down 10 --band 0.62,0.80 --shot rows
     python tools/menu.py --shot now shot
 
-The roster is a grid of 15 rows: Down moves a whole row, Right moves one
-character within it, and both wrap. Map Select is the same shape. Confirming a
-character opens its form list, then Custom Select, then Select Color - three
-Crosses takes the defaults. Custom Select equips Z-Items; a character's moves
-are fixed and are never chosen here.
+The roster is a grid of 15 rows: Down moves a whole row, Right one character, both
+wrap. Map Select is the same shape. Confirming a character opens its form list,
+then Custom Select, then Select Color; three Crosses takes the defaults. Custom
+Select equips Z-Items; a character's moves are fixed.
 """
 
 from __future__ import annotations
@@ -28,8 +22,7 @@ from __future__ import annotations
 import argparse
 import time
 
-# Before PIL: until this has run, tools/ is at the front of sys.path and
-# shadows the stdlib. See tools/_bootstrap.py.
+# Before PIL; see tools/_bootstrap.py.
 import _bootstrap  # noqa: F401
 
 from PIL import Image

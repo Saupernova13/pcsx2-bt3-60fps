@@ -1,13 +1,8 @@
 """Which of a list of addresses actually execute during a window of the game.
 
-A static scan finds hundreds of candidates and most of them have nothing to do
-with the situation being measured. This puts a breakpoint on every one, removes
-each the moment it fires, and runs the window - so the run converges instead of
-stopping on the same hot site forever, and what comes out is the short list
-worth sweeping.
-
-Breakpoints are added in batches, because a few hundred at once is slow and the
-run restarts from the save state for each batch anyway.
+Puts a breakpoint on every candidate, removes each the moment it fires, and runs
+the window, so the run converges on the short list worth sweeping. Breakpoints go
+in batches (hundreds at once is slow); the run restarts from the save state per batch.
 
     python tools/census.py 8 full 130 work/tickcount.txt work/executed.txt
     python tools/census.py 8 full 30 work/tickcount.txt work/flight.txt --lead 134
