@@ -891,16 +891,32 @@ patch=1,EE,002FE544,word,3C888888 // 1/30 -> 1/60 s a tick   the shake's countdo
 //     +0x08, +0x0C  large and small motor, seconds * 30.0, counted down a tick
 //     +0x10         the large motor pulses on sin(+0x10 * k / 30.0), +1 a tick
 //     +0x14         the small motor is on when bit 0 of this tick count is 0
-// so at 60fps rumble lasted half as long and pulsed twice as fast. The three
-// 30.0s become 60.0 and the small motor toggles on bit 1. The update is not
+// so at 60fps rumble lasted half as long and pulsed twice as fast. The pulse's
+// 30.0 becomes 60.0, the motor times double (below) and the small motor toggles
+// on bit 1. The update is not
 // gated: FUN_00122F10 sends the pad's accumulated rumble and zeroes it on every
 // call, so a skipped tick would switch the motors off for a frame.
 //
 // Dynamic Mess Em Up Punch's first hit: rumble reaches the pad for 10 vsyncs at 30fps, 5
 // without this, 11 with it, over the same pulse curve (191, 250 ... 131).
+//
+// The motor times are converted to ticks with cvt.w.s, which truncates: seconds
+// * 60 would keep the half tick that seconds * 30 drops, a rumble 1-2 vsyncs
+// long. The conversion keeps the game's * 30 and doubles the truncated count (000F25E0 large, 000F25F4 small). Hercule's Dynamic Mess Em Up
+// Punch, first hit: both motors stop on the 30fps vsync (v73, v79; 1 late before).
 [60FPS - controller rumble]
 description=Run the controller's rumble in real time, so hits rumble for as long as at 30fps and pulse at the same rate.
-patch=1,EE,001DC554,word,3C014270 // lui $at, 0x41f0 -> 0x4270   large motor time, seconds * 30 -> * 60
-patch=1,EE,001DC578,word,3C014270 // lui $at, 0x41f0 -> 0x4270   small motor time
 patch=1,EE,001DC654,word,3C014270 // lui $at, 0x41f0 -> 0x4270   large motor pulse, phase / 30 -> / 60
 patch=1,EE,001DC6C0,word,30420002 // andi $v0, $v0, 1 -> 2       small motor toggles every 2 ticks
+patch=1,EE,000F25E0,word,46000064 // cvt.w.s f1,f0            large motor: seconds * 30, truncated as on a PS2
+patch=1,EE,000F25E4,word,44010800 // mfc1 at,f1
+patch=1,EE,000F25E8,word,00010840 // sll at,at,1              x 2 vsync ticks
+patch=1,EE,000F25EC,word,03E00008 // jr ra
+patch=1,EE,000F25F0,word,AC810008 // sw at,8(a0)
+patch=1,EE,000F25F4,word,46006024 // cvt.w.s f0,f12           small motor: the same
+patch=1,EE,000F25F8,word,44030000 // mfc1 v1,f0
+patch=1,EE,000F25FC,word,00031840 // sll v1,v1,1
+patch=1,EE,000F2600,word,08077165 // j 001DC594
+patch=1,EE,000F2604,word,00000000 // nop
+patch=1,EE,001DC564,word,0803C978 // cvt.w.s f1,f0 -> j 000F25E0
+patch=1,EE,001DC58C,word,0803C97D // cvt.w.s f0,f12 -> j 000F25F4
