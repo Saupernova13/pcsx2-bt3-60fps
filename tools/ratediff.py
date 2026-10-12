@@ -1,17 +1,15 @@
 """Ask every word in RAM whether it still moves at double speed.
 
-Same save state, same scripted input, the same number of **vsyncs** - the same
-real time - once unpatched and once patched. A quantity the patch compensates
-covers the same distance in both arms; one it misses covers twice as much.
+Same save state, scripted input and number of **vsyncs** (the same real time),
+once unpatched and once patched. A compensated quantity covers the same distance
+in both arms; a missed one covers twice as much.
 
-Three snapshots per arm, not two. A word that only moves because its pool was
-freed and refilled jumps once, while a clock advances the same amount in each
-half of the window, and requiring the halves to agree is what separates them:
-on the run that mattered it cut 805 false candidates to 28 real ones.
+Three snapshots per arm: a word that only moves because its pool was freed and
+refilled jumps once, while a clock advances equally in each half, and requiring
+the halves to agree separates them.
 
-Read as int32 as well as float32. An integer counter is a denormal when read as
-a float and disappears from a float scan, and the two clocks behind every
-staged beat in this game are integers.
+Read as int32 as well as float32: integer counters are denormal floats, and the
+clocks behind staged beats are integers.
 
     python tools/ratediff.py 8 120 work/rd.npz
     python tools/ratediff.py 8 120 work/rd.npz --hold L2,Triangle --lead 71
@@ -57,9 +55,8 @@ def capture(roo: Roo, slot: int, vsyncs: int, specs: list[str], leads: list[int]
         roo.loadstate(slot)
         time.sleep(1.0)
         patchctl.apply(roo, groups_for(spec), quiet=True)
-        # Never load the state again here. These states were captured while
-        # patched, so a second load puts the patched words back and the
-        # unpatched arm stops being unpatched.
+        # Never load the state again here: it was captured patched, so the unpatched arm
+        # would stop being unpatched.
         roo.frame_advance(2)
         if hold:
             roo.input_set(*hold)
@@ -120,13 +117,11 @@ def report(path: str, ints: bool, top: int, any_start: bool) -> None:
     print(f"  compensated (1x)             : {int(one_x.sum())}")
 
     idx = np.flatnonzero(two_x)
-    # np.split of an empty array returns one empty piece, not none, so the
-    # empties are dropped here rather than crashing on run[0] below.
+    # np.split of an empty array returns one empty piece; drop the empties.
     runs = [r for r in np.split(idx, np.flatnonzero(np.diff(idx) != 1) + 1) if r.size]
     runs.sort(key=lambda r: -r.size)
     if not runs:
-        # A real answer, and the two counts above prove the scan ran: the
-        # 30fps arm found movers and the patch compensated them.
+        # A real answer: the 30fps arm found movers and the patch compensated them.
         print("")
         print("Nothing in this window is still running at 2x.")
         return

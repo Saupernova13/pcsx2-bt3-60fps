@@ -1,21 +1,14 @@
 """Time and photograph a move in REAL time, with the game running free.
 
-This exists because the obvious instrument does not work. A screenshot needs a
-RUNNING VM, so any loop of "frame-advance N, screenshot" lets the game run a few
-uncontrolled ticks at every sample - about five here, and 181 on the first one
-after a state load. Every duration measured that way is fiction, and worse, the
-error is invisible: the runs are reproducible, they are just reproducibly wrong.
-
-Running free and sampling on the wall clock has no such problem. Each sample is
-a real instant, so a 30fps run and a 60fps run line up on real time and can be
-compared directly - which is the comparison a player is making when they say
-something is too fast.
+A screenshot needs a RUNNING VM, so a "frame-advance N, screenshot" loop lets the
+game run uncontrolled ticks at every sample (about five, and 181 after a state
+load), and the error is reproducible, so invisible. Sampling on the wall clock
+instead makes a 30fps and a 60fps run line up on real time.
 
     python tools/realclock.py --slot 8 --presets off full
     python tools/realclock.py --slot 8 --presets full --sheet work/ult.png
 
---sheet tiles the frames into one image, labelled in seconds. Read the picture:
-a numeric trace tells you when something changed, the tiles tell you what.
+--sheet tiles the frames into one image, labelled in seconds.
 """
 
 from __future__ import annotations
@@ -23,8 +16,7 @@ from __future__ import annotations
 import argparse
 import time
 
-# Before numpy and PIL: until this has run, tools/ is at the front of
-# sys.path and shadows the stdlib. See tools/_bootstrap.py.
+# Before numpy and PIL; see tools/_bootstrap.py.
 import _bootstrap  # noqa: F401
 
 import numpy as np
@@ -82,9 +74,8 @@ def capture(roo: Roo, preset: str, slot: int, pokes, shots: int, cadence: float)
 def load_frames(paths):
     """Open each queued screenshot, waiting for the capture to actually land.
 
-    The screenshot command only queues the write, so a path can be absent or
-    still zero bytes when we get here; and on Windows the file can exist while
-    the emulator still holds it open.
+    The command only queues the write, so a path can be absent or empty, and on
+    Windows the file can exist while the emulator still holds it open.
     """
     frames = []
     for path in paths:
