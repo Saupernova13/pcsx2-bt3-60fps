@@ -1,16 +1,10 @@
 """Make game/ and PCSXROO's ps2ee library importable for the tools.
 
-The tools and the game knowledge (tools/game/) live side by side, so this adds
-tools/ itself. The generic ps2ee library lives in PCSXROO
-(https://github.com/Saupernova13/pcsxroo), under pcsxroo/ps2ee/. The PCSXROO
-checkout is found from the first of these that is set:
+Adds tools/ itself, and the PCSXROO checkout (pcsxroo/ps2ee/), found from the
+first of: the PCSXROO_REPO environment variable, a "PCSXROO_REPO" key in this
+repo's local.json, a sibling checkout named pcsxroo.
 
-1. the PCSXROO_REPO environment variable,
-2. a "PCSXROO_REPO" key in this repo's local.json,
-3. a sibling checkout named pcsxroo, next to this repo.
-
-Import this before anything third-party. Until it has run, tools/ is still at
-the front of sys.path and shadows the stdlib - see the sys.path note below.
+Import this before anything third-party (see the sys.path note below).
 """
 
 from __future__ import annotations
@@ -41,8 +35,7 @@ def _local_json_setting() -> str | None:
 
 def find_pcsxroo() -> Path:
     """The PCSXROO checkout, or exit with one sentence saying how to provide it."""
-    # A location that is set but wrong is reported as such, rather than quietly
-    # falling through to a different checkout than the one asked for.
+    # A location that is set but wrong is reported, not silently replaced by another checkout.
     for source, value in (
         ("the PCSXROO_REPO environment variable", os.environ.get("PCSXROO_REPO")),
         (f"PCSXROO_REPO in {REPO / 'local.json'}", _local_json_setting()),
@@ -65,28 +58,17 @@ def find_pcsxroo() -> Path:
 
 PCSXROO = find_pcsxroo()
 
-# Appended, never prepended, so a tool can never shadow a stdlib module. Running
-# `python tools/<tool>.py` puts tools/ at sys.path[0], and tools/bisect.py then
-# wins over the stdlib `bisect` that `random` imports - which breaks any later
-# import of capstone, and with it ps2ee, on any interpreter that has not already
-# loaded `bisect`. Both paths go on the end, stdlib stays ahead of them.
+# Appended, never prepended, so a tool can never shadow a stdlib module: running
+# `python tools/<tool>.py` puts tools/ at sys.path[0], and tools/bisect.py would
+# beat the stdlib `bisect`, breaking capstone and ps2ee on Linux. tools/ stays
+# before PCSXROO's path so this repo's module wins a name collision.
 #
-# Order between the two is kept: tools/ before PCSXROO's, so this repo's own
-# module wins a name collision.
+# - A tool must import this before anything third-party; numpy and PIL reach the
+#   stdlib on their own while tools/ is still at sys.path[0].
+# - Entries are matched by what they resolve to: a relative "tools" entry at the
+#   front brings the shadowing back.
 #
-# Two things are needed for that to hold, and both have been got wrong here:
-#
-# - A tool must import this before anything third-party. numpy and PIL reach
-#   the stdlib on their own, and a tool that imports them first does so while
-#   tools/ is still at sys.path[0].
-# - An entry is matched by what it resolves to, not by how it is spelled. tools/
-#   can also reach sys.path as the relative "tools" a tool inserted for itself,
-#   which a comparison against the absolute path misses - and one relative entry
-#   at the front brings the shadowing straight back.
-#
-# .github/workflows/check.yml runs every tool with --help, which is what catches
-# either mistake: the shadowing is only fatal on an interpreter that has not
-# already loaded the module being shadowed.
+# .github/workflows/check.yml runs every tool with --help to catch either mistake.
 
 
 def _same_dir(entry: str, target: Path) -> bool:
