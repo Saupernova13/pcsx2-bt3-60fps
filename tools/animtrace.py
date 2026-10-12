@@ -1,19 +1,12 @@
 """Trace a move by its BEATS rather than by its pictures or its clock.
 
-FUN_001C4638 is a leaf that returns fighter+0x974, the current animation id,
-and the cinematic handlers advance by asking whether that animation has
-FINISHED - `FUN_001C47A8` - not by counting ticks. So for anything scripted,
-the animation ids ARE the beats, and reading one word per vsync says exactly
+FUN_001C4638 returns fighter+0x974, the current animation id, and cinematic
+handlers advance when the animation has FINISHED (`FUN_001C47A8`), not by counting
+ticks. So the animation ids are the beats, and one word per vsync says exactly
 where two arms part company.
 
-This is what settled issue #10. A pixel score said the Great Ape transformation
-was still 34 points wrong after every group in the patch; the beat trace said
-the animation ids switch on the same vsync in both arms, which moved the hunt
-off "the animation is cut short" and onto the camera inside it.
-
     python tools/animtrace.py --slot 3 --press R3 --presets off full
-    python tools/animtrace.py --slot 3 --press R3 --vsyncs 700 \
-        --presets off "60FPS - battle" "60FPS - battle+60FPS - animation clock"
+    python tools/animtrace.py --slot 3 --press R3 --vsyncs 700 --presets off "60FPS - battle" "60FPS - battle+60FPS - animation clock"
 """
 
 from __future__ import annotations
