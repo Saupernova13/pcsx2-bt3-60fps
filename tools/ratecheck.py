@@ -1,21 +1,16 @@
 """Audit which fields are still running at double speed, by A/B-ing the frame rate.
 
-BT3 has no timestep: it is a fixed 30Hz tick loop, and the 60fps patch simply
-ticks it twice as often. So every quantity in the game is 2x until something
-halves it, and the only honest test of a fix is whether the quantity moves half
-as far per frame at 60fps as it does at 30.
+BT3 is a fixed 30Hz tick loop that the patch ticks twice as often, so a fix is
+only right if the quantity moves half as far per frame at 60fps as at 30.
 
-This forces the vblank wait to 2 (30fps) and then back to 1 (60fps) from the
-outside, records the same memory in both, and reports the ratio:
+This forces the vblank wait to 2 (30fps) and back to 1 (60fps) from the outside,
+records the same memory in both, and reports the ratio:
 
     ratio ~0.50   compensated - correct at 60fps
     ratio ~1.00   NOT compensated - runs at double real speed
 
-The metric is total absolute variation per game frame, which behaves the same
-way for a ramp and for an oscillator and survives dropped samples.
-
-Hold the game in a repeatable state for the whole run - hovering with the pad
-untouched is ideal, since it needs no input and never stops.
+The metric is total absolute variation per game frame. Hold the game in a
+repeatable state, e.g. hovering with the pad untouched.
 
     python tools/ratecheck.py --seconds 8
     python tools/ratecheck.py --seconds 8 --region model --limit 40
@@ -31,9 +26,8 @@ import _bootstrap  # noqa: F401
 from game import fighter as fx
 from ps2ee.pine import Pine, PineNotRunning
 
-# FUN_00264D98 copies its vblank-count argument into $s1 here. Overwriting the
-# copy with a constant pins the frame rate no matter what the caller asked for.
-# Deliberately not a pnach address, so a live write is not undone every frame.
+# FUN_00264D98 copies its vblank-count argument into $s1 here; overwriting the copy
+# pins the frame rate. Not a pnach address, so a live write is not undone every frame.
 RATE_SITE = 0x00264DA4
 RATE_STOCK = 0x0080882D           # daddu $s1, $a0, $zero
 RATE_FORCE = {30: 0x24110002,     # addiu $s1, $zero, 2

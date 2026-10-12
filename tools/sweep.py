@@ -1,15 +1,12 @@
 """Change one site at a time and score it against the oracles that matter.
 
-A site is only worth keeping if it moves the thing being fixed *and* leaves
-alone something that was already right. Half the counters this finds are levels
-rather than clocks - a combo index, an input window - and slowing one of those
-breaks an ordinary combo while the number you were watching does not move at
-all. Two oracles catch that; one does not.
+A site is only worth keeping if it moves the thing being fixed *and* leaves alone
+something that was already right. Many counters are levels, not clocks (a combo
+index, an input window), and slowing one breaks an ordinary combo while the
+watched number does not move; two oracles catch that, one does not.
 
-The probe goes into a spare group, so nothing has to be rebuilt or restarted
-between sites. Gating is used rather than freezing on purpose: nopping an
-increment hangs anything waiting on it, while a counter that is gated and turns
-out not to be a clock simply leaves the measurement where it was.
+The probe goes into a spare group, so nothing is rebuilt or restarted between
+sites. Gating is used, not freezing: nopping an increment hangs anything waiting on it.
 
     python tools/sweep.py work/phase-sites.txt work/out.txt --oracles charge,melee
     python tools/sweep.py work/flight.txt work/out.txt --oracles ultimate --how half
