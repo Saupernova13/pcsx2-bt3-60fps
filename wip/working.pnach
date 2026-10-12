@@ -890,6 +890,10 @@ patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air 
 //   first disc's flight        8 vsyncs    4               8
 //   per-vsync step             13.9 (avg)  27.8            13.9
 //   first hit vs 30fps         -           5 early         1 early (the throw's own hand-off)
+// A disc grown in the hand and then thrown (Krillin's charged ki blast) skips
+// EftDisc_Init: EftDisc_Throw (0016D270) copies the ki blast's life in 30Hz frames
+// into +0x4AC and its fade into +0x4A4/+0x4A8. 000F2300 doubles the life and the
+// fade is taken from it: the disc lives 300 vsyncs, as at 30fps (150 before).
 [60FPS - disc travel]
 description=Fly, home, spin and fade discs such as Krillin's Ultimate at their real speed, so they land when they do at 30fps.
 patch=1,EE,0016B76C,word,3C014270 // EftDisc_Init: lui at,0x41F0 -> 0x4270   30.0 -> 60.0: life, grow, roll and fade in frames
@@ -916,3 +920,12 @@ patch=1,EE,000F2374,word,0805AF7D // j 0016BDF4
 patch=1,EE,000F2378,word,00000000 // nop
 patch=1,EE,0016BDEC,word,0803C8D8 // EftDisc_Update: move a0,s3 -> j 000F2360   pos += dir * speed
 patch=1,EE,0016BDF0,word,00000000 // (speed load moved into 000F2360)
+patch=1,EE,000F2300,word,46800020 // cvt.s.w $f0, $f0          held disc thrown: life in frames
+patch=1,EE,000F2304,word,46000000 // add.s   $f0, $f0, $f0     x 2: 60 frames a second
+patch=1,EE,000F2308,word,E60004AC // swc1    $f0, 0x4AC($s0)
+patch=1,EE,000F230C,word,0805B4FB // j       0016D3EC
+patch=1,EE,000F2310,word,00000000 // nop
+patch=1,EE,0016D3E4,word,0803C8C0 // EftDisc_Throw: cvt.s.w f0,f0 -> j 000F2300
+patch=1,EE,0016D3FC,word,C60004AC // lh v1,0x1C(s2) -> lwc1 f0,0x4AC(s0)   fade from the doubled life
+patch=1,EE,0016D404,word,00000000 // mtc1 v1,f0 -> nop
+patch=1,EE,0016D408,word,00000000 // cvt.s.w f0,f0 -> nop
