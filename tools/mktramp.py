@@ -1,16 +1,13 @@
 """Assemble a trampoline with PCSXROO and emit it as pnach lines.
 
-Hand-encoding MIPS by hand is how this project has produced its worst bugs, and
-re-assembling an instruction the game already contains is nearly as bad: a
-displaced instruction has to be replayed *exactly*, and an assembler that turns
-``dmove a0, sp`` back into ``addu`` has quietly changed a 64-bit move into a
-32-bit one. So a trampoline is built from two kinds of item:
+A displaced game instruction must be replayed exactly (re-assembling ``dmove a0, sp``
+yields ``addu``, a 32-bit move), so a trampoline is built from two kinds of item:
 
     ("asm", "mul.s $f14, $f14, $f2")   new code, assembled
     ("copy", 0x001DE034)               a word lifted verbatim from the game
 
-The assembling is done into the live game's own scratch zone, then read back,
-so what lands in the pnach is exactly what the emulator's assembler produced.
+Assembly happens in the live game's scratch zone and is read back, so the pnach
+holds exactly what the emulator's assembler produced.
 
     python tools/mktramp.py air
 """
@@ -49,12 +46,8 @@ def emit(name: str, base: int, words: list[int], items, hooks) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# The airborne channels. Both have the same shape: a per-tick "approach" step
-# updates a stored speed, and the speed is then applied to the position. At
-# 60fps both halves have to be halved - the applied step so the fighter covers
-# the same ground per second, and the approach step so the ramp and the decay
-# still take the same real time.
+# The airborne channels: a per-tick "approach" step updates a stored speed, which
+# is then applied to the position. At 60fps both halves are halved.
 
 HALF = ["lui $at, 0x3F00", "mtc1 $at, $f2"]     # $f2 = 0.5f
 
@@ -105,14 +98,8 @@ def air_vertical(roo: Roo) -> tuple[str, int, list, list]:
 def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
     """FUN_001DFD88: pos += residual(+0x80), then shrink it by a fixed eps.
 
-    A hit leaves a decaying slide behind. The whole vector is added every tick
-    and then shortened by an absolute epsilon, so at 60fps it is delivered in
-    half the real time and decays in half the real time - same total distance,
-    twice the speed. Halving both the application and the epsilon puts it back.
-
-    The scaled copy goes to a fixed scratch vector rather than the stack:
-    nothing runs between the scale and the add, so there is nothing to be
-    re-entrant against, and leaving sp alone keeps the trampoline harmless.
+    Both the application and the epsilon are halved. The scaled copy goes to a fixed
+    scratch vector, not the stack, to leave sp alone.
     """
     base, temp = 0x000F0980, 0x000F09E0
     items = [
@@ -120,9 +107,7 @@ def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
         ("asm", f"lui $a0, 0x{temp >> 16:04X}"),
         ("asm", f"ori $a0, $a0, 0x{temp & 0xFFFF:04X}"),
         ("asm", "jal 0x00121F38"),               # Vec4Scale(temp, residual, 0.5)
-        # The word at 001DFDB8 is "dmove a2, s1", not a1 - it is the delay slot
-        # of the guard branch, feeding the add that this replaces. The scale
-        # wants the residual as its source, so this one is assembled.
+        # The word at 001DFDB8 is "dmove a2, s1" (a branch delay slot), so this one is assembled.
         ("asm", "daddu $a1, $s1, $zero"),        # src = residual
         ("copy", 0x001DFDB0),                    # dmove a0, s0   pos
         ("copy", 0x001DFDAC),                    # dmove a1, s0   pos
@@ -131,8 +116,7 @@ def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
         ("asm", f"ori $a2, $a2, 0x{temp & 0xFFFF:04X}"),
         ("asm", "j 0x001DFDC4"),
         ("asm", "nop"),
-        # The decay epsilon, halved. Hooked one instruction early so the load
-        # of the epsilon rides in the delay slot and is already done here.
+        # The decay epsilon, halved. Hooked one instruction early so its load rides in the delay slot.
         *[("asm", t) for t in HALF],
         ("asm", "mul.s $f1, $f1, $f2"),
         ("copy", 0x001DFDD8),                    # dmove a0, s1
@@ -150,14 +134,9 @@ def air_residual(roo: Roo) -> tuple[str, int, list, tuple]:
 def gravity(roo: Roo) -> tuple[str, int, list, tuple]:
     """FUN_001DED28: vy(+0xAC) += g, clamped, then pos.y += vy.
 
-    The real gravity, and a separate routine from the vertical channel in
-    FUN_001DED78 - which is why a breakpoint there never fires during a free
-    fall. Both constants are plain gp-relative data words with exactly one
-    reader each, so the acceleration is halved in data; only the application
-    needs code.
-
-    The terminal-velocity clamp is deliberately left alone: vy stays in its
-    authored 30Hz units, so the value it is clamped to is still correct.
+    The real gravity, separate from the vertical channel in FUN_001DED78. The
+    acceleration is halved in data; only the application needs code. The
+    terminal-velocity clamp stays in its authored 30Hz units.
     """
     base = 0x000F0A00
     items = [
