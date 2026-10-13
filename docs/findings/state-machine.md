@@ -543,15 +543,15 @@ fixes a rate; none of them can fix a hand-off. A move is a chain of them, so
 Blast 2s and Ultimates ended 4-10 vsyncs early with every rate correct.
 
 `[60FPS - tick grid]` keeps motion and animation at 60fps half-steps and moves
-the discrete steps onto even vsyncs (frame counter `00331D64` even), the 30fps
-tick:
+the discrete steps no button starts onto even vsyncs (frame counter `00331D64`
+even), the 30fps tick. Input stays at 60Hz: the pad is read every vsync and a
+press or release acts on the vsync it reaches the game.
 
 | Part | Hook | On odd vsyncs | On even vsyncs |
 |---|---|---|---|
-| state switch | `001E2430` -> `000F2A00` | no switch, no animation request applied; root yaw only | as the game; first, effect flags raised since the last even tick become visible |
+| state switch | `001E2430` -> `000F2A00` | no switch, no animation request applied, root yaw only; unless the fighter's input changed on this vsync or the one before (pressed, released, command pressed or released: chr+0x744, 0x748, 0x754, 0x758), then as the game | as the game; first, effect flags raised since the last even tick become visible |
 | effect flags | the tail calls of `BtlCharApi_SetHeldFlagA7`..`AB` (`002072C8` + 0x38 n) -> `000F2820` | deferred into a 4-entry table at `000F2800` | flushed by `000F2880` before the fighter's handler runs |
 | animation end | `001C4858` -> `000F2240` | the end is reported | the last frame is held, no end yet |
-| pad | `001D4A24` -> `000F21C0` | last tick's pad kept | the pad is read |
 | prevFrame | `001C4818`, `001C4988` | `prevFrame = frame` | prevFrame kept, so an even tick's window covers both vsyncs |
 | PassedRatio / PassedFrame | `001C4A08`, `001C4A80` | answer 0 | as the game |
 | fighter events | `001C1F54` -> `000F3000` | none (hit windows still computed) | read with frame and prevFrame half a step ahead (what the 30fps tick shows), hit windows at the real frame; a new animation's window still starts at frame 0 |
@@ -564,23 +564,35 @@ animation half a tick ahead, so the hit-stop freeze ends on an odd vsync and the
 Z-Counter's flag `0x7B` drops before the switch (Z-Counter window 0). Reading
 the events ahead instead leaves the frames where the stall logic expects them.
 
-**The Perfect Smash window and the rig's pad.** Released on vsync R, the rig's
-pad reaches the game on R+1, except on some vsyncs it skips (R61 -> 63 without
-the grid too). The grid reads it on the next even vsync, so one input phase
-shows a 1-vsync window in release terms; in terms of when the release reaches
-the game the window is 2 vsyncs in both phases ({60, 61} at 30fps, {61, 62}
-with the grid, the 1-vsync offset being the tick phase between the two runs).
+**Input at 60Hz.** The first version also read the pad and applied every switch
+on even vsyncs only. A press could then wait a vsync, and a 2-vsync tap that
+fell on the wrong phase was never seen. The owner rejected that: input must be
+read and acted on every vsync. `lat.py` (7 save slots, 13 presses, holds and
+releases, both tick phases: 182 cases) times each press or release from
+reaching the game to the fighter's first state or animation change: 152 equal
+the test build. The 30 that differ are in slot 2 (a locked state that ignores
+buttons, all 26) and slot 3 (being hit by the CPU, 4 releases), where the change
+is not the button's.
+
+The cost: a move started by a press on an odd vsync runs half a tick ahead of
+the grid, so its own hand-offs snap early and some ends stay 1-3 vsyncs short.
+Tried and dropped: a tick per fighter, flipped by a press on its odd vsync.
+Inside the move it is exact, but every hand-off between that fighter and the
+rest of the game (still on the frame counter: the shipped 30Hz groups, a
+technique item's external flags) then costs 1 vsync instead of 2, both ways:
+Blast 2 beams ended 2-3 vsyncs earlier than with the first version, and with
+the items left on the frame counter Android 18's disc never fired.
 
 Measured against 30fps with every other group of the test build on (`bench.py`, `smokeall.py`, `defence.py`, `rushsweep.py`):
 
-| | test build | with the grid |
-|---|---|---|
-| first hit, 9 Blast 2s and Ultimates | 0 to 5 vsyncs early | within 1 (Spirit Bomb 2: its ball's travel) |
-| move ends, the same 9 | 4 to 10 early | 3 early to 1 late |
-| 54 moves from 9 save states, last state change | 8 early to 2 late, slot 3's sequences differ | within 3, each state one constant offset (its tick phase) |
-| Z-Counter window | 2 vsyncs, hit 2 early | presses 4-5 before the hit, as at 30fps |
-| vanish window | 8, hit 2 early | 4-11, as at 30fps |
-| 54 rush-mashing patterns | 39 match | 54 |
+| | test build | first version (input on the tick) | with the grid |
+|---|---|---|---|
+| move ends, 9 Blast 2s and Ultimates, from the move's start | 2 to 10 early | 4 early to on time | 5 to 1 early |
+| Blast 2 beams in 6 save states, end from the press | 5 to 8 early | 0 to 2 early | 0 to 4 early |
+| press or release to the reaction (182 cases) | - | up to 1 vsync late; a 2-vsync tap could be missed | equal to the test build where a button acts |
+| Z-Counter / vanish window | 2 / 8 vsyncs | 2 / 8 | 2 / 8, the presses as in the test build |
+| Perfect Smash | - | - | identical to the test build |
+| 54 rush-mashing patterns that match 30fps | 39 | 54 | 45: the other 9 press at the end of a combo window, which a press that acts at once still catches, as in the test build |
 
 Not equal yet: the CPU in a Rush Struggle scores 46-54 (by the AI's tick
 parity) against 51 at 30fps and 56 in the test build. Its input pattern differs,
