@@ -536,6 +536,23 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the tick grid (#127)
+
+Adds `[60FPS - tick grid]`. At 60fps every one-tick hand-off (a state request,
+an animation event, an effect's flag for the fighter, a technique noticing it
+is done) took 1 vsync instead of 2, so moves ended early with every rate right.
+The grid keeps motion and animation at 60fps and moves the steps no button
+starts onto the 30fps tick. Button presses and releases still act on the vsync
+they arrive, exactly as in the build without it.
+
+| | test build | with it |
+|---|---|---|
+| move ends, 9 Blast 2s and Ultimates | 2-10 early | 1-5 early |
+| Blast 2 beams in 6 save states | 5-8 early | 0-4 early |
+| press or release to the reaction, 182 cases | - | equal wherever a button acts |
+
+**Not confirmed in play.**
+
 ## Proposed - the recovery windows (#158)
 
 Adds `[60FPS - recovery windows]`, two words. A launched or blown-away fighter

@@ -9,6 +9,7 @@ from SuperCombo's names to this repo's old terms.
 | You say | It is | Fixed by / tracked in |
 |---|---|---|
 | ki aura, the aura's sprite animation | The aura around a fighter, which grows with Ki Bars (not a sprite) | `aura update rate`, `particle update rate` |
+| a move ends or fires a few frames early, Blast 2s and Ultimates finishing too soon | One-tick hand-offs between the steps of a move, 1 vsync each at 60fps instead of 2 (my label; the wiki does not cover it) | `tick grid`, issue #127 |
 | ki charging, ki draining, 5 bars of ki | Ki Charge (`L2`) and Ki Bars | `meter economy` (PR #16) |
 | max power, the blue bars | Max Power Mode | `meter economy`, `max power charge` (PR #16) |
 | blast stock, the gold number | Blast Stock: pays for Blast 1s and transformations | regen not measured |
