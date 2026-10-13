@@ -5,7 +5,7 @@ next tick) costs 1 vsync instead of 2, so multi-step moves end early. The grid m
 steps happen on even vsyncs only (the 30fps tick) while motion and animation keep their 60fps
 half-steps.
 
-`grid13.lines` is the current prototype, applied in the rig as
+The group is `[60FPS - tick grid]` in `wip/working.pnach`. `grid13.lines` was an earlier prototype, applied in the rig as
 `fk-animation clock,smash charge+lines:tools/grid/grid13.lines` (it carries its own copies of those
 two groups). Parts:
 

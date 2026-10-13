@@ -532,3 +532,56 @@ Covered elsewhere: the lie-down get-up (`slti 91`, #70) and the beam struggle's
 mash start (`slti 16`, `[60FPS - beam clash]`). Left for later, no rig scene yet:
 `BtlAct_VanishDashHandler` (action 0x35, `slti 13` and `slti 7`) and
 `BtlAct_Action67to69` (`slti 10`).
+
+## 2026-10-13 - issue #127: the 30Hz tick grid
+
+At 60fps a battle tick is one vsync, so every one-tick hand-off costs 1 vsync
+instead of 2: a state request applied on the next tick, an animation event seen
+on the next tick, a flag an effect raises for the fighter to read next tick, a
+technique item noticing its pieces are gone. Each group that halves a clock
+fixes a rate; none of them can fix a hand-off. A move is a chain of them, so
+Blast 2s and Ultimates ended 4-10 vsyncs early with every rate correct.
+
+`[60FPS - tick grid]` keeps motion and animation at 60fps half-steps and moves
+the discrete steps onto even vsyncs (frame counter `00331D64` even), the 30fps
+tick:
+
+| Part | Hook | On odd vsyncs | On even vsyncs |
+|---|---|---|---|
+| state switch | `001E2430` -> `000F2A00` | no switch, no animation request applied; root yaw only | as the game; first, effect flags raised since the last even tick become visible |
+| effect flags | the tail calls of `BtlCharApi_SetHeldFlagA7`..`AB` (`002072C8` + 0x38 n) -> `000F2820` | deferred into a 4-entry table at `000F2800` | flushed by `000F2880` before the fighter's handler runs |
+| animation end | `001C4858` -> `000F2240` | the end is reported | the last frame is held, no end yet |
+| pad | `001D4A24` -> `000F21C0` | last tick's pad kept | the pad is read |
+| prevFrame | `001C4818`, `001C4988` | `prevFrame = frame` | prevFrame kept, so an even tick's window covers both vsyncs |
+| PassedRatio / PassedFrame | `001C4A08`, `001C4A80` | answer 0 | as the game |
+| fighter events | `001C1F54` -> `000F3000` | none (hit windows still computed) | read with frame and prevFrame half a step ahead (what the 30fps tick shows), hit windows at the real frame; a new animation's window still starts at frame 0 |
+| multi-piece item | `00153D68` -> `000F2D40` | no step (its discs still move) | `EftMulti_Update` |
+| blast item end | `00156134` -> `000F2D80` | once ending: no timer step, no decision | the end timer (+1.0, the 30fps step) and the decisions |
+| first blend step | `001C4420` -> `000F3480` (`BtlAnim_ApplyBlend`) | - | a new blend takes the whole 30fps step at once, as on its first 30fps tick |
+
+Rejected on the way: a whole first animation step on even ticks. It puts the
+animation half a tick ahead, so the hit-stop freeze ends on an odd vsync and the
+Z-Counter's flag `0x7B` drops before the switch (Z-Counter window 0). Reading
+the events ahead instead leaves the frames where the stall logic expects them.
+
+**The Perfect Smash window and the rig's pad.** Released on vsync R, the rig's
+pad reaches the game on R+1, except on some vsyncs it skips (R61 -> 63 without
+the grid too). The grid reads it on the next even vsync, so one input phase
+shows a 1-vsync window in release terms; in terms of when the release reaches
+the game the window is 2 vsyncs in both phases ({60, 61} at 30fps, {61, 62}
+with the grid, the 1-vsync offset being the tick phase between the two runs).
+
+Measured against 30fps with every other group of the test build on (`bench.py`, `smokeall.py`, `defence.py`, `rushsweep.py`):
+
+| | test build | with the grid |
+|---|---|---|
+| first hit, 9 Blast 2s and Ultimates | 0 to 5 vsyncs early | within 1 (Spirit Bomb 2: its ball's travel) |
+| move ends, the same 9 | 4 to 10 early | 3 early to 1 late |
+| 54 moves from 9 save states, last state change | 8 early to 2 late, slot 3's sequences differ | within 3, each state one constant offset (its tick phase) |
+| Z-Counter window | 2 vsyncs, hit 2 early | presses 4-5 before the hit, as at 30fps |
+| vanish window | 8, hit 2 early | 4-11, as at 30fps |
+| 54 rush-mashing patterns | 39 match | 54 |
+
+Not equal yet: the CPU in a Rush Struggle scores 46-54 (by the AI's tick
+parity) against 51 at 30fps and 56 in the test build. Its input pattern differs,
+not its rate: the AI makes different choices (#131).
