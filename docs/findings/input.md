@@ -270,3 +270,41 @@ current team member's record, `FUN_001CE050(fighter) + 0x40` (member index at
 the fusion still went through, so it is not. The HUD object at `01876860` keeps
 P1's displayed stock at `+0x70`.
 
+
+## 2026-10-09 - issue #88: the repeat timer runs at two rates
+
+`FUN_002577B0` counts its counter down once a call: it fires `delay + 1` calls
+after a press and then every `rate + 1` (`a0` held mask, `a1` new presses,
+`a2`/`a3` the counter and last mask, `t0` delay, `t1` rate). It has two
+callers, `00122D30` (pad `+0x158`) and `00257760` (pad `+0x194`, which writes
+the repeat word at pad `+0x190`, `00333990`). How often they run depends on
+where the game is:
+
+| Down or Right held, repeat word `00333990` | calls a second | first repeat after the press | then every |
+|---|---|---|---|
+| battle, 30fps, 20 / 1 | 30 | 42 vsyncs | 4 |
+| battle, 60fps, v26's doubled 40 / 2 | 60 | 41 | 3 |
+| character select, 30fps or 60fps, 20 / 1 | 60 | 22 | 2 |
+| character select, v26's 40 / 2 | 60 | 42 | 3 |
+
+So the menus outside battle always ran their timer once a vsync. The patch
+does not change them, but v26's doubling in `SetRepeat` did: every menu
+outside a battle repeated at about half its PS2 speed. Inside a battle,
+doubling missed by one because the timer adds one call to each count.
+
+`SetRepeat(20, 1)` runs once at boot (`FUN_002BD230`, before the game proper),
+so the values cannot follow the mode. The callers now go through a wrapper at
+`000F1D60` that reads the battle manager (`002FEB14`): set, `delay + 1` and
+`rate + 1` from the stored doubled values (41 / 3); clear, half of them (20 / 1).
+`SetRepeat` still doubles, so a boot and every save state made with an earlier
+version hold the same 40 / 2. The rig's save states hold 20 / 1, because they
+were cut before the hook existed; write 40 / 2 by hand when testing this.
+
+| with the wrapper, stored 40 / 2 | first repeat | then every |
+|---|---|---|
+| battle (save state 3, `Down`) | 42 vsyncs, as 30fps | 4, as 30fps |
+| character select (`Right`) | 22 vsyncs, as the PS2 | 2, as the PS2 |
+
+`SetRepeat` through v26's hook, run directly from a paused VM (`a0` = 20,
+`a1` = 1, `pc` = `002577F8`), stores 40 / 2 in both pads, so the wrapper's
+input is the one a real boot gives it.
