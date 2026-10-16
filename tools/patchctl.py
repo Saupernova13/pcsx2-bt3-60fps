@@ -114,6 +114,8 @@ THROWN = ["60FPS - thrown object rate"]
 SOLARFLARE = ["60FPS - solar flare"]
 
 # Rush Struggle: only the AI's synthetic stick is gated.
+# Since 2026-09-22 (#56) it also doubles the contest's length in FUN_001D9330 and
+# the five hit cadences, so the struggle lasts its 30fps real time.
 STRUGGLE = ["60FPS - rush struggle"]
 
 # Beam Struggle: event-manager phases back on real time; only the AI rotation is gated.
