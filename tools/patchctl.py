@@ -133,12 +133,17 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# Motion blends, found 2026-09-29 for issue #98. The crossfade between two
+# motions counts its weight down once a tick with a step set from seconds * 30.0,
+# which [60FPS - animation clock] does not cover. The setup now uses 60.0.
+BLEND = ["60FPS - motion blend"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLEND
                   + SPARES)
 
 PRESETS = {
@@ -198,7 +203,12 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLEND),
+    # "full" without the motion blend, so that group has a named baseline.
+    "noblend": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
