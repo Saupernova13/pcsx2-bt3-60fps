@@ -805,3 +805,109 @@ move is to find the node that *owns* a live blast and walk its fields, rather
 than scanning RAM blind again.
 
 **No fix. Nothing shipped from this session's blast work.**
+
+## 2026-09-30 - issue #109, a blast's speed and size ramps count seconds as 30 ticks
+
+Found re-measuring `[60FPS - paralysis]` and `[60FPS - blast script clock]` with
+every open fix applied. Save state 6 is Devilman 227 units from a standing
+Ultimate Gohan; `L2 + Circle` is Kaikosen, a beam that paralyses. Gohan entered
+state 211 at v61 at 30fps and at v54 in the build. Removing any one group other
+than `blast script clock` left it at v54, so nothing shipped was the cause.
+
+### Finding the mover
+
+The battle keeps a per-tick list of effect events at `018704A0` (0x20 bytes
+each, count at `01870520`, filled by `FUN_001D9B78`). It logs the beam's launch
+(type 0x26) and its contact (type 0x12), which turns "the paralysis is early"
+into two timestamps:
+
+| | 30fps | build |
+|---|---|---|
+| launch | v25 | v24 |
+| contact | v59 | v53 |
+| launch to contact | 34 vsyncs | 29 |
+
+The contact's caller chain gives the hit record the beam registers each tick
+(`FUN_00155588`, which copies the beam's position and velocity out of its state
+block), and the velocity in that record tells the rest:
+
+    30fps  -3.602@v25 -4.087@v27 -4.572@v29 ... -9.352@v53     one step every 2 vsyncs
+    build  -3.602@v24 -4.087@v25 -4.572@v26 ... -9.352@v38     the same steps, one a vsync
+
+`[60FPS - beam object travel]` halves the distance a beam covers per tick. It
+does not touch how fast the speed itself changes, and this beam accelerates.
+
+### The two ramps
+
+`FUN_001519F8(params, state)` is the speed ramp and `FUN_001518D8` the size
+ramp. They are the same code over different fields:
+
+| | speed | size |
+|---|---|---|
+| duration in seconds | `params+0x38` | `params+0x14` |
+| fraction of it spent on the first leg | `params+0x3C` | `params+0x18` |
+| start, middle, end value | `params+0x2C`, `+0x30`, `+0x34` | `params+0x08`, `+0x0C`, `+0x10` |
+| tick counter, stepped 1.0 a tick | `state+0x2C4` | `state+0x2B4` |
+| current value | `state+0x2B8` | `state+0x2A8` |
+| the conversion | `00151A10  lui $at, 0x41F0` | `001518F0  lui $at, 0x41F0` |
+| callers | 3 | 11 |
+
+    ticks = seconds * 30.0
+    counter < ticks * fraction   value = start  + (middle - start) * counter / (ticks * fraction)
+    counter < ticks              value = middle + (end - middle) * (counter - first leg) / (rest)
+    otherwise                    value = end
+
+The speed becomes the beam's velocity (`001560E0`: direction times speed). The
+size is multiplied into the hit volume `FUN_00155588` registers, so it decides
+who is hit and when; the picture of Explosive Wave's sphere does not change with
+it.
+
+These are two of the 145 `lui rX, 0x41F0` sites. The earlier sweep of that
+family (2026-09-06, above) was scored against one beam's hit cadence, which
+neither ramp affects, so both were crossed off with the rest.
+
+### The fix
+
+`[60FPS - blast ramp clock]` changes both immediates to `0x4270`, 60.0. A ramp
+needs twice the ticks, and on each 30Hz tick boundary it holds the value it has
+at 30fps.
+
+Three of the 70 inputs tried across the ten rig save states run a ramp:
+
+| | 30fps | build | with the group |
+|---|---|---|---|
+| **Kaikosen** (state 6): speed 6 -> 13 -> 18 over 0.5 s | | | |
+| speed at v39 | 13.33 | 18.00 | 13.33 |
+| top speed reached | v53 | v38 | v53 |
+| launch to contact at 227 units | 34 vsyncs | 29 | 33 |
+| Gohan paralysed | v61 | v54 | v58 |
+| **Explosive Wave**, Vegeta (Scouter) (state 9): size 20 -> 30 -> 50 over 0.5 s | | | |
+| size at v27 | 27.62 | 50.00 | 27.62 |
+| first damage, opponent at 39.7 units | v35 | v23 | v34 |
+| first damage, opponent at 54.5 units | v41 | v27 | v42 |
+| **Android Barrier**, Super 17 (state 4): size 10 -> 11.8 -> 12 over 1 s | | | |
+| full size reached | v70 | v41 | v71 |
+
+Kaikosen's speed and Explosive Wave's size equal the 30fps value on all 15 of
+the 30Hz ticks of their ramps. Android Barrier's first tick falls on the other
+vsync parity, so it runs half a tick behind: 0.06 of a size unit at most.
+
+The 3 vsyncs Kaikosen still leads by are not the ramp. The cast launches the
+beam 1 vsync early, the half-size steps find contact 1 vsync sooner (30fps
+steps 9.35 units past the last miss, the build 4.68), and the paralysis starts
+one tick after contact, which is 1 vsync instead of 2.
+
+For the two Explosive Wave distances the opponent has to be inside the wave's
+reach. Writing a fighter's position does not hold (all 13 copies in the struct
+were back at the old value 20 vsyncs later), so the scene walks Vegeta toward the
+opponent with `Up` under the 30fps words, waits 60 vsyncs, then applies the arm
+under test. The stop is repeatable: 39.688 units twice running.
+
+### Left alone
+
+- **The size ramp's other branch.** With a duration of 0, `001519A8` adds
+  `params+0x1C` to the size once a tick and caps it at `params+0x10`. That is a
+  per-tick rate too, but none of the 70 inputs has a non-zero step, so there was
+  nothing to measure a fix against.
+- **Which other moves ramp.** The parameters come from each character's blast
+  file, and only the ten characters in the rig's save states were tried.
