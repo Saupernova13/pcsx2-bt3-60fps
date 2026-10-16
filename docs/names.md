@@ -12,6 +12,8 @@ from SuperCombo's names to this repo's old terms.
 | ki charging, ki draining, 5 bars of ki | Ki Charge (`L2`) and Ki Bars | `meter economy` (PR #16) |
 | max power, the blue bars | Max Power Mode | `meter economy`, `max power charge` (PR #16) |
 | blast stock, the gold number | Blast Stock: pays for Blast 1s and transformations | regen not measured |
+| the red part of the health bar | The displayed health, draining toward the real health after a hit | `health bar drain`, issue #84 |
+| the health bar shaking on a hit | The bar's shake slots, set by the damage handler | `health bar shake`, issue #84 |
 | buffs | Timed Blast 1s: stat boosts, After Image Strike | `buff duration` (PR #25) |
 | blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration` |
 | ult, ultimate attack | Ultimate Blast (`L2`+`Down`+`Triangle`, in Max Power Mode) | same, plus `camera pacing` |

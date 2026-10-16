@@ -564,3 +564,18 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - the health bar (#84)
+
+Adds `[60FPS - health bar drain]` (seven words) and `[60FPS - health bar shake]`
+(a wrapper at `000F1AC0` and one hook). `FUN_0021CD20` drains the red section
+by a speed a tick and counts the bar's shake down a tick; the speeds are halved
+and the shake loop runs on even ticks.
+
+| Dynamic Mess Em Up Punch against Ultimate Gohan, every open fix on | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| red section drains 6360 health | 104 vsyncs | 52 | 105 |
+| shake on that hit | 20 vsyncs | 10 | 20 |
+| shake on a small hit | 10 vsyncs | 5 | 10 |
+
+**Not confirmed in play.**
