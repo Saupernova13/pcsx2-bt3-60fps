@@ -342,6 +342,20 @@ smoke-test moves return to idle.
 
 **Confirmed in play 2026-10-05**, in the test build.
 
+## Proposed - the defensive windows (#18)
+
+Adds `[60FPS - defence windows]`. `FUN_001DFFE0` counts seven press-armed windows
+once a tick, the vanish window among them, so at 60fps a Defensive Vanish
+or Z-Counter had half its real time.
+
+| window, 1P vs 2P against a pad-2 smash | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Defensive Vanish (Circle) | 8 vsyncs | 4 | **8** |
+| Z-Counter (Up + Square) | 2 vsyncs | 1 | **2** |
+| lockout on vanish-behind after a guard press (`+0x1080`, added 2026-10-10) | 32 vsyncs | 16 | **31** |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
