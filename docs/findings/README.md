@@ -23,6 +23,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 1 |
 | [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 1 |
 | [Effect classes and their clocks](effect-classes.md) | The 28 effect-node classes that share the freeze check, and which of them count 30Hz ticks. | 1 |
+| [Cloth: capes](cloth.md) | The cape flutter's phases and the game's own 60Hz cloth settings. | 2 |
 
 ## The original introduction
 
