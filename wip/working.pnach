@@ -102,14 +102,15 @@ patch=1,EE,000F01D4,word,00000000 // nop
 patch=1,EE,001C4838,word,0803C068 // lwc1 -> j 000F01A0 (FUN_001C47A4 play-once step)
 patch=1,EE,001C49A8,word,0803C070 // lwc1 -> j 000F01C0 (FUN_001C4920 looping step)
 
-// Auras, glows and swirls rotate at the right speed.
-// Halves the per-tick rotation rates (plain data words, one reader each) read by FUN_00251A48.
+// Hair locks and other dangling pieces sway at the right speed (the group keeps its first name).
+// Halves the three per-tick phase rates (plain data words, one reader each) read by FUN_00251A48.
+// Leave 002FE738 (0.90) alone: it is a child's fixed phase offset from its parent (00251EB0),
+// not a rate (#113).
 [60FPS - effect rotation]
-description=Halve the per-tick rotation rates behind auras and effect swirls.
+description=Sway hair locks and other dangling pieces at their real speed.
 patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
 patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
 patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
-patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 
 // The ki aura plays at its real-time speed.
 // Hook in FUN_00164860: odd frames jump to 00164A9C (draw only), even frames run the full update.
