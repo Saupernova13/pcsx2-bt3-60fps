@@ -30,6 +30,7 @@ from SuperCombo's names to this repo's old terms.
 | recovering after being launched or blown away | The recovery windows of states 206 and 213 / 214 / 223 | `recovery windows`, issue #158 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
+| the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | Drain Life stopping short of a far opponent | A rushing Blast 2's time limit (the wiki calls Drain Life a Target Rush Blast 2; a "Rush Blast" there is a tapped ki blast) | `rushing Blast 2 time limit`, issue #115 |
 | fusing, the fusion controls | Fusion: a direction plus `R3`, with `R3` held for 12 game ticks (about 0.4 s); a tap does nothing | not a 60fps defect, issue #51 |
