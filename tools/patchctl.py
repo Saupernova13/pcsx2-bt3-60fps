@@ -133,12 +133,18 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# Eye blinks, found 2026-09-28 for issue #90. FUN_0024EB70 re-arms a random
+# 90-179 tick timer and holds the blink image for 3-5 ticks, all counted once a
+# tick, so at 60fps fighters blinked twice as often. Its random branch now runs
+# on even ticks only.
+BLINK = ["60FPS - eye blink"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLINK
                   + SPARES)
 
 PRESETS = {
@@ -198,7 +204,12 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLINK),
+    # "full" without the eye blinks, so that group has a named baseline.
+    "noblink": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
