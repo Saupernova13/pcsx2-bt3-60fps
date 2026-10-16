@@ -521,3 +521,37 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-10-02 - issue #117: a ki blast's homing turn is per tick
+
+From the audit of the `lui $at, 0x41F0` sites (see `state-machine.md`,
+2026-09-30). `00210064` is in `FUN_00210050`, which the ki blast launcher calls
+at `001D1A58`:
+
+    turn = table+0x14 / 30.0 * pi / 180      degrees a second -> radians a tick
+
+The launcher puts it at `+0x24` of the blast. While the blast's flag 4 is set,
+the projectile update (`FUN_00176980`) hands it to `FUN_00131030` (`001769E4`),
+which turns the blast's direction toward its target by up to that angle, once a
+tick. `[60FPS - projectile travel]` halves the distance a blast covers per tick;
+nothing halved the turn. Cell 2nd Form's rate is 50 degrees a second.
+
+A blast at a standing opponent barely turns, so the scene needs the target to
+move. Save state 7 is a 1P vs 2P match: Cell backs away under the 30fps words,
+the arm under test is applied, and Ultimate Gohan (pad 2,
+`roo.cmd('input.set', buttons=['Left'], pad=1)`) holds `Left` from the moment
+Cell taps `Triangle`. `fk/kihome.py` and `fk/kihead.py` in the scratch tools.
+
+| | 30fps | 60fps before | `00210064` at 60.0 |
+|---|---|---|---|
+| heading change, first 12 vsyncs of flight, from 300 units | 9.8 deg | 14.6 deg | 9.8 deg |
+| from 200 units: closest approach | 37.0, miss | 14.1, miss | 38.2, miss |
+| from 300 units | 28.9, miss | hit at v53 | 32.8, miss |
+| from 400 units | 17.3, miss | hit at v60 | 19.1, miss |
+| `Triangle` at a standing opponent (save state 3): damage at | v16 | v16 | v16 |
+
+`[60FPS - ki blast homing]` is that one word. `FUN_002100A0` and
+`FUN_002100F8` are copies of the getter that nothing calls.
+
+Not covered: after a blast's life runs out it counts `+0x5C8` up by 1.0 a tick
+toward `+0x5CC` before it is removed (`00176ABC`). That count was not measured.
