@@ -564,3 +564,18 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - lightning effects (#96)
+
+Adds `[60FPS - lightning effect rate]` (a wrapper at `000F1B90` and one hook).
+One effect class draws the purple lightning round Goten as he transforms, and
+counts its delay, spawns and run once a tick. The game's own freeze check now
+answers "frozen" on odd ticks for that update, so it runs at 30Hz and is still
+drawn every frame.
+
+| Goten, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| lightning run, 0 -> 25 | v26-v74 | v18-v42 | v26-v74 |
+| spawn countdown steps | 73 | 150 | 72 |
+
+**Not confirmed in play.**
