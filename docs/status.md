@@ -564,3 +564,16 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - voice cooldowns (#86)
+
+Adds `[60FPS - voice cooldown]` (one word). A fighter's voice category stays
+quiet for table seconds * 30.0 ticks after a clip, counted down once a tick;
+the 30.0 becomes 60.0.
+
+| Save state 3, every open fix on | 30fps | 60fps before | 60fps with the group |
+|---|---|---|---|
+| a 0.5 s cooldown | 30 vsyncs | 15 | 30 |
+| clips over a 7-hit rush | 4 | 5 | 4, on the same vsyncs |
+
+**Not confirmed in play.**
