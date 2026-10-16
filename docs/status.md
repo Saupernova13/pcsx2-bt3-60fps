@@ -564,3 +564,18 @@ The same comparison in the handler of states 275-277 is not changed: nothing in
 the rig reaches it.
 
 **Confirmed in play 2026-10-05**, in the test build: Drain Life drains again (#41).
+
+## Proposed - the Special Beam Cannon's spiral (#101)
+
+Adds `[60FPS - spiral effect rate]` (a wrapper at `000F1BC0` and one hook). The
+effect class that draws the spiral round the Special Beam Cannon stepped its
+age, counter, scale and chain once a tick. The game's own freeze check now
+answers "frozen" on odd ticks for that update, so it runs at 30Hz and is still
+drawn every frame.
+
+| Imperfect Cell, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| spiral counter reaches 24 | v103 | v80 | v104 |
+| spiral scale reaches 1.1 | v101 | v79 | v102 |
+
+**Not confirmed in play.**

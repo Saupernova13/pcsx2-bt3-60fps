@@ -133,12 +133,18 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# Spiral effects, found 2026-09-29 for issue #101. One effect class draws the
+# Special Beam Cannon's spiral and steps its age, counter, scale and chain once
+# a tick. The game's own freeze check answers "frozen" on odd ticks for that
+# update, so it runs at 30Hz and still draws at 60.
+SPIRAL = ["60FPS - spiral effect rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + SPIRAL
                   + SPARES)
 
 PRESETS = {
@@ -198,7 +204,12 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + SPIRAL),
+    # "full" without the spiral effects, so that group has a named baseline.
+    "nospiral": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
