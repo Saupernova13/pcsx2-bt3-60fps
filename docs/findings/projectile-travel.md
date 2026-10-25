@@ -521,3 +521,60 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-09-21 - issue #43, ki blasts die early: the projectile's life is counted in ticks
+
+The report: ki blasts travel at the right speed but vanish before the 30fps
+game's do - Kid Buu's regular blasts die early, his charged ones do not.
+
+### The life
+
+The effect-node update, `FUN_00176980`, is the one `[60FPS - projectile travel]`
+hooks for the step. Straight after the move it counts the node's life down:
+
+```
+00176A64  lw    $v0, 0x5B4($s1)     life in ticks, armed at spawn from the class (0017688C)
+00176A68  addiu $v0, $v0, -1
+00176A6C  bgtz  $v0, 00176A80
+00176A70  sw    $v0, 0x5B4($s1)
+00176A74  ...   +0x5B0 |= 0x10       dead: the move is skipped from then on (00176A1C)
+```
+
+Krillin's Rush Ki Blast is armed at 118. At 30fps that is 3.9s at 27.8 units a
+tick; at 60fps with the step halved it is 2.0s at 13.9 a tick, so a blast that
+misses gets half the range.
+
+A blast that **hits** never shows it: the impact sets `0x10` itself, and the
+stage caps separation at about 785 units, well inside even the halved range. On
+save state 7 (Krillin 703 units from a standing Ultimate Gohan) the shot ends
+at 663 units in every arm. The shortfall is only visible on a miss, which is
+exactly how the report describes it - a blast that "stops existing sooner".
+
+Moving the opponent to force a miss does not work: `fighter+0x14` is rewritten
+from the model every tick. So the life was set to 10 ticks on the blast's first
+step instead, and the flight timed to the `0x10` flag:
+
+| arm | flies | travels |
+|---|---|---|
+| 30fps | 18 vsyncs | 250 units |
+| v24 | 9 vsyncs | 125 units |
+| v24 + `[60FPS - projectile life]` | 19 vsyncs | 264 units |
+
+### The fix
+
+The decrement is reached two ways: after the move, and from `001769BC`, which
+skips the move for a node flagged `0x100` and branches to `00176A68` with the
+life loaded in its delay slot. The hook therefore replaces the branch after the
+decrement, where both paths meet, with a jump to a helper at `000F1880` that
+adds the tick's parity back, re-stores the life and takes the original branch.
+`$t0` is unused in `FUN_00176980`.
+
+### Not this group
+
+- **Charged ki blasts** are not effect nodes: holding `Triangle` never reaches
+  `00176A34`. They are the spawned-object class, whose end comes from its blast
+  script's events - the clock `[60FPS - blast script clock]` (#31) paces - not
+  from a tick life. That matches the report's own split: Kid Buu's charged
+  blasts last, his regular ones do not.
+- Videl's charged blast was not tested; whether it is an effect node or a
+  scripted object decides which group it needs.
