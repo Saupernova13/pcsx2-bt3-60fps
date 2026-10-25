@@ -290,12 +290,17 @@ SPRITECLOCK = ["60FPS - sprite effect clock"]
 # tick while charging, back by pi/30 a tick after. Both steps are halved.
 BOB = ["60FPS - camera bob"]
 
+# Blast speed and size ramps, found 2026-09-30 for issue #109. FUN_001519F8 and
+# FUN_001518D8 ramp a blast's speed and hit size over a duration in seconds,
+# which they turn into ticks with * 30.0. Both constants become 60.0.
+RAMP = ["60FPS - blast ramp clock"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB + RAMP
                   + SPARES)
 
 PRESETS = {
@@ -355,7 +360,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB + RAMP),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -477,6 +482,11 @@ PRESETS = {
               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the blast ramps, so that group has a named A/B baseline.
+    "noramp": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

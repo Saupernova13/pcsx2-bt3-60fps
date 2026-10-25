@@ -38,6 +38,7 @@ from SuperCombo's names to this repo's old terms.
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | Drain Life stopping short of a far opponent | A rushing Blast 2's time limit (the wiki calls Drain Life a Target Rush Blast 2; a "Rush Blast" there is a tapped ki blast) | `rushing Blast 2 time limit`, issue #115 |
 | fusing, the fusion controls | Fusion: a direction plus `R3`, with `R3` held for 12 game ticks (about 0.4 s); a tap does nothing | not a 60fps defect, issue #51 |
+| blasts that speed up or grow (Kaikosen, Explosive Wave, Android Barrier) | A blast's speed and size ramps (no wiki name) | `blast ramp clock`, issue #109 |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | screen shake on a hit | The camera shake, four timed slots per camera | `camera shake`, issue #80 |
 | vibration, rumble | Controller rumble, two motors per fighter | `controller rumble`, issue #80 |
