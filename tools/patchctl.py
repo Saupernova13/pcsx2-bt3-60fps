@@ -213,12 +213,18 @@ TUMBLE = ["60FPS - knockdown tumble"]
 # fired early. It now leaves only on an even tick, after at least two counts.
 BEAMCHARGE = ["60FPS - beam charge"]
 
+# The effect-command ramps, found 2026-09-28 for issue #77. FUN_0014FF90 runs a
+# move's scripted effects once a tick and animates each command's scale by a rate
+# per tick, or by a timer against seconds * 30.0, so at 60fps hit flashes grew
+# twice as fast - Dynamic Mess Em Up Punch's filled the screen. Rate and timer step halved.
+FXRAMP = ["60FPS - effect command ramp"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP
                   + SPARES)
 
 PRESETS = {
@@ -278,7 +284,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -335,6 +341,11 @@ PRESETS = {
                      + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                      + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                      + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the effect-command ramps, so that group has a named baseline.
+    "noramp": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
