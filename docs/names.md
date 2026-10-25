@@ -37,6 +37,7 @@ from SuperCombo's names to this repo's old terms.
 | the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | Drain Life stopping short of a far opponent | A rushing Blast 2's time limit (the wiki calls Drain Life a Target Rush Blast 2; a "Rush Blast" there is a tapped ki blast) | `rushing Blast 2 time limit`, issue #115 |
+| grabs looking floaty on the knockback (Ultimate Gohan's grab) | Giant Throw: the thrown fighter's flight, state 212 | `throw flight`, issue #125 |
 | fusing, the fusion controls | Fusion: a direction plus `R3`, with `R3` held for 12 game ticks (about 0.4 s); a tap does nothing | not a 60fps defect, issue #51 |
 | blasts that speed up or grow (Kaikosen, Explosive Wave, Android Barrier) | A blast's speed and size ramps (no wiki name) | `blast ramp clock`, issue #109 |
 | lightning crackling over Explosive Wave and barriers | Arc effect (one effect class) | `arc effect rate`, issue #111 |

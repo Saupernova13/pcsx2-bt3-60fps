@@ -630,3 +630,31 @@ Compares against zero, a state's first tick, are left out.
 | `001F6678`, `001FAFB4`, `001FBB1C`, `001FE060`, `001FE6C0`, `001FEA08`, `001FEEC0`, `001FF340`, `001FF8C4` | 262-264, 298-300, 260, 236, 238-243 | equal to a register: an event on one tick |
 
 `001FB9A4` (`< 16`, the Beam Struggle) is already handled by `beam clash`.
+
+## 2026-10-08 - issue #125, the hold in a thrown fighter's flight
+
+Ultimate Gohan's Giant Throw (save state 7, Gohan on pad 2: `Square` x3 and
+`Triangle` stun Cell in state 199, then `Up`+`Triangle`) puts Gohan in state 132
+and Cell in **state 212**, `FUN_001E9218`. Cell 1st Form's Giant Throw in #42
+took the other path (states 221 and 219, `FUN_001EA5F8`, paced by their
+animations) and measured correct; this one does not.
+
+On entry the handler sets `fighter+0x3D8 = (int)(fighter+0xFC8 * 15.0)`
+(`001E9268`-`001E9280`). While the flight's middle animation (`0xBE`/`0xC1`)
+plays it takes 1 off once a tick (`001E93B0`-`001E93BC`), and at 0 it moves on
+to the landing (`0xBF`/`0xC2`). The speed along the way is right - 3.2 units a
+vsync in both arms - so only the hold is short:
+
+| Cell in state 212 | 30fps | 60fps, every open fix on | `001E926C` at 30.0 |
+|---|---|---|---|
+| vsyncs | 70 | 57 | 69 |
+| distance | 220 | 181 | 220 |
+
+`[60FPS - throw flight]` changes the `15.0` (`lui at, 0x4170`) to `30.0`, the same
+shape as `[60FPS - knockback flight]` for states 213, 214 and 223. The counter
+still runs every tick, so a fighter cannot be left in the state.
+
+`fighter+0xFC8` has two other readers, neither a tick count: `001E8014` (a blend
+factor) and `001E8928` (state 206). States 219-222 also hold a "may recover after
+9 ticks" check on `fighter+0xD44`; it only matters when the victim tries to
+recover early, and is left alone.
