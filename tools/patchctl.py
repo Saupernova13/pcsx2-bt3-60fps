@@ -133,12 +133,31 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# The fighter meter economy, found 2026-09-16 chasing the "ki charges and drains
+# faster" report. FUN_001E16C0 is one tick of one fighter's whole economy - ki
+# income by two paths, three more gauges, a -400 drain, and a 0..29 counter that
+# fires the once-per-second blocks when it wraps. Every constant in it is per
+# 30Hz frame and that counter IS the game's second, so at 60fps a fighter earns,
+# spends and reaches every per-second milestone twice as fast. It has exactly one
+# caller, so one gate fixes the system rather than a dozen constants.
+ECONOMY = ["60FPS - meter economy"]
+
+# Max Power Mode's charge, found 2026-09-17. Holding L2 at full Ki fills the
+# Max Power gauge from the charge state's handler, outside the economy gate, at
+# an amount FUN_0020F000 derives from seconds * 30.0. That 30.0 becomes 60.0.
+MPMCHARGE = ["60FPS - max power charge"]
+
+# The ki charge loop, found 2026-10-09 for issue #4. Past the charge's start
+# animation, its handler adds ki once a tick at 001EB8D4, outside the economy
+# gate; a wrapper halves each amount, alternating the rounding.
+KICHARGE = ["60FPS - ki charge loop"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE
                   + SPARES)
 
 PRESETS = {
@@ -198,7 +217,13 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE),
+    # The set without the meter economy, kept so the new group has a named
+    # baseline to be diffed against without editing a preset.
+    "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
