@@ -61,6 +61,20 @@ the PR with the new score, what moved it and what still holds it below 99%,
 and update the body's line to match. When it reaches 99%, the comment says it
 is ready for a play test. `/trim-pr-body` keeps the confidence line.
 
+**Every PR also carries the matching confidence label**, so the score shows in
+the PR list. Change the label whenever the score crosses a band:
+
+| Label | Colour | Score |
+|---|---|---|
+| `confidence: 99%` | green | 99% or more: ready to play-test |
+| `confidence: 95-98%` | yellow | 95-98% |
+| `confidence: 90-94%` | orange | 90-94% |
+| `confidence: under 90%` | red | below 90% |
+
+`gh pr edit --add-label` fails on this token (it needs `read:org`); use
+`gh api -X POST repos/Saupernova13/pcsx2-bt3-60fps/issues/N/labels -f "labels[]=..."`,
+and `DELETE .../issues/N/labels/<name>` to drop the old band.
+
 **Run `/trim-pr-body` on the PR after opening it.**
 
 Everything else follows the global conventions: conventional commit subjects,
