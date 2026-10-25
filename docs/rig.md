@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Fifteen traps, most of which cost an hour or more
+## Twenty-one traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -132,6 +132,41 @@ at boot only.
 validation run leaves a `428113C2.pnach` there that looks like a deliverable.
 Pass `--to work/export-check` when all you want is the validator.
 
+**16. `fk` is whatever the rig's cheat file holds, not the test build.** `hs`'s
+`fk` arm and `patchctl` read `<pcsxroo>/bin/cheats/428113C2.pnach`. Until
+2026-10-12 that file held only the merged groups plus spares, so every `fk` run
+silently lacked the open PRs' groups. `python tools/rigsync.py` copies the test
+build into it under the real group names and enables every name in the rig's
+ini; restart the rig when a new name appears (trap 14).
+
+**17. The EE's FPU has no `c.lt.s` (`0x3C`) form.** A trampoline compare encoded
+`4602003C` (`c.lt.s`) never sets the condition, so its `bc1t` is never taken. Use
+`c.olt.s` (`0x34`, e.g. `46020034`), as the game's own code does. Single-step a
+new cave (`roo.step()`) before trusting a measurement with it.
+
+**18. Menu presses need about 2 seconds each, and a pause menu remembers its
+cursor.** `menu.py press A B C` sends them too close together for the pause menu:
+only the first registers. Press one at a time with a 2 s gap. The pause cursor
+is part of the save state: in `rocky-super17-vs-standing-gohan.p2s` it opens on
+`COM Settings`, so `Return to Main Menu` is 3 `Down`s away, not 5.
+
+**19. A state saved inside the menu program does not reload.** Saved on the main
+menu, it loads with the EE pc at `0x3F000000` and never runs. Start every menu
+scene from a battle state and drive the menus live (see `Getting to any scene`).
+
+**20. A press sent with `input.set` while frame-advancing can be lost on a
+menu.** Shenron's `Cross` registered at 30fps but not in the full build that
+way. Press menu buttons with `menu.py` while the VM runs, then pause.
+
+**21. The CPU's outcomes depend on its start phase.** Writing the same CPU
+patch one frame later turned a Beam Struggle from 81 to 91 CPU rotations.
+Compare CPU behaviour as a distribution over several start delays
+(`aistats.py` `DELAYS=`), never one run against one run.
+
+A breakpoint does not end a frame: after a stop at one, `frame_advance(1)` runs
+on to the next breakpoint or to the end of the same frame (`reason: user`).
+Counting every hit per vsync is a loop on that.
+
 ## Getting to any scene
 
 Until 2026-09-16 every A/B ran from a hand-made save state, which meant only
@@ -172,6 +207,15 @@ The roster is **15 rows of 7**, and both axes wrap. Rows seen so far, in Down
 order: Goku (Early), Goku (Mid), Goku (End), Goku (GT), Master Roshi, Captain
 Ginyu, Frieza, Cell, Majin Buu, Bardock, Cooler, Pikkon, Demon King Piccolo,
 Kid Goku, Password Character. Map Select has the same shape, six rows.
+
+**The Shenron wish screen** runs its own 30fps loop and is reachable from any
+battle: pause, `Return to Main Menu`, `Up` then `Cross` at `EXIT?`, four `Down`s
+on the main menu to `Shenron`, `Cross`. Shenron appears about 660 vsyncs later.
+`work/tools-scratch/wishmeasure.py` drives it and times the screen's shockwave
+ring and camera shake (#81, #138).
+
+**1P vs 2P:** main menu, `Up` three times to `Duel`, `1P VS 2P`, `Single Battle`;
+pad 2 confirms its own fighter.
 
 ### Do not browse the roster - compute the cell
 
@@ -227,6 +271,7 @@ group off:
 | `rocky-gs2-vs-standing-gohan.p2s` | Great Saiyaman 2 against a standing Ultimate Gohan | Justice Finishing Pose 2 turns Max Power Mode on, then her Ultimate (#44) |
 | `rocky-cell1-near-standing-gohan.p2s` | Cell 1st Form 11 units from a standing Ultimate Gohan | Giant Throw, Special Beam Cannon, Heavy Finish (#42, #13) |
 | `owner-ssj4-vegeta-fusion-native.p2s` | the owner's own save, cut with their test build on (patchctl puts back the words of any group an arm leaves off): Team Battle, SSJ4 Vegeta with SSJ4 Goku as partner, 6 Blast Stocks, a COM that attacks within seconds | fusion (#51): hold `Right`+`R3` 24 vsyncs or more |
+| `rocky-s17-vs-gohan-1p2p.p2s` | Duel, 1P vs 2P: Super 17 against Ultimate Gohan, 225 units, both pads human (pad 2 is `input.set` with `pad=1`) | anything two players must do at once: a smash clash, rushing into the Auto-Counter stance (#144, #167) |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
