@@ -270,3 +270,118 @@ current team member's record, `FUN_001CE050(fighter) + 0x40` (member index at
 the fusion still went through, so it is not. The HUD object at `01876860` keeps
 P1's displayed stock at `+0x70`.
 
+
+## 2026-09-21 - issue #18, the defensive windows: six countdowns in FUN_001DFFE0
+
+#18 predicted that every one-tick input window SuperCombo describes - Defensive
+Vanish, Z-Counter, the vanish window that shrinks with health - is half as long
+in real time at 60fps. It is, and they share one function.
+
+### A scene where the opponent attacks on demand
+
+Training's COM can stand or fight on its own schedule, neither of which a
+window sweep can use. **Duel → 1P vs 2P** can: PCSXROO drives pad 2 as well as
+pad 1 (`input.set` takes `pad: 1`), and a versus match has no health regen.
+`work/state-backups/rocky-vs2p-cell2-near-gohan.p2s` is Cell 2nd Form 12 units
+from Ultimate Gohan. Pad 2 holds Square for 20 vsyncs, a level-1 smash (state
+75), which lands on P1 at v32 (state 196). Pad 1 taps a button for 2 vsyncs, one
+vsync later each run.
+
+### Measured
+
+| defence | 30fps | v24 | v24 + `[60FPS - defence windows]` |
+|---|---|---|---|
+| Circle (vanish, state 32) | hit-10 … hit-3: **8 vsyncs** | hit-5 … hit-2: 4 | hit-9 … hit-2: **8** |
+| Up + Square (Z-Counter, states 43/45/57/139) | hit-4, hit-3: **2 vsyncs** | hit-2: 1 | hit-3, hit-2: **2** |
+
+The v24 and fixed arms carry `smash charge` and `meter economy` so the attacker
+throws the same level-1 smash; on v24 alone the same hold charges a stronger one
+(#17). The window sits one vsync later relative to the hit because a 60fps press
+registers on the next tick rather than up to one vsync after it.
+
+### The mechanism
+
+The vanish is queued in `FUN_001E12D0` by flag `0x76`, which the hit resolver
+`FUN_001C8580` raises when `defender+0x1068 > 0` at `001C863C`. `FUN_001DFFE0`,
+once a tick per fighter, owns that counter and five siblings:
+
+| counter | armed by | to | rest |
+|---|---|---|---|
+| `+0x1068` | button 0x27 (vanish) | 2, 3 or 4 by health (`FUN_001CEE90`) | -30 |
+| `+0x106C` | button 0x27 | 2, or 4 with flag 0x138 | -30 |
+| `+0x1070` | button 0x26 | 1 | -30 |
+| `+0x1074` | button 0x2B, with state bit 0x20 | 5 | -15 |
+| `+0x1078` | button 0x27 | 5 | -30 |
+| `+0x107C` | button 0x27 | 2, or 4 with flag 0x138 | -30 |
+
+Each counts `addiu v0,v0,-1; slti v1,v0,rest` every tick. A press arms a window
+only while the counter is below its rest value; a press while it is not (inside
+the window or its cooldown) sets it to -1, the game's anti-mash rule.
+
+### The fix, and the trap in it
+
+The first version made every decrement net to zero on odd ticks and produced an
+alternating window: vanish on hit-9, -7, -5, fail on hit-8, -6. At rest the
+counter sits at -30 and relies on dropping to -31 each tick to re-arm; held at
+-30 on odd ticks, a press there took the "pressed during cooldown" branch and
+killed the window. The helper therefore counts every tick when the value is at
+or below rest (`slti at, v0, rest+1; movn t0, zero, at`), and on even ticks
+only inside the window and its cooldown.
+
+## 2026-10-10 - the seventh defence window
+
+BT3-Decompiled (`BtlMove_UpdateDefenseTimers`, `src/battle/btl_char_move.c`)
+lists seven windows in `FUN_001DFFE0`, not six. The seventh, `fighter+0x1080`,
+counts up: for a character with parameter flag `8` (every fighter in the rig's
+saves), a guard press sets it to -15, it climbs once a tick and rests at 1, and
+`BtlDecide_Main` (`src/battle/btl_act_change.c`) allows action 0x24 - vanish and reappear behind the
+opponent, which costs ki - only while it is above 0. So a guard press locks that
+move out for 16 frames, 8 at 60fps.
+
+`[60FPS - defence windows]` now hooks its increment (`001E022C`) with the same
+kind of helper as the six countdowns (`000F2520`: the +1 nets to nothing on odd
+ticks, the `slti` is replayed). Lockout after Circle, rig slot 0 (Goku (Early)):
+
+| | armed | allowed again | lockout |
+|---|---|---|---|
+| 30fps | v3 | v35 | 32 vsyncs |
+| 60fps before | v2 | v18 | 16 |
+| with the helper | v2 | v33 | 31 |
+
+## 2026-10-09 - issue #88: the repeat timer runs at two rates
+
+`FUN_002577B0` counts its counter down once a call: it fires `delay + 1` calls
+after a press and then every `rate + 1` (`a0` held mask, `a1` new presses,
+`a2`/`a3` the counter and last mask, `t0` delay, `t1` rate). It has two
+callers, `00122D30` (pad `+0x158`) and `00257760` (pad `+0x194`, which writes
+the repeat word at pad `+0x190`, `00333990`). How often they run depends on
+where the game is:
+
+| Down or Right held, repeat word `00333990` | calls a second | first repeat after the press | then every |
+|---|---|---|---|
+| battle, 30fps, 20 / 1 | 30 | 42 vsyncs | 4 |
+| battle, 60fps, v26's doubled 40 / 2 | 60 | 41 | 3 |
+| character select, 30fps or 60fps, 20 / 1 | 60 | 22 | 2 |
+| character select, v26's 40 / 2 | 60 | 42 | 3 |
+
+So the menus outside battle always ran their timer once a vsync. The patch
+does not change them, but v26's doubling in `SetRepeat` did: every menu
+outside a battle repeated at about half its PS2 speed. Inside a battle,
+doubling missed by one because the timer adds one call to each count.
+
+`SetRepeat(20, 1)` runs once at boot (`FUN_002BD230`, before the game proper),
+so the values cannot follow the mode. The callers now go through a wrapper at
+`000F1D60` that reads the battle manager (`002FEB14`): set, `delay + 1` and
+`rate + 1` from the stored doubled values (41 / 3); clear, half of them (20 / 1).
+`SetRepeat` still doubles, so a boot and every save state made with an earlier
+version hold the same 40 / 2. The rig's save states hold 20 / 1, because they
+were cut before the hook existed; write 40 / 2 by hand when testing this.
+
+| with the wrapper, stored 40 / 2 | first repeat | then every |
+|---|---|---|
+| battle (save state 3, `Down`) | 42 vsyncs, as 30fps | 4, as 30fps |
+| character select (`Right`) | 22 vsyncs, as the PS2 | 2, as the PS2 |
+
+`SetRepeat` through v26's hook, run directly from a paused VM (`a0` = 20,
+`a1` = 1, `pc` = `002577F8`), stores 40 / 2 in both pads, so the wrapper's
+input is the one a real boot gives it.
