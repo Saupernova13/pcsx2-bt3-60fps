@@ -20,15 +20,29 @@ patch=1,EE,000F004C,word,E4440C80 // swc1 $f4, 0xc80($v0)
 patch=1,EE,000F0050,word,08071145 // j 0x1c4514
 patch=1,EE,000F0054,word,00000000 // nop
 
-// Menus scroll at the right speed: doubles the auto-repeat delay and rate, which are counted in ticks.
+// Menus scroll at the right speed. SetRepeat (002577F8) still stores delay and rate doubled; both
+// callers of the timer (00122D30, 00257760) go through a wrapper that uses delay + 1 / rate + 1 in
+// battle (60 ticks a second) and delay / 2 / rate / 2 outside it (once a vsync, the PS2 values).
 [60FPS - input repeat timing]
-description=Double the auto-repeat delay and rate so menus scroll at the right speed.
+description=Keep menu auto-repeat at its real speed: in battle the timer counts 60 ticks a second, so its delay and rate double there, and menus outside battle keep the PS2 values.
 patch=1,EE,002577F8,word,0803C020 // lui -> j 000F0080
 patch=1,EE,000F0080,word,00042040 // sll $a0, $a0, 1
 patch=1,EE,000F0084,word,00052840 // sll $a1, $a1, 1
 patch=1,EE,000F0088,word,3C020033 // lui $v0, 0x33
 patch=1,EE,000F008C,word,08095E00 // j 0x257800
 patch=1,EE,000F0090,word,00000000 // nop
+patch=1,EE,00122D30,word,0C03C758 // jal 002577B0 -> jal 000F1D60
+patch=1,EE,00257760,word,0C03C758 // jal 002577B0 -> jal 000F1D60
+patch=1,EE,000F1D60,word,3C010030 // lui $at, 0x30
+patch=1,EE,000F1D64,word,8C21EB14 // lw $at, -0x14EC($at)    battle manager, 002FEB14
+patch=1,EE,000F1D68,word,14200004 // bnez $at, 000F1D7C
+patch=1,EE,000F1D6C,word,00000000 // nop
+patch=1,EE,000F1D70,word,00084042 // srl $t0, $t0, 1         no battle: delay / 2
+patch=1,EE,000F1D74,word,08095DEC // j 002577B0
+patch=1,EE,000F1D78,word,00094842 // srl $t1, $t1, 1         rate / 2
+patch=1,EE,000F1D7C,word,25080001 // addiu $t0, $t0, 1       battle: delay + 1
+patch=1,EE,000F1D80,word,08095DEC // j 002577B0
+patch=1,EE,000F1D84,word,25290001 // addiu $t1, $t1, 1       rate + 1
 
 // Double taps, holds and combo links keep their real-time windows.
 // Counts the 128 per-button frame counters (FUN_001D3C10) on even ticks only.
@@ -102,14 +116,15 @@ patch=1,EE,000F01D4,word,00000000 // nop
 patch=1,EE,001C4838,word,0803C068 // lwc1 -> j 000F01A0 (FUN_001C47A4 play-once step)
 patch=1,EE,001C49A8,word,0803C070 // lwc1 -> j 000F01C0 (FUN_001C4920 looping step)
 
-// Auras, glows and swirls rotate at the right speed.
-// Halves the per-tick rotation rates (plain data words, one reader each) read by FUN_00251A48.
+// Hair locks and other dangling pieces sway at the right speed (the group keeps its first name).
+// Halves the three per-tick phase rates (plain data words, one reader each) read by FUN_00251A48.
+// Leave 002FE738 (0.90) alone: it is a child's fixed phase offset from its parent (00251EB0),
+// not a rate (#113).
 [60FPS - effect rotation]
-description=Halve the per-tick rotation rates behind auras and effect swirls.
+description=Sway hair locks and other dangling pieces at their real speed.
 patch=1,EE,002FE72C,word,3D4CCCCC // 0.10 -> 0.05   phase rate, slot +0x28
 patch=1,EE,002FE730,word,3DEB851E // 0.23 -> 0.115  phase rate, slot +0x2C
 patch=1,EE,002FE734,word,3E0A3D70 // 0.27 -> 0.135  phase rate, slot +0x30
-patch=1,EE,002FE738,word,3EE66666 // 0.90 -> 0.45   phase rate, parent branch
 
 // The ki aura plays at its real-time speed.
 // Hook in FUN_00164860: odd frames jump to 00164A9C (draw only), even frames run the full update.
@@ -617,6 +632,120 @@ patch=1,EE,001C6C18,word,00000000 // nop
 patch=1,EE,001C5720,word,0803C4D0 // -> 0F1340  gate the camera-move countdown
 patch=1,EE,001C5724,word,00000000 // nop
 
+// The screen shake's jitter, found 2026-10-09 for issue #129. FUN_0023F478 draws
+// five random numbers once a tick - three for a position offset, two for an
+// angle - scaled by the largest shake slot. Its battle caller (001C6B48) runs
+// once per fighter camera every tick, so at 60fps the camera jumped to a new
+// offset every frame instead of every other one. The call now goes through a
+// wrapper that holds each camera's five values for two ticks: on even ticks it
+// calls the function and saves the outputs under the camera's slot array; on odd
+// ticks it copies the saved ones back and draws nothing. Two cameras share the
+// call site, so the saved values sit in a table of four entries (slot array, then
+// five floats) at 000F1F00, filled round-robin through the index at 000F1F80.
+// The table is never written by a patch line: the patch rewrites its words every
+// frame, which would wipe it. It relies on the scratch zone being zero.
+//
+// Goku's Kamehameha on Ultimate Gohan (save state 0), each camera's offsets at
+// every return to 001C6B50:
+//
+//                          30fps       60fps before   with this group
+//   new offsets in shake   11          21             11
+//   vsyncs each is held    2           1              2
+//
+// On an odd tick the held offsets are copied back, x/y/z and x/y; CamShake_Calc
+// also zeroes the rotation's z/w and sets the position's w to 1.0 (Vec4_SetZero /
+// SetZeroW1). Left out, the camera roll added stack leftovers on every odd tick
+// (90 of 180 updates, slot 7); 000F2570 writes them too.
+[60FPS - camera shake jitter]
+description=Hold each new screen-shake offset for two frames, so the camera shakes as often as on a PS2 instead of jumping every frame.
+patch=1,EE,001C6B48,word,0C03C764 // jal 0023F478 -> jal 000F1D90
+patch=1,EE,000F1D90,word,27BDFFE0 // addiu sp,sp,-0x20
+patch=1,EE,000F1D94,word,FFBF0000 // sd ra,0x0(sp)
+patch=1,EE,000F1D98,word,FFB00008 // sd s0,0x8(sp)
+patch=1,EE,000F1D9C,word,FFB10010 // sd s1,0x10(sp)
+patch=1,EE,000F1DA0,word,FFB20018 // sd s2,0x18(sp)
+patch=1,EE,000F1DA4,word,0080802D // daddu s0,a0,zero
+patch=1,EE,000F1DA8,word,00A0882D // daddu s1,a1,zero
+patch=1,EE,000F1DAC,word,00C0902D // daddu s2,a2,zero
+patch=1,EE,000F1DB0,word,3C080033 // lui t0,0x33
+patch=1,EE,000F1DB4,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F1DB8,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F1DBC,word,11000017 // beq t0,zero,0xf1e1c
+patch=1,EE,000F1DC0,word,3C0A000F // lui t2,0xF
+patch=1,EE,000F1DC4,word,254A1F00 // addiu t2,t2,0x1F00
+patch=1,EE,000F1DC8,word,254B0080 // addiu t3,t2,0x80
+patch=1,EE,000F1DCC,word,8D4C0000 // lw t4,0x0(t2)
+patch=1,EE,000F1DD0,word,11900006 // beq t4,s0,0xf1dec
+patch=1,EE,000F1DD4,word,00000000 // nop
+patch=1,EE,000F1DD8,word,254A0020 // addiu t2,t2,0x20
+patch=1,EE,000F1DDC,word,154BFFFB // bne t2,t3,0xf1dcc
+patch=1,EE,000F1DE0,word,00000000 // nop
+patch=1,EE,000F1DE4,word,1000000D // beq zero,zero,0xf1e1c
+patch=1,EE,000F1DE8,word,00000000 // nop
+patch=1,EE,000F1DEC,word,8D4C0004 // lw t4,0x4(t2)
+patch=1,EE,000F1DF0,word,AE2C0000 // sw t4,0x0(s1)
+patch=1,EE,000F1DF4,word,8D4C0008 // lw t4,0x8(t2)
+patch=1,EE,000F1DF8,word,AE2C0004 // sw t4,0x4(s1)
+patch=1,EE,000F1DFC,word,8D4C000C // lw t4,0xC(t2)
+patch=1,EE,000F1E00,word,AE2C0008 // sw t4,0x8(s1)
+patch=1,EE,000F1E04,word,8D4C0010 // lw t4,0x10(t2)
+patch=1,EE,000F1E08,word,AE4C0000 // sw t4,0x0(s2)
+patch=1,EE,000F1E0C,word,8D4C0014 // lw t4,0x14(t2)
+patch=1,EE,000F1E10,word,AE4C0004 // sw t4,0x4(s2)
+patch=1,EE,000F1E14,word,0803C95C // j 000F2570               odd tick: finish the held offsets
+patch=1,EE,000F1E18,word,AE400008 // sw zero,0x8(s2)          rotOfs.z = 0
+patch=1,EE,000F1E1C,word,0C08FD1E // jal 0x23F478
+patch=1,EE,000F1E20,word,00000000 // nop
+patch=1,EE,000F1E24,word,3C0A000F // lui t2,0xF
+patch=1,EE,000F1E28,word,254A1F00 // addiu t2,t2,0x1F00
+patch=1,EE,000F1E2C,word,254B0080 // addiu t3,t2,0x80
+patch=1,EE,000F1E30,word,8D4C0000 // lw t4,0x0(t2)
+patch=1,EE,000F1E34,word,1190000E // beq t4,s0,0xf1e70
+patch=1,EE,000F1E38,word,00000000 // nop
+patch=1,EE,000F1E3C,word,254A0020 // addiu t2,t2,0x20
+patch=1,EE,000F1E40,word,154BFFFB // bne t2,t3,0xf1e30
+patch=1,EE,000F1E44,word,00000000 // nop
+patch=1,EE,000F1E48,word,3C0D000F // lui t5,0xF
+patch=1,EE,000F1E4C,word,8DAE1F80 // lw t6,0x1F80(t5)
+patch=1,EE,000F1E50,word,31CE0003 // andi t6,t6,0x3
+patch=1,EE,000F1E54,word,25CF0001 // addiu t7,t6,0x1
+patch=1,EE,000F1E58,word,31EF0003 // andi t7,t7,0x3
+patch=1,EE,000F1E5C,word,ADAF1F80 // sw t7,0x1F80(t5)
+patch=1,EE,000F1E60,word,000E7140 // sll t6,t6,5
+patch=1,EE,000F1E64,word,25AA1F00 // addiu t2,t5,0x1F00
+patch=1,EE,000F1E68,word,014E5021 // addu t2,t2,t6
+patch=1,EE,000F1E6C,word,AD500000 // sw s0,0x0(t2)
+patch=1,EE,000F1E70,word,8E2C0000 // lw t4,0x0(s1)
+patch=1,EE,000F1E74,word,AD4C0004 // sw t4,0x4(t2)
+patch=1,EE,000F1E78,word,8E2C0004 // lw t4,0x4(s1)
+patch=1,EE,000F1E7C,word,AD4C0008 // sw t4,0x8(t2)
+patch=1,EE,000F1E80,word,8E2C0008 // lw t4,0x8(s1)
+patch=1,EE,000F1E84,word,AD4C000C // sw t4,0xC(t2)
+patch=1,EE,000F1E88,word,8E4C0000 // lw t4,0x0(s2)
+patch=1,EE,000F1E8C,word,AD4C0010 // sw t4,0x10(t2)
+patch=1,EE,000F1E90,word,8E4C0004 // lw t4,0x4(s2)
+patch=1,EE,000F1E94,word,AD4C0014 // sw t4,0x14(t2)
+patch=1,EE,000F1E98,word,DFBF0000 // ld ra,0x0(sp)
+patch=1,EE,000F1E9C,word,DFB00008 // ld s0,0x8(sp)
+patch=1,EE,000F1EA0,word,DFB10010 // ld s1,0x10(sp)
+patch=1,EE,000F1EA4,word,DFB20018 // ld s2,0x18(sp)
+patch=1,EE,000F1EA8,word,03E00008 // jr ra
+patch=1,EE,000F1EAC,word,27BD0020 // addiu sp,sp,0x20
+patch=1,EE,000F2570,word,AE40000C // sw zero,0xC(s2)          rotOfs.w = 0, as CamShake_Calc leaves them
+patch=1,EE,000F2574,word,3C0C3F80 // lui t4,0x3F80
+patch=1,EE,000F2578,word,0803C7A6 // j 000F1E98
+patch=1,EE,000F257C,word,AE2C000C // sw t4,0xC(s1)            posOfs.w = 1.0
+patch=1,EE,000F26E0,word,3C080030 // lui t0,0x30
+patch=1,EE,000F26E4,word,8D08EB14 // lw t0,-0x14EC(t0)       gBtlChars 002FEB14: 0 outside a battle
+patch=1,EE,000F26E8,word,11000003 // beq t0,zero,000F26F8
+patch=1,EE,000F26EC,word,00000000 // nop
+patch=1,EE,000F26F0,word,0803C764 // j 000F1D90               battle: the held-offset wrapper
+patch=1,EE,000F26F4,word,00000000 // nop
+patch=1,EE,000F26F8,word,0808FD1E // j 0023F478               wish screen: CamShake_Calc as before
+patch=1,EE,000F26FC,word,00000000 // nop
+patch=1,EE,0023D5D0,word,0C03C9B8 // jal 000F26E0 (DemoCam_Update fixed pose)
+patch=1,EE,0023D788,word,0C03C9B8 // jal 000F26E0 (DemoCam_Update animated)
+
 // Cut-in mouth and face tracks no longer stop mid-sentence.
 // Halves the keyframe clock add at 0024ED20 and 0024F290 (rate 2.0). Hooks the add, not the rate
 // load; the trampolines replay what the delay slot got wrong.
@@ -868,6 +997,1430 @@ patch=1,EE,001F9260,word,3C014270 // lui $at, 0x41F0 -> 0x4270   limit: seconds 
 description=Let a launched or blown-away fighter recover after its real 9 frames, not half that.
 patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
 patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
+
+// The fighter's meter economy - ki, the three gauges beside it, and every
+// milestone the game reaches "after a second". FUN_001E16C0 is one tick of it
+// for one fighter, and it has exactly one caller, 001E2584, at the tail of the
+// per-fighter update. Everything inside is authored per 30Hz frame: ki comes in
+// at a flat 3333 a tick while charging plus a computed trickle, the second and
+// third gauges fill by their own constants, fighter+0xD80 runs down by 400 a
+// tick, and - the part that makes this a system rather than a list of constants
+// - fighter+0x132C counts 0..29 and fires the once-a-second blocks when it
+// wraps. That counter IS the game's second. At 60fps it wraps twice as often,
+// so a "per second" bonus arrives every half second, on top of every rate being
+// doubled. FUN_0020EF20 even divides by a literal 30 to get its per-frame
+// share, which is as close to a framerate constant as BT3 has.
+//
+// Gating the single call puts the whole economy back on real time at once -
+// income, drain, and the second itself - instead of halving a dozen constants
+// and still getting the second wrong. Measured from the Rocky Area state, the
+// gated arm lands on the 30fps arm's exact values: after 46 vsyncs ki 259962
+// against 259962, both other gauges equal, and the second-counter at 14 against
+// 14, where the ungated arm reads 340761 and 7. Spending ki on a move is not
+// affected - that happens on the move's own code path, not per tick.
+//
+// The same gate paces the Blast 1 buffs. FUN_00200AA0 counts every buff timer
+// down, and its only caller is inside FUN_001E16C0: After Image Strike lasts
+// 14.88s against 14.88s at 30fps and 7.40s without the gate. Do not also double
+// the buff durations (the old buff duration group, #25) - that makes 29.88s.
+[60FPS - meter economy]
+description=Run the fighter's ki and gauge economy every other frame so ki fills and drains at its real-time speed and the game's one-second milestones still take a second.
+patch=1,EE,000F1580,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1584,word,8D081D64 // lw $t0, 0x1D64($t0)    frame counter
+patch=1,EE,000F1588,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F158C,word,15000003 // bnez $t0, 0x000F159C   odd tick: skip the tick
+patch=1,EE,000F1590,word,00000000 // nop
+patch=1,EE,000F1594,word,080785B0 // j 0x001E16C0           even tick: tail jump, ra kept
+patch=1,EE,000F1598,word,00000000 // nop
+patch=1,EE,000F159C,word,03E00008 // jr $ra
+patch=1,EE,000F15A0,word,00000000 // nop
+patch=1,EE,001E2584,word,0C03C560 // jal 001E16C0 -> jal 000F1580
+
+// The rest of a ki charge, found 2026-10-09 for issue #4. Holding L2 plays the
+// charge state's start animation (0x34), then loops 0x35. Ki during the start
+// comes from the meter economy, which the group above gates. In the loop the
+// charge state's handler (FUN_001EB718) adds FUN_0020EC00's amount (or
+// FUN_0020EC88's with flag 0x11) through FUN_001CEBB8 once a tick, outside the
+// economy: a per-second table value / 30 plus terms, clamped, so it cannot be
+// fixed at a divisor. The call at 001EB8D4 now goes through a wrapper that adds
+// the frame counter's low bit and halves: 795 becomes 397 and 398 on alternate
+// ticks, 795 per two ticks as at 30fps, and the bar still moves every frame.
+//
+// Krillin (save state 3) holding L2 from 20000 ki, ki gained per 10 vsyncs:
+//
+//                          v0-v50    v50 on
+//   30fps                  5425      3975
+//   60fps before           5425      7950
+//   with this group        5425      3975
+[60FPS - ki charge loop]
+description=Fill ki at its real speed for the whole of a held charge, not only its first second.
+patch=1,EE,001EB8D4,word,0C03C848 // jal 001CEBB8 -> jal 000F2120
+patch=1,EE,000F2120,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2124,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F2128,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F212C,word,00A82821 // addu a1,a1,t0
+patch=1,EE,000F2130,word,08073AEE // j 0x1CEBB8
+patch=1,EE,000F2134,word,00052843 // sra a1,a1,1
+
+// Max Power Mode's charge, found 2026-09-17, the other half of issue #4.
+// SuperCombo: Max Power Mode is "activated by charging while both having a full
+// Ki gauge and at least one Blast Stock", shown as a blue gauge over the Ki bars.
+//
+// That gauge is the meter object's +0x1C (fighter+0x0A00), capped at 30000. The
+// charge state's handler (state 55, FUN_001EB718) adds to it once a tick at
+// 001EB90C, and the amount comes from FUN_0020F000, which spreads 30000 over a
+// charge time in seconds at a hard-coded 30 ticks a second:
+//
+//   0020F028  lui   $at, 0x41F0          30.0
+//   0020F03C  div.s $f20, $f20, $f0
+//   0020F040  mul.s $f20, $f20, $f1       seconds * 30.0 = ticks
+//   0020F04C  div   $v0, $v1              30000 / ticks = amount a tick
+//
+// [60FPS - meter economy] does not reach it: the add is in the state handler, not
+// in FUN_001E16C0. It fixes the DRAIN after activation, not the fill. One word
+// makes the divisor 60.0, so the amount halves and the tick count doubles.
+// FUN_0020F000 has one caller.
+//
+// Save state 4, Goku (Early) at full Ki, L2 held, first add to 30000 ("MAX
+// POWER!"), from the pnach:
+//
+//   30fps                                112 vsyncs   535 a tick
+//   60fps, shipped + meter economy        56 vsyncs   535 a tick
+//   60fps, the same + this group         113 vsyncs   265 a tick
+[60FPS - max power charge]
+description=Fill the Max Power Mode gauge at its real-time speed while charging, so Max Power Mode takes as long to reach at 60fps as on a real PS2.
+patch=1,EE,0020F028,word,3C014270 // lui $at, 0x41F0 -> 0x4270   30.0 -> 60.0 ticks a second
+
+
+// The smash charge. SuperCombo's BT3 wiki names the mechanic: a Smash Attack
+// is Square held with a direction, level 3 is "indicated by your character
+// flashing white", and a Perfect Smash is "releasing the attack button at the
+// exact moment your character reaches level three of charge". The same page
+// states BT3's frame as a 30th of a second, which is this whole project in one
+// line.
+//
+// FUN_001E33E0 is the charge step: it reads gp-0x6D80 (002FD4F0, 0.0444444 =
+// 1/22.5), scales it, adds it to the raw charge at fighter+0xD7C and stores the
+// normalised 0..1 copy at fighter+0xD78. The constant has exactly one reader,
+// so it is halved in data the way the gravity group's acceleration is, and one
+// word covers all eleven charge states: 71-76, the six Smash directions
+// (FUN_001E4330), and 83-87 (FUN_001E4D80) both call it.
+//
+// The charge then takes 44 vsyncs to fill instead of 22, which is the same real
+// time as 30fps and the same sequence sample for sample: 0.04 0.09 0.13 ...
+// 0.98 1.00.
+//
+// The Perfect Smash window. fighter+0xD84 counts TICKS since the charge hit
+// maximum and 001E4804 grants the Perfect Smash only when it reads exactly 1,
+// which is one tick of release timing: 2 vsyncs at 30fps, 1 at 60fps. Releasing
+// on each vsync in turn and breakpointing the grant at 001E4810, in the full test
+// build of 2026-10-09: 30fps accepts v59 and v60, the charge fix alone only v58.
+// (An earlier note here said the charge fix alone restored 2 vsyncs; in the full
+// build it does not.) The test now accepts 1 or 2 through 000F1CE0, which gives
+// v58 and v59 - the 30fps width, one vsync earlier because the charge state
+// starts 2 vsyncs earlier. Every other value takes the original branch with a0
+// untouched, so the ordinary Full Power smash is unchanged.
+//
+// The Perfect Smash then dashes on a counter of its own (work[2] in
+// BtlAct_SmashChargeHandler, BT3-Decompiled): the dash starts at frame 2 and the
+// attack moves on at frame 6, counted once a tick. Both compares are doubled, so
+// the Perfect Smash lasts its 30fps time: 62 vsyncs after the Perfect at 30fps,
+// 55 before, 61 with them (Goku (Early), rig slot 0).
+//
+// Needs the meter economy group (PR #16). The step is scaled by Momentum
+// (fighter+0xD80, which rush hits fill), and Momentum drains 400 a tick inside
+// the economy that group gates. Without it a charge started after a rush fills
+// late: 22 vsyncs against 20 from half Momentum.
+[60FPS - smash charge]
+description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
+patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick
+patch=1,EE,000F1CE0,word,2481FFFF // addiu $at, $a0, -1        a0 = fighter+0xD84
+patch=1,EE,000F1CE4,word,2C210002 // sltiu $at, $at, 2         1 or 2?
+patch=1,EE,000F1CE8,word,10200003 // beqz $at, +3
+patch=1,EE,000F1CEC,word,00000000 // nop
+patch=1,EE,000F1CF0,word,08079203 // j 0x001E480C               Perfect Smash
+patch=1,EE,000F1CF4,word,00000000 // nop
+patch=1,EE,000F1CF8,word,08079208 // j 0x001E4820               the original non-perfect path
+patch=1,EE,000F1CFC,word,00000000 // nop
+patch=1,EE,001E4804,word,0803C738 // bne $a0, $v0, 001E4820 -> j 000F1CE0   Perfect Smash test
+patch=1,EE,001E4644,word,28620004 // slti $v0, $v1, 2 -> 4        Perfect Smash dash starts at frame 2
+patch=1,EE,001E4664,word,28620004 // slti $v0, $v1, 2 -> 4
+patch=1,EE,001E466C,word,2862000C // slti $v0, $v1, 6 -> 12       and ends at frame 6
+patch=1,EE,001E4694,word,2862000C // slti $v0, $v1, 6 -> 12
+
+// The charge flash, found 2026-09-22 for issue #6. Level 3 is "indicated by your
+// character flashing white", and the flash is a pulse. While the fighter holds
+// flag 0x1E, FUN_001D1558 cycles fighter+0x134C through 0-3 once a tick and, each
+// time it wraps to 0, calls FUN_0024E5B8 to set a model flash slot's intensity
+// to 0.2 ($gp-0x5C10); FUN_0024E6B0 takes 0.0333 ($gp-0x5C0C) off it every tick.
+// So the flash fires every 4 ticks and fades 0.167 / 0.133 / 0.1 / 0.067, and at
+// 60fps it pulsed twice as fast. FUN_001D15E0 runs the same pulse for flag 0x1F
+// through +0x1350, and FUN_001D14F8 re-fires a steady glow every tick for 0x1D.
+//
+// Both counters now cycle 0-7, the decay is halved, and the start intensity is
+// 0.1833 so the first frame shows 0.167 as at 30fps. Every 30fps sample of the
+// pulse is then reproduced at the matching vsync, the in-between frames are the
+// halfway values, and the steady glow stays at 0.167. Both constants have one
+// reader, and only these three routines trigger a model flash.
+//
+// Cell 1st Form, Square held from rocky-cell1-near-standing-gohan.p2s, mean
+// brightness of Cell's body: the pulse repeats every 8 vsyncs at 30fps, every 4
+// with every group on, and every 8 with this group.
+[60FPS - charge flash]
+description=Pulse the white flash that marks a Level 3 charge at its real-time rate, so the Perfect Smash cue flashes as fast as it does at 30fps instead of twice as fast.
+patch=1,EE,001D15A8,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1E pulse: count 0-7
+patch=1,EE,001D15B8,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D15BC,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,001D1630,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1F pulse: count 0-7
+patch=1,EE,001D1640,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D1644,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,002FE664,word,3C888888 // flash fade 0.0333 -> 0.0167 per tick ($gp-0x5C0C, one reader 0024E6D4)
+patch=1,EE,002FE660,word,3E3BBBBC // flash start 0.2 -> 0.1833 ($gp-0x5C10, one reader 0024E5D8)
+
+// Paralysis, found 2026-09-17 for issue #28. SuperCombo lists Babidi's Demon Eye
+// as "paralyzes opponent for 4 seconds or less", and the 30fps game gives 4.00s
+// exactly. At 60fps it gave 2.00s.
+//
+// fighter+0x0FE0 is the victim's paralysis in ticks, armed from move data at
+// 001CBC18 and in FUN_00204200 - several arming paths, one decrement:
+//
+//   001E1ED4  lw    $v0, 0xFE0($s1)
+//   001E1EE0  addiu $v0, $v0, -1         once a tick while positive
+//   001E1EE8  sw    $v0, 0xFE0($s1)
+//   001E1F10  addiu $v0, $v0, -3         and 3 more per mashed button
+//
+// The hook replaces the load with a call that adds the tick's parity, so the
+// -1 after it does nothing on odd ticks. The mash subtraction is untouched, so
+// each press still shortens the paralysis by the same real time.
+//
+// Save state 6, Babidi 60 units from a standing Ultimate Gohan, L2 + Circle.
+// Gohan's state 211, paralysed, from the pnach:
+//
+//   30fps                                        240 vsyncs  4.00s
+//   60fps, every shipped group but beam travel   120 vsyncs  2.00s
+//   60fps, the same plus this group              239 vsyncs  3.98s
+//   60fps, 60FPS - battle plus this group        240 vsyncs  4.00s
+[60FPS - paralysis]
+description=Count paralysis down in real time, so a 4-second paralysis lasts 4 seconds at 60fps instead of 2.
+patch=1,EE,000F1700,word,8E220FE0 // lw $v0, 0xFE0($s1)       paralysis ticks left
+patch=1,EE,000F1704,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1708,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F170C,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1710,word,03E00008 // jr $ra
+patch=1,EE,000F1714,word,00481021 // addu $v0, $v0, $t0       odd tick: +1, so the -1 after it does nothing
+patch=1,EE,001E1ED4,word,0C03C5C0 // lw $v0, 0xFE0($s1) -> jal 000F1700
+
+// Scripted blast events, found 2026-09-17 for issue #29. Babidi's Demon Eye
+// paralyses a standing opponent 60 units away at 30fps and missed entirely on
+// v23.
+//
+// A blast's beam or projectile object asks a controller object whether an
+// event has fired - 0x400 ends the beam - through FUN_0014A8C0(id, mask). The
+// controller (FUN_00158980, one call per tick) gets its events from
+// FUN_00158F58 in one of two modes, chosen by controller+0x18:
+//
+//   mode 0   events are pulses from the owning fighter's animation, already
+//            paced correctly. Frieza's rocks and Buu's charged blast.
+//   mode 1   events fire when the controller's age, +0x14 and +1 a tick,
+//            EQUALS a scripted tick number. Demon Eye.
+//
+// So in mode 1 every event came at half its real time. [60FPS - beam object
+// travel] made that visible: it halves the beam's speed, the end event still
+// came after 16 ticks, and the beam died 30 units out.
+//
+// The hook replaces the age load in the mode-1 branch. On an even age it
+// compares age / 2, so each event fires once at its real time; on an odd age it
+// compares 0x40000000, which no event can hold (unset ones may be -1). Mode 0
+// never reaches this branch.
+//
+// Gating the whole object family, or only the controller, was tried first and
+// is WRONG: mode-0 pulses land on odd ticks and a gated controller never sees
+// them, so Frieza's rocks and Buu's charged blast stopped hitting at range.
+//
+// Opponent's first reaction, from the pnach:
+//
+//                                  30fps   v23     v23 + this
+//   Demon Eye, 60 units            v56     miss    v56
+//   Frieza's rocks, 125/474/628    v109/129/137   v105/125/133   v105/125/133
+//   Buu's charged blast, 86/657    v51/81  v46/77  v46/77
+[60FPS - blast script clock]
+description=Fire a blast's scripted events at their real time, so Demon Eye and every blast on the same script reach as far as at 30fps instead of ending halfway.
+patch=1,EE,000F1740,word,8C850014 // lw $a1, 0x14($a0)        the controller's age in ticks
+patch=1,EE,000F1744,word,30A80001 // andi $t0, $a1, 1
+patch=1,EE,000F1748,word,11000002 // beq $t0, $zero, +3      even age: keep age / 2
+patch=1,EE,000F174C,word,00052843 // sra $a1, $a1, 1          (delay) age / 2
+patch=1,EE,000F1750,word,3C054000 // lui $a1, 0x4000          odd age: an age no event has
+patch=1,EE,000F1754,word,03E00008 // jr $ra
+patch=1,EE,000F1758,word,00000000 // nop
+patch=1,EE,00159010,word,0C03C5D0 // lw $a1, 0x14($a0) -> jal 000F1740
+
+// Combat timers, found 2026-09-17 for issue #34. The fighter's per-tick update,
+// FUN_001E1D20, runs a block of countdowns after the state dispatch and the
+// meter economy. None is compensated. Paralysis (#28) and Solar Flare (#32) are
+// in the same block and have their own groups; these are the rest that play
+// could be shown to arm:
+//
+//   001E1E3C  +0x0D48   combo timer, re-armed on every hit taken
+//   001E1E88  +0x1036   repetition memory, 50 bytes: a used option's byte drops
+//                       to 0 and climbs 1 a tick to 100 - SuperCombo's "option
+//                       anti-repetition system"
+//   001E2008  +0x0FF0   14-tick window after hitstun or stun ends
+//   001E1FD4  +0x0DE4   30-tick timer on the attacker after a Ground Slash
+//   001E1FF8  +0x0E40   59-tick timer on the attacker after a Blast 2 cinematic
+//   001E1F88  +0x0FE8   3-tick sideways shake when a hit is shrugged off: armed
+//                       at 001C9FF4 on hit result 2, which +0x0E18 (False
+//                       Courage, "cannot be stunned") forces
+//   001E1FAC  +0x0FE4   30-tick hurt face (flag 0x96, face mode 5) after each
+//                       step of damage dealt over time, armed in FUN_001CF220 -
+//                       Cell's Drain Life
+//
+// Each decrement nets to nothing on odd ticks, and the repetition loop returns
+// past itself on odd ticks. Where the original stored in a jal's delay slot the
+// helper does the store and the slot becomes a nop. +0x0DE4 is reached through
+// two delay slots, so 001E1FC4-001E1FD8 is replayed in a trampoline.
+//
+// For +0x0FE8 and +0x0FE4 the jal replaces the decrement itself, and its delay
+// slot is the move $a0, $s1 that follows; the helper returns the decremented
+// value with the odd tick added back, and the original store runs.
+//
+// Left alone: +0x0964, the ticks-in-state counter the phase timers read.
+//
+// Save state 4, Goku (Early) dashed to close range on a standing Ultimate
+// Gohan; Frieza's rocks from save state 7. Vsyncs each timer is non-zero, from
+// the pnach:
+//
+//                                       30fps   shipped   shipped + this
+//   combo +0x0D48, Heavy Finish          204     167       198
+//   after hitstun +0x0FF0, Heavy Finish   28      14        28
+//   repetition byte back to 100          198      99       199
+//   +0x0DE4, Ground Slash                 68      39        69
+//   +0x0E40, after the rock cinematic    118      59       119
+//
+// The last two from save state 7, Cell (2nd Form) against a pad-2 Ultimate
+// Gohan. The shake with +0x0E18 written on Gohan and one Square; the face after
+// Drain Life's last drain step:
+//
+//   +0x0FE8, shake per vsync       3,3,2,2,1,1   3,2,1   3,3,2,2,1,1
+//   +0x0FE4, after the last step        60        30        60
+//
+// The Heavy Finish stun itself, state 203, is 116 / 114 / 114.
+[60FPS - combat timers]
+description=Count the combo timer, the move-repetition memory and the short windows after hitstun, Ground Slash and Blast 2 cinematics in real time, so combos keep their 30fps rules at 60fps. Also the shake of a hit shrugged off under False Courage and the hurt face after Drain Life.
+patch=1,EE,000F17C0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F17C4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F17C8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F17CC,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F17D0,word,00481021 // addu $v0, $v0, $t0       odd tick: undone
+patch=1,EE,000F17D4,word,03E00008 // jr $ra
+patch=1,EE,000F17D8,word,AE220D48 // sw $v0, 0xD48($s1)       combo timer
+patch=1,EE,000F17E0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F17E4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F17E8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F17EC,word,11000003 // beq $t0, $zero, +3       even tick: run the loop
+patch=1,EE,000F17F0,word,24050031 // li $a1, 0x31             (delay) 50 entries
+patch=1,EE,000F17F4,word,3C1F001E // lui $ra, 0x001E
+patch=1,EE,000F17F8,word,27FF1EAC // addiu $ra, $ra, 0x1EAC   odd tick: return past the loop
+patch=1,EE,000F17FC,word,03E00008 // jr $ra
+patch=1,EE,000F1800,word,00000000 // nop
+patch=1,EE,000F1808,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F180C,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1810,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1814,word,00481021 // addu $v0, $v0, $t0       odd tick: undo the -1 in the delay slot
+patch=1,EE,000F1818,word,AE220FF0 // sw $v0, 0xFF0($s1)       post-hitstun window
+patch=1,EE,000F181C,word,03E00008 // jr $ra
+patch=1,EE,000F1820,word,0220202D // dmove $a0, $s1           (delay) replayed
+patch=1,EE,000F1824,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1828,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F182C,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1830,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F1834,word,00481021 // addu $v0, $v0, $t0       odd tick: undone
+patch=1,EE,000F1838,word,03E00008 // jr $ra
+patch=1,EE,000F183C,word,AE220E40 // sw $v0, 0xE40($s1)       post-cinematic timer
+patch=1,EE,000F1840,word,18600009 // blez $v1, L0             no time left
+patch=1,EE,000F1844,word,32420004 // andi $v0, $s2, 4         (delay) replay 001E1FCC
+patch=1,EE,000F1848,word,14400009 // bnez $v0, OUT            held: replay 001E1FD0
+patch=1,EE,000F184C,word,2462FFFF // addiu $v0, $v1, -1       (delay) replay 001E1FD4
+patch=1,EE,000F1850,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1854,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1858,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F185C,word,00481021 // addu $v0, $v0, $t0       odd tick: undone
+patch=1,EE,000F1860,word,080787F7 // j 0x001E1FDC
+patch=1,EE,000F1864,word,AE220DE4 // sw $v0, 0xDE4($s1)       (delay) replay 001E1FD8
+patch=1,EE,000F1868,word,080787F7 // L0: j 0x001E1FDC
+patch=1,EE,000F186C,word,AE200DE0 // sw $zero, 0xDE0($s1)     (delay) replay 001E1FC8
+patch=1,EE,000F1870,word,080787F7 // OUT: j 0x001E1FDC
+patch=1,EE,000F1874,word,00000000 // nop
+patch=1,EE,000F19D0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19D4,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19D8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19DC,word,2462FFFF // addiu $v0, $v1, -1
+patch=1,EE,000F19E0,word,03E00008 // jr $ra
+patch=1,EE,000F19E4,word,00481021 // addu $v0, $v0, $t0       (delay) odd tick: undone
+patch=1,EE,000F19E8,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F19EC,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F19F0,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F19F4,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F19F8,word,03E00008 // jr $ra
+patch=1,EE,000F19FC,word,00481021 // addu $v0, $v0, $t0       (delay) odd tick: undone
+patch=1,EE,001E1E3C,word,0C03C5F0 // addiu $v0, -1 -> jal 000F17C0   combo timer
+patch=1,EE,001E1E40,word,00000000 // sw $v0, 0xD48($s1) -> nop   (stored by the helper)
+patch=1,EE,001E1E80,word,0C03C5F8 // li $a1, 0x31 -> jal 000F17E0   repetition memory
+patch=1,EE,001E200C,word,0C03C602 // dmove $a0, $s1 -> jal 000F1808   post-hitstun window
+patch=1,EE,001E2010,word,00000000 // sw $v0, 0xFF0($s1) -> nop   (stored by the helper)
+patch=1,EE,001E1FF8,word,0C03C609 // addiu $v0, -1 -> jal 000F1824   post-cinematic timer
+patch=1,EE,001E1FFC,word,00000000 // sw $v0, 0xE40($s1) -> nop   (stored by the helper)
+patch=1,EE,001E1FC4,word,0803C610 // blezl $v1 -> j 000F1840   attacker's move timer
+patch=1,EE,001E1FC8,word,00000000 // sw $zero, 0xDE0($s1) -> nop   (replayed at L0)
+patch=1,EE,001E1F88,word,0C03C674 // addiu $v0, $v1, -1 -> jal 000F19D0   shrugged-off hit shake
+patch=1,EE,001E1FAC,word,0C03C67A // addiu $v0, $v0, -1 -> jal 000F19E8   hurt face after drain damage
+
+// Projectile life, found 2026-09-21 for issue #43 - "ki blasts are destroyed
+// early, so they have less range". [60FPS - projectile travel] halves the step
+// of every effect-node projectile, and that is right, but the same update also
+// counts the projectile's life down once a tick and nothing compensated that:
+//
+//   00176A64  lw    $v0, 0x5B4($s1)     life, in ticks, armed from the class
+//   00176A68  addiu $v0, $v0, -1        at spawn (0017688C) - 118 for Krillin
+//   00176A6C  bgtz  $v0, alive
+//   00176A70  sw    $v0, 0x5B4($s1)
+//   00176A74  ...   flags(+0x5B0) |= 0x10   dead: it stops and is cleaned up
+//
+// At 60fps a projectile gets half the step for half the real time, so it dies
+// at half the range. The decrement is also reached from 001769BC, which skips
+// the move after a hit and lands on 00176A68 with the life loaded in its delay
+// slot, so the hook sits on the branch after the decrement, where both paths
+// meet. The helper adds back the tick's parity - the -1 nets to nothing on odd
+// ticks - re-stores the life and takes the original branch. $t0 is not used
+// anywhere in FUN_00176980.
+//
+// Measured from save state 7, Krillin 703 units from a standing Ultimate Gohan,
+// a tapped Rush Ki Blast with its life set to 10 ticks on the first step:
+//
+//   30fps              18 vsyncs, 250 units
+//   v24                 9 vsyncs, 125 units
+//   v24 + this group   19 vsyncs, 264 units
+//
+// A blast that hits is unchanged: 663 units at 30fps, 677 with this group, the
+// impact ending it before its life does.
+[60FPS - projectile life]
+description=Count a ki blast's life in real time, so a blast that misses flies as far at 60fps as at 30fps instead of vanishing at half the range.
+patch=1,EE,000F1880,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1884,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1888,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F188C,word,00481021 // addu $v0, $v0, $t0       odd tick: undo the -1
+patch=1,EE,000F1890,word,1C400003 // bgtz $v0, +3             still alive
+patch=1,EE,000F1894,word,AE2205B4 // sw $v0, 0x5B4($s1)       (delay) store the life
+patch=1,EE,000F1898,word,0805DA9D // j 0x00176A74             dead: set flag 0x10
+patch=1,EE,000F189C,word,00000000 // nop
+patch=1,EE,000F18A0,word,0805DAA0 // j 0x00176A80             alive: carry on
+patch=1,EE,000F18A4,word,00000000 // nop
+patch=1,EE,00176A6C,word,0803C620 // bgtz $v0, alive -> j 000F1880
+
+// The clouds, found 2026-09-21 for issue #52. A global sky object (the pointer
+// at gp-0x58BC) carries a texture scroll that FUN_001350E0 advances once a tick
+// with no timestep:
+//
+//   0013511C  lwc1  f2, 0x2B0(v1)       rate, 0.0016 on Rocky Area, 0.0008 at
+//   00135120  lwc1  f1, 0x2A0(v1)       the World Tournament
+//   00135128  mul.s f1, f1, f2          u += dir.u * rate
+//   0013512C  add.s f0, f0, f1          then the same for v at 00135138,
+//   00135130  swc1  f0, 0x2A8(v1)       both wrapped to +/-4.0 (+0x2B4)
+//
+// FUN_00135200 draws the layer from those two words. It is not in the stage's
+// keyframe graph, which is why [60FPS - stage animation] fixed the blimp and the
+// banners and left the clouds at double speed.
+//
+// The rate is loaded twice, once per axis, and both loads are hooked: each jumps
+// to a helper that loads it, halves it and returns past the load. The load after
+// each hook runs in the jump's delay slot, as it did before. $f3 and $at are not
+// used anywhere in the function.
+//
+// Measured from save state 7 over 240 vsyncs: u -0.192 at 30fps, -0.384 on v24,
+// -0.192 with this group. From the World Tournament state at vsync 400, the sky
+// beside the banners differs from the 30fps picture by 20.3 on v24 and 2.3 with
+// this group (a second 30fps run: 0.0).
+[60FPS - sky scroll]
+description=Scroll the clouds at their real speed, so the sky does not drift at double speed at 60fps.
+patch=1,EE,000F18C0,word,C46202B0 // lwc1 $f2, 0x2B0($v1)     the scroll rate, u axis
+patch=1,EE,000F18C4,word,3C013F00 // lui $at, 0x3F00          0.5f
+patch=1,EE,000F18C8,word,44811800 // mtc1 $at, $f3
+patch=1,EE,000F18CC,word,46031082 // mul.s $f2, $f2, $f3       halve it
+patch=1,EE,000F18D0,word,0804D449 // j 0x00135124
+patch=1,EE,000F18D4,word,00000000 // nop
+patch=1,EE,000F18D8,word,C44202B0 // lwc1 $f2, 0x2B0($v0)     the scroll rate, v axis
+patch=1,EE,000F18DC,word,3C013F00 // lui $at, 0x3F00          0.5f
+patch=1,EE,000F18E0,word,44811800 // mtc1 $at, $f3
+patch=1,EE,000F18E4,word,46031082 // mul.s $f2, $f2, $f3       halve it
+patch=1,EE,000F18E8,word,0804D450 // j 0x00135140
+patch=1,EE,000F18EC,word,00000000 // nop
+patch=1,EE,0013511C,word,0803C630 // lwc1 $f2, 0x2B0($v1) -> j 000F18C0
+patch=1,EE,00135138,word,0803C636 // lwc1 $f2, 0x2B0($v0) -> j 000F18D8
+
+// Devilman's Fork Attack, found 2026-09-21 for issue #54 - "the thrown fork is
+// faster". The fork is a spawned object on a class of its own: none of the
+// movers the other travel groups hook ever runs for it. Its update is
+// FUN_00154DE8, laid out like the rock class's FUN_0015BFB8 (the same freeze
+// check, script poll and phase byte), and it moves by
+//
+//   001550A8  jal Vec3Scale     vel(+0x70) = dir * speed(+0x04), on one path
+//   001550C4  jal Vec3Add       pos += vel, reached by both paths
+//   001550C8  dmove a1, a0      (delay slot)
+//
+// once a tick, so at 60fps the fork covers its path in half the real time. The
+// hook is the same shape as [60FPS - blast object travel]: the add becomes a jump
+// to a helper that calls the fused scale-add FUN_001225D0(dst, a1, a2) =
+// [a2] + [a1] * $f12 with $f12 = 0.5, then returns past the original call.
+//
+// Measured from save state 6, Devilman 227 units from a standing Ultimate Gohan,
+// L2 + Triangle, the fork's model (index 2) x per vsync after it appears:
+//
+//   30fps   47 47 47 47 27 27 8 8 -11 -11 ...   hits on v75, 16 vsyncs after it appears
+//   v24     47 47 27 8 -11 -30 -50 -69          hits on v64, 8 vsyncs after
+//   this    47 47 37 27 18 8 -1 -11 -21 ...     hits on v69, 13 vsyncs after
+//
+// What is left is before the flight: the throw animation starts about 3 vsyncs
+// early and the fork waits 2 vsyncs at its spawn point where 30fps waits 4 - the
+// same pre-launch overshoot the shipped header already lists for Frieza's rocks.
+// The blast script clock group (PR #31) does not reach it.
+//
+// Between the fire event and its first move the shot spends one update in state 1
+// (eft_shot_tech.c: state 1 only advances), one 30fps tick: 4 vsyncs from the fire to
+// the first move at 30fps, 2 at 60fps. 000F2590 counts state 1's visits in the shot's
+// timer (+0x18, used only after a hit and zero until then) and advances on the third.
+// Devilman's fork, rig slot 6: hit at v78 at 30fps, v75 before, v77 with it; the 1
+// left is the throw's own hand-off (#127).
+[60FPS - weapon object travel]
+description=Halve the per-tick flight of thrown-weapon objects such as Devilman's fork, so they cross the gap in real time rather than twice as fast.
+patch=1,EE,000F18F0,word,00C0282D // move $a1, $a2          a1 = the velocity
+patch=1,EE,000F18F4,word,0080302D // move $a2, $a0          a2 = the position
+patch=1,EE,000F18F8,word,3C013F00 // lui $at, 0x3f00        0.5f
+patch=1,EE,000F18FC,word,0C048974 // jal 0x1225d0           dst = a2 + a1 * $f12
+patch=1,EE,000F1900,word,44816000 // mtc1 $at, $f12         (delay slot)
+patch=1,EE,000F1904,word,08055433 // j 0x1550cc             past the original add
+patch=1,EE,000F1908,word,00000000 // nop
+patch=1,EE,001550C4,word,0803C63C // jal Vec3Add -> j 000F18F0
+patch=1,EE,000F2590,word,92A80001 // lbu   t0,1(s5)            task state
+patch=1,EE,000F2594,word,24090001 // li    t1,1
+patch=1,EE,000F2598,word,1509000B // bne   t0,t1,000F25C8      state 3: advance as before
+patch=1,EE,000F259C,word,00000000 // nop
+patch=1,EE,000F25A0,word,3C093F80 // lui   t1,0x3F80
+patch=1,EE,000F25A4,word,44890800 // mtc1  t1,f1
+patch=1,EE,000F25A8,word,C6600018 // lwc1  f0,0x18(s3)        timer (unused before a hit) as a visit count
+patch=1,EE,000F25AC,word,46010000 // add.s f0,f0,f1
+patch=1,EE,000F25B0,word,3C094040 // lui   t1,0x4040            3.0
+patch=1,EE,000F25B4,word,44891000 // mtc1  t1,f2
+patch=1,EE,000F25B8,word,46020034 // c.olt.s f0,f2
+patch=1,EE,000F25BC,word,45010005 // bc1t  000F25D4            visits 1 and 2: wait
+patch=1,EE,000F25C0,word,E6600018 // swc1  f0,0x18(s3)
+patch=1,EE,000F25C4,word,AE600018 // sw    zero,0x18(s3)       visit 3: reset, advance
+patch=1,EE,000F25C8,word,24170001 // li    s7,1                advance = 1
+patch=1,EE,000F25CC,word,08055444 // j     00155110
+patch=1,EE,000F25D0,word,00000000 // nop
+patch=1,EE,000F25D4,word,08055444 // j     00155110            advance stays 0
+patch=1,EE,000F25D8,word,00000000 // nop
+patch=1,EE,00155108,word,0803C964 // li s7,1 -> j 000F2590     EftPropShot state 1: 4 vsyncs, as one 30fps tick each side
+
+// Defensive input windows, found 2026-09-21 for issue #18 - "one-tick input
+// windows are half as long in real time". FUN_001DFFE0 runs once a tick per
+// fighter and keeps six windows, fighter+0x1068 to +0x107C. A button press arms
+// one to a few ticks - the vanish window +0x1068 to 2, 3 or 4 by remaining
+// health, which is SuperCombo's "lowered health makes the vanishing window
+// smaller" - and each counts down once a tick, then on past zero into a cooldown
+// that ends at a rest value (-30, or -15 for +0x1074). The hit resolver
+// (FUN_001C8580, 001C863C) vanishes the defender while +0x1068 is still positive.
+// At 60fps every window and cooldown is half as long in real time.
+//
+// Each countdown is `addiu v0, v0, -1` followed by `slti v1, v0, rest`. The hook
+// makes the addiu a jal to a helper that nets the -1 to nothing on odd ticks and
+// replays the slti, which ran in the jal's delay slot on the old value. At the
+// rest value the helper counts every tick regardless: the game re-arms a window
+// only after the counter drops below rest, so a rest value that held still on an
+// odd tick would turn a press on that tick into the "pressed during cooldown"
+// branch and kill it. $t0 and $at are unused in FUN_001DFFE0.
+//
+// Measured in a 1P vs 2P match (save state 7): pad 2 throws a light smash, pad 1
+// taps Circle (vanish) or Up+Square (Z-Counter) one vsync later each run:
+//
+//   vanish window     30fps 8 vsyncs   v24 4   v24 + this 8
+//   Z-Counter window  30fps 2 vsyncs   v24 1   v24 + this 2
+//
+// (with the smash charge and meter economy groups, so both arms throw the same
+// level-1 smash; without them v24's smash is stronger).
+//
+// The seventh window, +0x1080 (BT3-Decompiled, BtlMove_UpdateDefenseTimers),
+// counts up instead: a guard press (Circle) sets it to -15 and it climbs once a
+// tick to 1, and the vanish-behind-the-opponent move (action 0x24) needs it above
+// 0. Its increment gets the same treatment (helper 000F2520). Lockout after
+// Circle, rig slot 0: 32 vsyncs at 30fps, 16 before, 31 with it.
+[60FPS - defence windows]
+description=Count the vanish, Z-Counter and other defensive input windows in real time, so they are as wide at 60fps as at 30fps.
+patch=1,EE,000F1910,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1914,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1918,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F191C,word,2841FFE3 // slti $at, $v0, -29        at rest (-30)?
+patch=1,EE,000F1920,word,0001400B // movn $t0, $zero, $at      at rest: count every tick
+patch=1,EE,000F1924,word,2442FFFF // addiu $v0, $v0, -1        the original decrement
+patch=1,EE,000F1928,word,00481021 // addu $v0, $v0, $t0        odd tick: undone
+patch=1,EE,000F192C,word,03E00008 // jr $ra
+patch=1,EE,000F1930,word,2843FFE2 // slti $v1, $v0, -30        (delay) replay the compare
+patch=1,EE,000F1940,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1944,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1948,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F194C,word,2841FFF2 // slti $at, $v0, -14        at rest (-15)?
+patch=1,EE,000F1950,word,0001400B // movn $t0, $zero, $at
+patch=1,EE,000F1954,word,2442FFFF // addiu $v0, $v0, -1
+patch=1,EE,000F1958,word,00481021 // addu $v0, $v0, $t0
+patch=1,EE,000F195C,word,03E00008 // jr $ra
+patch=1,EE,000F1960,word,2843FFF1 // slti $v1, $v0, -15        (delay) replay the compare
+patch=1,EE,001E0048,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1068 vanish window
+patch=1,EE,001E00B4,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x106C
+patch=1,EE,001E0100,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1070
+patch=1,EE,001E0158,word,0C03C650 // addiu $v0, -1 -> jal 000F1940   +0x1074 (rest -15)
+patch=1,EE,001E01A4,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x1078
+patch=1,EE,001E01CC,word,0C03C644 // addiu $v0, -1 -> jal 000F1910   +0x107C
+patch=1,EE,000F2520,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F2524,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F2528,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F252C,word,24420001 // addiu $v0, $v0, 1        the original increment
+patch=1,EE,000F2530,word,00481023 // subu $v0, $v0, $t0       odd tick: undone
+patch=1,EE,000F2534,word,03E00008 // jr $ra
+patch=1,EE,000F2538,word,28430002 // slti $v1, $v0, 2         (delay) replay the compare
+patch=1,EE,001E022C,word,0C03C948 // addiu $v0, $v0, 1 -> jal 000F2520   +0x1080 teleport lockout
+
+// The knockdown tumble, found 2026-09-22 for issue #42. A fighter knocked flat by
+// a throw or a finishing blow lands in state 216 (FUN_001E9EC8) and tumbles along
+// the ground. Two of its tests are authored in 30Hz units.
+//
+// FUN_001E7F38 swaps the tumble animation (0xD2/0xD3) for the slowing one
+// (0xD5/0xD6) once |fighter+0x50| <= 2.7777774, the word at $gp-0x6B80. That
+// vector is the position change since the last tick, which the airborne groups
+// halve at 60fps, so the test tripped at twice the real speed. The slowing
+// animation ends the slide, and the CPU gets up the moment it starts: its AI
+// rule 0x2A waits for a category-2 animation (FUN_001BF6F8). So a thrown opponent
+// stopped short and recovered early. The word has one reader, 001E7F88, so it is
+// halved in data.
+//
+// 001EA1B4 gets a fighter who presses nothing back up once the ticks-in-state
+// counter fighter+0x964 reaches 91: 182 vsyncs at 30fps, 91 at 60. Now 182.
+// Halving the threshold alone lets the full-length slide run into that 91-tick
+// get-up, which is why the two words are one group.
+//
+// Drain Life Cell's ending, 1P vs 2P from rocky-vs2p-cell2-near-gohan.p2s: the
+// victim slides 22.9 units and lies 182 vsyncs at 30fps, 6.2 and 91 on v24, 23.0
+// and 182 with this group. Cell 1st Form's Giant Throw on a CPU, strafed right
+// 30 vsyncs first so the tumble misses the rocks: 392 units over 96 vsyncs at
+// 30fps, 356 over 71 on v24, 411 over 103 with this group.
+[60FPS - knockdown tumble]
+description=Slow a knocked-down fighter's tumble at its real speed and keep them down for their real time, so a thrown opponent slides as far as at 30fps and the CPU does not get up early.
+patch=1,EE,002FD6F0,word,3FB1C71B // tumble slowing test 2.7777774 -> 1.3888887 per tick ($gp-0x6B80, one reader 001E7F88)
+patch=1,EE,001EA1B4,word,284200B6 // slti $v0, $v0, 91 -> 182   state 216 lie-down get-up, fighter+0x964
+
+// The beam charge hold, found 2026-09-22 for issue #72 while measuring #13.
+// State 272's handler, FUN_001F7860, holds a beam Blast 2's charge in animation
+// 0x106, 0x128 or 0x14A (one per Blast 2 slot). Each tick it counts
+// fighter+0x3D8 at 001F7A00 - gated to even ticks by [60FPS - state phase
+// timers] - and sets the charge +0xE44 to 2 * count / max. The release (input
+// condition 0x6F) or full charge sets +0x3D0 bit 1, and 001F7ACC-001F7AD4 leaves
+// the hold on that bit.
+//
+// Each tick runs the input phase before the per-tick phase, so at 30fps a
+// release seen at a tick also counts that tick before leaving, and a tap leaves
+// after two counts. The exit test is not gated: at 60fps a release seen on an
+// odd tick left before the next count, and a tap left after one.
+//
+// The hook replaces the exit branch with a jump to a helper that leaves only
+// on an even tick and only once the count is at least 2. Full charge lands on
+// an even tick, so it still leaves at once. The jump's delay slot is the
+// original move $a0, $s1, which both destinations expect.
+//
+// Charge at the end of the hold, and damage (lowest HP reached, since training
+// refills health), from the pnach. Cell (1st Form)'s Special Beam Cannon from
+// save state 1, Goku (Early)'s Kamehameha from save state 0
+// (rocky-goku-early-vs-standing-gohan.p2s):
+//
+//                                  30fps          v24            v24 + this
+//   Special Beam Cannon, tapped    0.067  7860    0.033  7660    0.067  7860
+//   Kamehameha, tapped             0.067  7020    0.033  6900    0.067  7020
+//   Kamehameha, held 61 vsyncs     0.833  9600    0.800  9540    0.833  9600
+//   Kamehameha, held 62 vsyncs     0.867  9720    0.833  9600    0.867  9720
+//   Special Beam Cannon, full      1.000 13430    1.000 13430    1.000 13430
+//
+// The tapped Special Beam Cannon fires (animation 0x12A) at v62 / v60 / v62.
+[60FPS - beam charge]
+description=End a beam's charge on the tick the 30fps game would, so a quickly released Kamehameha or Special Beam Cannon charges and hits as hard as at 30fps and fires on time.
+patch=1,EE,000F1A00,word,1040000A // beq $v0, $zero, HOLD      release bit clear
+patch=1,EE,000F1A04,word,8E080000 // lw $t0, 0($s0)            (delay) the hold's count, fighter+0x3D8
+patch=1,EE,000F1A08,word,29080002 // slti $t0, $t0, 2
+patch=1,EE,000F1A0C,word,15000007 // bnez $t0, HOLD            fewer than 2 counts
+patch=1,EE,000F1A10,word,3C080033 // lui $t0, 0x0033           (delay)
+patch=1,EE,000F1A14,word,8D081D64 // lw $t0, 0x1D64($t0)       frame counter
+patch=1,EE,000F1A18,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1A1C,word,15000003 // bnez $t0, HOLD            odd tick
+patch=1,EE,000F1A20,word,00000000 // nop
+patch=1,EE,000F1A24,word,0807DEB7 // j 0x001F7ADC              leave the hold
+patch=1,EE,000F1A28,word,00000000 // nop
+patch=1,EE,000F1A2C,word,0807DF08 // HOLD: j 0x001F7C20
+patch=1,EE,000F1A30,word,00000000 // nop
+patch=1,EE,001F7AD4,word,0803C680 // beq $v0, $zero, 0x001F7C20 -> j 000F1A00   leave the charge hold
+
+// The effect-command ramps, found 2026-09-28 for issue #77. A move's scripted
+// effects - the flashes on Hercule's Dynamic Mess Em Up Punch, the fireball on a hit in
+// Great Saiyaman 2's Ultimate - are spawned and steered by an effect-command
+// runner, FUN_0014FF90, once a tick. A command can animate a parameter at
+// slot+0x160 and hand it to its effect every tick; the effect's scale comes
+// from it (0014EE30 -> FUN_0019D868). Two modes, both counting 30Hz ticks:
+//     rate:  value += def+0x30 a tick                         (00150AA4)
+//     timed: timer += 1.0 a tick (001509D0) against def+0x28 seconds * 30.0,
+//            value = two linear segments of the timer
+// so at 60fps an effect grew twice as fast. Dynamic Mess Em Up Punch's first hit flash
+// reached a scale of -5.73 against -2.12 at 30fps and filled the screen.
+//
+// The timer steps 0.5. The rate is halved in a wrapper entered from 00150A98,
+// the rate's load; the addu in its delay slot still runs first, and $f0, used
+// as scratch, is reloaded at 00150AA0.
+//
+// Dynamic Mess Em Up Punch, L2 + Triangle from rocky-hercule-vs-standing-gohan.p2s, with
+// every open fix on: the flash's scale steps -0.258 a vsync, -0.516 a 30Hz tick
+// as at 30fps, and ends
+// at -2.64 (-2.12 at 30fps, -5.73 without). The ramp starts two game ticks after
+// its effect in both arms, so at 60fps it runs one 30Hz step longer. Best-match
+// pixel difference against 30fps at the hits: v112 37.9 -> 21.6, v116 68.0 ->
+// 25.9, v200 19.2 -> 9.6, v250 26.0 -> 11.3. The timed mode, traced in Vegeta
+// (Scouter)'s Great Ape: its timer reads 0, 0.5, 1.0 a tick against 0, 1, 2.
+[60FPS - effect command ramp]
+description=Grow scripted effects - the flashes on Hercule's Dynamic Mess Em Up Punch and other hits - at their real speed, so they reach the size they have at 30fps instead of filling the screen.
+patch=1,EE,000F1A70,word,C6610030 // lwc1 $f1, 0x30($s3)      the ramp's rate per tick
+patch=1,EE,000F1A74,word,3C013F00 // lui $at, 0x3f00
+patch=1,EE,000F1A78,word,44810000 // mtc1 $at, $f0
+patch=1,EE,000F1A7C,word,46000842 // mul.s $f1, $f1, $f0      half the rate
+patch=1,EE,000F1A80,word,080542A8 // j 0x00150AA0             back to value += rate
+patch=1,EE,000F1A84,word,00000000 // nop
+patch=1,EE,00150A98,word,0803C69C // lwc1 $f1, 0x30($s3) -> j 000F1A70   the rate mode
+patch=1,EE,001509D0,word,3C013F00 // lui $at, 0x3f80 -> 0x3f00   the timed mode's timer, 1.0 -> 0.5 a tick
+
+// The camera shake, found 2026-09-28 for issue #80. A hit or an explosion puts
+// a shake into one of four slots per camera: a time left in seconds and a size.
+// FUN_0023F438 counts every slot down by gp-0x5D2C, 1/30 s, once a tick, and
+// FUN_0023F478 shakes the camera by (time left * size), so at 60fps a shake
+// ended in half its time. Three camera updates call the countdown (001C6B60,
+// 0023D63C, 0023D7C4) and it is the constant's only reader, so the constant
+// itself becomes 1/60.
+//
+// Dynamic Mess Em Up Punch's first hit, every open fix on: the two slots it fills reach 0
+// at v117 and v123 at 30fps, v111 and v114 without this, v117 and v123 with it.
+// Not covered: the shake's random offsets are drawn once a tick, so at 60fps
+// the camera jitters twice as often; matching that would mean caching the
+// draws of all three cameras.
+//
+// The Shenron wish screen runs its own 30fps loop and also ticks this shake
+// (DemoCam_Update from shen_scene.c). 000F2610 doubles the step back to 1/30
+// when no battle is loaded (gBtlChars null); in battle the doubling never runs
+// (0 of 454 calls, Hercule's Blast 2).
+[60FPS - camera shake]
+description=Count the camera shake down in real time, so the screen shakes on a hit for as long as at 30fps.
+patch=1,EE,002FE544,word,3C888888 // 1/30 -> 1/60 s a tick   the shake's countdown step
+patch=1,EE,000F2610,word,C782A2D4 // lwc1 f2,-0x5D2C(gp)      shake step, 1/60 a tick
+patch=1,EE,000F2614,word,3C010030 // lui  at,0x30
+patch=1,EE,000F2618,word,8C21EB14 // lw   at,-0x14EC(at)      gBtlChars: a battle is loaded
+patch=1,EE,000F261C,word,14200002 // bne  at,zero,000F2628
+patch=1,EE,000F2620,word,00000000 // nop
+patch=1,EE,000F2624,word,46021080 // add.s f2,f2,f2           no battle (the Shenron wish screen runs at 30fps): 1/30
+patch=1,EE,000F2628,word,0808FD0F // j    0023F43C
+patch=1,EE,000F262C,word,00000000 // nop
+patch=1,EE,0023F438,word,0803C984 // CamShake_Tick: lwc1 f2 -> j 000F2610
+
+// Controller rumble, found 2026-09-28 for issue #80. FUN_001DC5E0 runs each
+// fighter's rumble (fighter+0x15D0) once a tick:
+//     +0x08, +0x0C  large and small motor, seconds * 30.0, counted down a tick
+//     +0x10         the large motor pulses on sin(+0x10 * k / 30.0), +1 a tick
+//     +0x14         the small motor is on when bit 0 of this tick count is 0
+// so at 60fps rumble lasted half as long and pulsed twice as fast. The pulse's
+// 30.0 becomes 60.0, the motor times double (below) and the small motor toggles
+// on bit 1. The update is not
+// gated: FUN_00122F10 sends the pad's accumulated rumble and zeroes it on every
+// call, so a skipped tick would switch the motors off for a frame.
+//
+// Dynamic Mess Em Up Punch's first hit: rumble reaches the pad for 10 vsyncs at 30fps, 5
+// without this, 11 with it, over the same pulse curve (191, 250 ... 131).
+//
+// The motor times are converted to ticks with cvt.w.s, which truncates: seconds
+// * 60 would keep the half tick that seconds * 30 drops, a rumble 1-2 vsyncs
+// long. The conversion keeps the game's * 30 and doubles the truncated count (000F25E0 large, 000F25F4 small). Hercule's Dynamic Mess Em Up
+// Punch, first hit: both motors stop on the 30fps vsync (v73, v79; 1 late before).
+[60FPS - controller rumble]
+description=Run the controller's rumble in real time, so hits rumble for as long as at 30fps and pulse at the same rate.
+patch=1,EE,001DC654,word,3C014270 // lui $at, 0x41f0 -> 0x4270   large motor pulse, phase / 30 -> / 60
+patch=1,EE,001DC6C0,word,30420002 // andi $v0, $v0, 1 -> 2       small motor toggles every 2 ticks
+patch=1,EE,000F25E0,word,46000064 // cvt.w.s f1,f0            large motor: seconds * 30, truncated as on a PS2
+patch=1,EE,000F25E4,word,44010800 // mfc1 at,f1
+patch=1,EE,000F25E8,word,00010840 // sll at,at,1              x 2 vsync ticks
+patch=1,EE,000F25EC,word,03E00008 // jr ra
+patch=1,EE,000F25F0,word,AC810008 // sw at,8(a0)
+patch=1,EE,000F25F4,word,46006024 // cvt.w.s f0,f12           small motor: the same
+patch=1,EE,000F25F8,word,44030000 // mfc1 v1,f0
+patch=1,EE,000F25FC,word,00031840 // sll v1,v1,1
+patch=1,EE,000F2600,word,08077165 // j 001DC594
+patch=1,EE,000F2604,word,00000000 // nop
+patch=1,EE,001DC564,word,0803C978 // cvt.w.s f1,f0 -> j 000F25E0
+patch=1,EE,001DC58C,word,0803C97D // cvt.w.s f0,f12 -> j 000F25F4
+
+// Burst effects, found 2026-09-28 for issue #82. Two effect classes draw the
+// bursts on a beam's impact and the sparks around Vegeta (Scouter)'s energy
+// ball, and each runs its whole update once a tick:
+//     002C3E78  FUN_0017D8E0: a start delay (+0x510), a timer in seconds
+//               (+0x4E4, -1/30 a tick), a fade (+0x4E8 -= +0x4EC), a countdown
+//               (+0x490), and in modes 1-3 random pieces emitted every tick
+//     002C4308  FUN_001A2DD0: a fade driven by obj+0x114 -= 1.0 a tick, and
+//               per-tick moves in its helpers FUN_001A0FC0-FUN_001A1A40
+// so at 60fps the bursts faded in half their time and emitted twice as much.
+// Both open with the game's freeze check (0017D904, 001A2E08) and skip the whole
+// update while frozen; both draw in a separate method (vtable+0x14). The wrapper
+// below answers "frozen" on odd ticks, the same fix [60FPS - thrown object rate]
+// uses, so every channel runs at 30Hz and the burst is still drawn every frame.
+// Neither update calls anything another group compensates.
+//
+// Goku's Kamehameha, L2 + Triangle held 60 vsyncs from save state 0, every open
+// fix on: the burst's two fades (10 -> 0 and 1.0 -> 0) take 20 vsyncs as at 30fps,
+// 10 without this. Vegeta (Scouter)'s transformation: the spark effect's timer
+// steps 1/30 every two vsyncs and it lives 30 vsyncs as at 30fps (15 without).
+// Every vsync of the burst drawn, none dropped.
+[60FPS - burst effect rate]
+description=Run beam-impact bursts and transformation sparks at the game's own 30Hz, so they fade over their real time instead of twice as fast.
+patch=1,EE,000F1A90,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1A94,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1A98,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1A9C,word,00000000 // nop
+patch=1,EE,000F1AA0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1AA4,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1AA8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1AAC,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1AB0,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1AB4,word,03E00008 // jr $ra
+patch=1,EE,000F1AB8,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0017D904,word,0C03C6A4 // jal 0012D1D0 -> jal 000F1A90   spark class update
+patch=1,EE,001A2E08,word,0C03C6A4 // jal 0012D1D0 -> jal 000F1A90   burst class update
+
+// The health bar, found 2026-09-28 for issue #84. FUN_0021CD20 updates it once
+// a tick (HUD = *(gp-0x5728), HUD+0x24 the side it updates) and does two jobs:
+//     drain   the displayed health (HUD+0x28 + 4*side, the red section) falls
+//             toward the real one (HUD+0x30 + 4*side) by a speed a tick
+//             (HUD+0x248 + 4*side): at least 200 / 150 / 120 while the gap is
+//             over 20000 / 10000 / 5000, reset to 100 once it has caught up
+//     shake   three slots per side, a tick count and an amplitude (halfwords
+//             at HUD+0x0C + 12*side + 4*slot), set on a hit by FUN_0021FA38 and
+//             FUN_0021FA88 (15, 10 or 5 by damage, or 8); each tick a slot
+//             counts down and re-rolls its sprite's x/y offset
+// so at 60fps the red section drained, and the bar shook, in half the time.
+// The drain keeps its 60 steps a second at half the size; the shake loop runs
+// on even ticks, so its offsets change every 2 vsyncs as at 30fps.
+//
+// Dynamic Mess Em Up Punch against Ultimate Gohan (rocky-hercule-vs-standing-gohan.p2s),
+// every open fix on:
+//
+//                          drain 6360    shake, count 10       shake, count 5
+//   30fps                  104 vsyncs    20, new offset / 2    10
+//   60fps, before          52            10, new offset / 1    5
+//   60fps, both groups     105           20, new offset / 2    10
+//
+// The function is not gated as a whole: it also steps the bar-break tween at
+// HUD+0x1B8 (jal 0x267B00 at 0021CE58), which [60FPS - tween duration] already
+// times in 60Hz frames.
+[60FPS - health bar drain]
+description=Drain the red part of the health bar at its real speed after a hit.
+patch=1,EE,0021CE9C,word,24050064 // addiu $a1, $zero, 200 -> 100   gap over 20000
+patch=1,EE,0021CEAC,word,28430064 // slti $v1, $v0, 200 -> 100
+patch=1,EE,0021CEC0,word,2405004B // addiu $a1, $zero, 150 -> 75    gap over 10000
+patch=1,EE,0021CED0,word,2843004B // slti $v1, $v0, 150 -> 75
+patch=1,EE,0021CEE8,word,2405003C // addiu $a1, $zero, 120 -> 60    gap over 5000
+patch=1,EE,0021CEF4,word,2843003C // slti $v1, $v0, 120 -> 60
+patch=1,EE,0021CFD0,word,24030032 // addiu $v1, $zero, 100 -> 50    the reset speed
+
+// The shake loop (0021CD4C-0021CE24) on even ticks only. The wrapper is entered
+// from 0021CD44 in place of its lw, replays that lw and the sll after it (which
+// ran in the jump's delay slot on the old $s3), and on odd ticks continues after
+// the loop.
+[60FPS - health bar shake]
+description=Shake the health bar on a hit for as long as at 30fps.
+patch=1,EE,000F1AC0,word,8CB30024 // lw $s3, 0x24($a1)        replayed: the side
+patch=1,EE,000F1AC4,word,0013A040 // sll $s4, $s3, 1          replayed
+patch=1,EE,000F1AC8,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1ACC,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F1AD0,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1AD4,word,15000003 // bnez $t0, 000F1AE4
+patch=1,EE,000F1AD8,word,00000000 // nop
+patch=1,EE,000F1ADC,word,08087353 // j 0x21CD4C               even tick: the shake loop
+patch=1,EE,000F1AE0,word,00000000 // nop
+patch=1,EE,000F1AE4,word,0808738B // j 0x21CE2C               odd tick: after it
+patch=1,EE,000F1AE8,word,00000000 // nop
+patch=1,EE,0021CD44,word,0803C6B0 // lw $s3, 0x24($a1) -> j 000F1AC0
+
+// Voice cooldowns, found 2026-09-28 for issue #86. FUN_001DC738(fighter,
+// category) plays a voice clip - a random variant of one of 57 categories - and
+// then blocks that category for a cooldown at fighter+0x1454 + 4*category:
+//     cooldown = table seconds * 30.0      001DC85C, the table at
+//                                          *(*(gp-0x575C)+0x28), 8 bytes each
+// FUN_001DC918 counts all 57 down by 1 once a tick (from the fighter update at
+// 001C1C24), and a category plays again only at 0, so at 60fps a grunt or shout
+// could repeat after half its time. Those two are the only code that writes or
+// reads the cooldowns, and the 30.0 is an immediate this multiply alone uses, so
+// it becomes 60.0: a 0.5 s cooldown is 30 ticks at 60Hz.
+//
+// Save state 3, Krillin 66 units from a standing Ultimate Gohan, rush and ki
+// blast strings, every open fix on:
+//
+//                       0.5 s cooldown   0.4 s cooldown   clips over a 7-hit rush
+//   30fps               30 vsyncs        24 vsyncs        4
+//   60fps, before       15               12               5
+//   60fps, this group   30               24               4, on the same vsyncs
+[60FPS - voice cooldown]
+description=Keep each voice line's cooldown for its real time, so grunts and shouts do not repeat twice as often.
+patch=1,EE,001DC85C,word,3C014270 // lui $at, 0x41f0 -> 0x4270   seconds * 30 -> * 60
+
+// Eye blinks, found 2026-09-28 for issue #90. FUN_0024F428 runs each model's
+// face (model+0x1664) once a tick and calls FUN_0024EB70 for the eyes. Unless
+// the model's flags (model+0xA40) hand the eyes to an animation (0x04000000) or
+// shut them (0x08000000), that counts face+0x08 down a tick; below 0 it re-arms
+// it to rand() % 90 + 90 ticks and sets face+0x0C to rand() % 3 + 3, and while
+// +0x0C counts down the blink flag face+0x10 - the eye image - is 1. So at 60fps
+// a fighter blinked twice as often, each blink half as long.
+//
+// Only that random branch runs on even ticks: the wrapper is entered in place of
+// the bnez at 0024EBD0 (its delay slot's v0 = 1 still runs), takes the shut-eyes
+// path every tick as before, and on odd ticks returns without writing +0x10, so
+// the eye image holds for 2 vsyncs a tick and rand() is called as often as at
+// 30fps.
+//
+// Save state 6, Devilman against a standing Ultimate Gohan, 30 seconds of idle,
+// every open fix on, per face:
+//
+//                       blinks   blink length        gap between blinks
+//   30fps               6-7      6, 8 or 10 vsyncs   220-342 vsyncs
+//   60fps, before       13       3, 4 or 5           92-178
+//   60fps, this group   7        6, 8 or 10          204-324
+[60FPS - eye blink]
+description=Blink at the real rate, so fighters' eyes do not flicker shut twice as often.
+patch=1,EE,000F1AF0,word,3C080800 // lui $t0, 0x0800
+patch=1,EE,000F1AF4,word,00684024 // and $t0, $v1, $t0          $v1 = model+0xA40
+patch=1,EE,000F1AF8,word,15000008 // bnez $t0, 000F1B1C         eyes shut: as before
+patch=1,EE,000F1AFC,word,00000000 // nop
+patch=1,EE,000F1B00,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1B04,word,8D081D64 // lw $t0, 0x1D64($t0)        frame counter
+patch=1,EE,000F1B08,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1B0C,word,15000005 // bnez $t0, 000F1B24         odd tick: skip
+patch=1,EE,000F1B10,word,00000000 // nop
+patch=1,EE,000F1B14,word,08093AF6 // j 0x24EBD8                 even tick: the blink timer
+patch=1,EE,000F1B18,word,00000000 // nop
+patch=1,EE,000F1B1C,word,08093B17 // j 0x24EC5C                 store +0x10 = 1
+patch=1,EE,000F1B20,word,00000000 // nop
+patch=1,EE,000F1B24,word,08093B1B // j 0x24EC6C                 return, +0x10 untouched
+patch=1,EE,000F1B28,word,00000000 // nop
+patch=1,EE,0024EBD0,word,0803C6BC // bnez $v0, 0x24EC5C -> j 000F1AF0
+
+// Swirl effects, found 2026-09-29 for issue #94. One effect class (vtable
+// 002C40C0) draws the white wind swirls round a fighter charging ki and round
+// Goten as he transforms. Its update, FUN_00190FE8, runs once a tick on the
+// emitter at node+0x38:
+//     +0x68         start delay, -1.0 a tick; nothing else runs while it is above 0
+//     +0x64         tick counter, +1.0 a tick; +0x3B8 particles spawn whenever it
+//                   is a multiple of +0x3B4, each turning the emitter a step
+//     +0x60, +0x6C  life and a countdown, -1.0 a tick
+//     FUN_00191D28  ages every particle +1.0 a tick (+0x118) and moves it
+// so at 60fps the swirls started early, turned twice as fast and lived half as
+// long. The update opens with the game's freeze check (0019101C) and skips all
+// of it while frozen; the swirl is drawn by a separate method (vtable+0x14,
+// FUN_00191348). The wrapper below answers "frozen" on odd ticks, the same fix
+// [60FPS - thrown object rate] uses, so the whole update runs at 30Hz and the
+// swirl is still drawn every frame. Nothing it calls is paced by another group.
+//
+// Every open fix on. Krillin charging ki, L2 held from save state 3:
+//
+//                             30fps       60fps before   with this group
+//   emitter 1 tick counter    64 steps    122 steps      64 steps
+//   emitter 2 tick counter    69 steps    125 steps      69 steps
+//   emitter 3 life, 6 -> 0    16 vsyncs   8 vsyncs       16 vsyncs
+//
+// Goten, R3 from save state 8: the swirl's tick counter and spin angle take the
+// 30fps value at every vsync from v10 to v70 (the emitter is set up a vsync
+// early, at v9). Without the group they start at v18, not v26, and step every
+// vsync.
+[60FPS - swirl effect rate]
+description=Run the wind swirls of a ki charge or a transformation at the game's own 30Hz, so they turn and fade at their real speed instead of twice as fast.
+patch=1,EE,000F1B60,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1B64,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1B68,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1B6C,word,00000000 // nop
+patch=1,EE,000F1B70,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1B74,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1B78,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1B7C,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1B80,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1B84,word,03E00008 // jr $ra
+patch=1,EE,000F1B88,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0019101C,word,0C03C6D8 // jal 0012D1D0 -> jal 000F1B60   swirl emitter update
+
+// Lightning effects, found 2026-09-29 for issue #96. One effect class (vtable
+// 002C3E48) draws the purple lightning streaks round Goten as he transforms.
+// Its update, FUN_0017C8F8, runs once a tick on the object at node+0x38:
+//     +0xEA0         start delay, -1.0 a tick
+//     +0xE9C         spawn countdown, -1.0 a tick; at 0 FUN_0017C3F0 spawns a
+//                    bolt and reloads it
+//     +0xEA8         run counter, +1.0 a tick up to +0xEAC
+//     +0xE94, +0xEA4 life, +1.0 a tick up to +0xE98, then a fade, -1.0 a tick
+// so at 60fps the lightning started early, spawned twice as many bolts and ran
+// out in half the time. The update opens with the game's freeze check
+// (0017C928) and skips all of it while frozen; the lightning is drawn by a
+// separate method (vtable+0x14, FUN_0017CB60). The wrapper below answers
+// "frozen" on odd ticks, the same fix [60FPS - thrown object rate] uses, so
+// the whole update runs at 30Hz and the lightning is still drawn every frame.
+//
+// Goten, R3 from save state 8, every open fix on:
+//
+//                              30fps      60fps before   with this group
+//   run counter, 0 -> 25       v26-v74    v18-v42        v26-v74
+//   spawn countdown steps      73         150            72
+//
+// The run counter takes the 30fps value at every vsync from v6 to v230.
+[60FPS - lightning effect rate]
+description=Run the lightning round a transforming fighter at the game's own 30Hz, so it flashes and fades at its real speed instead of twice as fast.
+patch=1,EE,000F1B90,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1B94,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1B98,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1B9C,word,00000000 // nop
+patch=1,EE,000F1BA0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1BA4,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1BA8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1BAC,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1BB0,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1BB4,word,03E00008 // jr $ra
+patch=1,EE,000F1BB8,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0017C928,word,0C03C6E4 // jal 0012D1D0 -> jal 000F1B90   lightning class update
+
+// Motion blends, found 2026-09-29 for issue #98. When a model changes motion,
+// FUN_0024C668(model, seconds) starts a crossfade: weight model+0xC84 = 1.0 and
+// step model+0xC88 = 1 / (seconds * 30.0), the only store to that step.
+// FUN_001C47A8 counts the weight down by the step once a tick. [60FPS - animation
+// clock] halves the clip time but not this countdown, so at 60fps every blend
+// between two motions finished in half its seconds, and states that wait for
+// the blend ended early. 30.0 becomes 60.0: the step halves at its source and
+// the blend is sampled at 60Hz over its real length.
+//
+// Krillin's ki blast, Triangle from save state 3, every open fix on:
+//
+//                                    30fps      60fps before   with this group
+//   crossfade 0.833 -> 0             v19-v29    v19-v24        v19-v30
+//   a bone rotation settles          v29        v24            v30
+//   firing state 174 ends            v31        v25            v31
+//   three taps 20 vsyncs apart       one chain  idle between   one chain
+//
+// With the group the bone rotation passes through each 30fps value one vsync
+// after it. The ki charge ends at v216 as at 30fps (v212 before). The other
+// smoke-test timelines are unchanged.
+[60FPS - motion blend]
+description=Blend between a fighter's motions over their real time, so poses do not snap and moves that wait for the blend, such as chained ki blasts, keep their 30fps timing.
+patch=1,EE,0024C6A8,word,3C014270 // lui $at, 0x41F0 (30.0) -> 0x4270 (60.0)   crossfade ticks per second
+
+// Spiral effects, found 2026-09-29 for issue #101. One effect class (vtable
+// 002C3F50) draws the blue spiral that winds round the Special Beam Cannon. Its
+// update, FUN_00187F90, runs once a tick on the object at node+0x38: a start
+// delay (+0x258) and a fade (+0x260), each -1.0 a tick; an age (+0x250), +1.0 a
+// tick against a lifetime of +0x34 seconds * 30.0; a countdown (+0x25C); the
+// spiral's counter (+0x368) and scale (+0x370); and FUN_0018A7A0, which steps
+// each segment of its chain. So at 60fps the spiral wound and grew twice as
+// fast. The update opens with the game's freeze check (00187FC0) and skips all
+// of it while frozen; the spiral is drawn by a separate method (vtable+0x14,
+// FUN_00188258). The wrapper below answers "frozen" on odd ticks, the same fix
+// [60FPS - thrown object rate] uses, so the whole update runs at 30Hz and the
+// spiral is still drawn every frame.
+//
+// Imperfect Cell, L2 + Up + Triangle from save state 1, every open fix on:
+//
+//                                 30fps    60fps before   with this group
+//   spiral counter reaches 24     v103     v80            v104
+//   spiral scale reaches 1.1      v101     v79            v102
+//
+// The beam ends the spiral from outside, 4 vsyncs early at 60fps in every arm:
+// the beam's own one-tick hand-offs. The beam's damage is the same with and
+// without the group.
+[60FPS - spiral effect rate]
+description=Wind the Special Beam Cannon's spiral at the game's own 30Hz, so it grows and turns at its real speed instead of twice as fast.
+patch=1,EE,000F1BC0,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1BC4,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1BC8,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1BCC,word,00000000 // nop
+patch=1,EE,000F1BD0,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1BD4,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1BD8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1BDC,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1BE0,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1BE4,word,03E00008 // jr $ra
+patch=1,EE,000F1BE8,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,00187FC0,word,0C03C6F0 // jal 0012D1D0 -> jal 000F1BC0   spiral class update
+
+// Ray effects, found 2026-09-29 for issue #103. One effect class (vtable
+// 002C3AA8) draws the long light rays that burst from a charging Kamehameha.
+// Its update, FUN_00168C00, runs once a tick on the object at node+0x38 and
+// counts a start delay (+0x38), a life (+0x48), a hold (+0x3C) and a fade
+// (+0x44 over +0x40, the alpha +0x4C = fade / length) down by 1.0 each, so at
+// 60fps the rays vanished early. The update opens with the game's freeze check
+// (00168C2C) and skips all of it while frozen; the rays are drawn by a separate
+// method (vtable+0x14, FUN_00168DA0). The wrapper below answers "frozen" on odd
+// ticks, the same fix [60FPS - thrown object rate] uses, so the whole update
+// runs at 30Hz and the rays are still drawn every frame.
+//
+// Goku's Kamehameha, L2 + Triangle held 60 vsyncs from save state 0, every
+// open fix on:
+//
+//                          30fps       60fps before   with this group
+//   hold 3 -> 0            v97-v101    v97-v99        v97-v101
+//   alpha drops to 0       v103        v100           v103
+//
+// The hold and the alpha take the 30fps value at every vsync from v81 to v104.
+[60FPS - ray effect rate]
+description=Hold and fade the light rays of a charging Kamehameha at the game's own 30Hz, so they last their real time instead of vanishing early.
+patch=1,EE,000F1BF0,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1BF4,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1BF8,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1BFC,word,00000000 // nop
+patch=1,EE,000F1C00,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1C04,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1C08,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C0C,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1C10,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1C14,word,03E00008 // jr $ra
+patch=1,EE,000F1C18,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,00168C2C,word,0C03C6FC // jal 0012D1D0 -> jal 000F1BF0   ray class update
+
+// Speed lines, found 2026-09-29 for issue #8. The sprite effect class (vtable
+// 002C3EF0, update FUN_001866C0) spawns the radial speed lines round a hit - the
+// pink and yellow streaks of Hercule's Dynamic Mess Em Up Punch - through FUN_001853C8 ->
+// FUN_001840A0. Each tick the update either spawns, when the countdown +0x1F8 is
+// at or below 0 (the spawner reloads it with the emitter's interval), or counts
+// +0x1F8 down. [blast effect duration] halves that step and five others in this
+// update, which keeps each timer's length but not its order: the spawn tick does
+// not count down, so a cycle took 1 + interval/0.5 ticks at 60fps against
+// 2 * (1 + interval/1.0) vsyncs at 30fps - 3 vsyncs against 4 in Dynamic Mess Em Up Punch -
+// and a window that closed on an odd tick let one more burst through.
+//
+// This group runs the whole update at 30Hz, as the game does: after the freeze
+// check (001866F4), odd ticks take the frozen path too; and each of the six
+// halved steps loads a full 1.0 instead of the 0.5 in $at - the static pair
+// (1.0, 0.0) at 002FEAD8 = $gp-0x5798, read-only (no store reaches it, and a
+// write watch over eight scenes saw none). With this group those six
+// blast effect duration words have no effect, and PR #66's gate on the particle
+// stepper, if present, always passes: it too runs on even ticks.
+// The draw is a separate method, so the lines are still drawn every frame.
+//
+// Dynamic Mess Em Up Punch, L2 + Triangle from save state 5, every open fix on, v100-v300:
+//
+//                          30fps       60fps before   with this group
+//   lines spawned          47          78             47
+//   spawn spacing          4 vsyncs    3 vsyncs       4 vsyncs
+//
+// Each of the three emitters spawns the same number of times at the same
+// spacing as at 30fps, one vsync earlier. Damage and both fighters' states are
+// the same with and without the group; GS2's Ultimate hearts update 24 times
+// (30fps 24, before 51).
+[60FPS - sprite effect clock]
+description=Run sprite effects such as the speed lines of Hercule's Present Bomb at the game's own 30Hz, so new lines appear as often as on a PS2 instead of about twice as often.
+patch=1,EE,000F1C20,word,14400008 // bnez $v0, 000F1C44        the game's own freeze check
+patch=1,EE,000F1C24,word,00000000 // nop
+patch=1,EE,000F1C28,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1C2C,word,8D081D64 // lw $t0, 0x1D64($t0)       frame counter
+patch=1,EE,000F1C30,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C34,word,15000003 // bnez $t0, 000F1C44        odd tick: frozen too
+patch=1,EE,000F1C38,word,00000000 // nop
+patch=1,EE,000F1C3C,word,080619BF // j 0x001866FC              even tick: the update
+patch=1,EE,000F1C40,word,00000000 // nop
+patch=1,EE,000F1C44,word,08061A38 // j 0x001868E0              the frozen path
+patch=1,EE,000F1C48,word,00000000 // nop
+patch=1,EE,001866F4,word,0803C708 // bnez $v0, 0x1868E0 -> j 000F1C20   (delay slot lw $v1 still runs)
+patch=1,EE,00186730,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x204 step 1.0
+patch=1,EE,001867CC,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x1F8 spawn countdown
+patch=1,EE,00186814,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x20C
+patch=1,EE,00186854,word,C781A868 // mtc1 $at, $f1 -> lwc1 $f1, -0x5798($gp)   +0x1F4 life
+patch=1,EE,00186894,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x1FC
+patch=1,EE,001868D0,word,C780A868 // mtc1 $at, $f0 -> lwc1 $f0, -0x5798($gp)   +0x200 window
+
+// Smash charge camera bob, found 2026-09-29 for issue #106. FUN_001C4E88 returns
+// sin(phase) * 1.5, which its three callers (001C5C18, 001C6200, 001C63B0) add to
+// the battle camera's height. While motion flag 14 is set, as it is through a
+// smash charge (hold Square, state 75), the phase at fighter+0x4B0 steps pi/75
+// once a tick (002FD074, read only at 001C4EDC). Once the flag clears it moves
+// back to 0 by pi/30 a tick (002FD088, read only at 001C4F38). At 60fps the camera
+// rose and sank on a 2.5 second period instead of 5. Both steps are halved, as
+// exact float halves.
+//
+// Krillin, save state 3, Square held from v0, every open fix on:
+//
+//              30fps     60fps before     with this group
+//   v40        0.545     1.09             0.545
+//   v80        1.38      2.76             1.38
+//   v120       2.22      -1.84 (wrapped)  2.22
+//   v160       3.06      -0.168           3.06
+//
+// With the group the phase equals the 30fps value at every even vsync of the
+// charge.
+[60FPS - camera bob]
+description=Rise and sink the camera during a smash charge at its real speed.
+patch=1,EE,002FD074,word,3CAB92A5 // pi/75 -> pi/150   phase step while charging
+patch=1,EE,002FD088,word,3D56774E // pi/30 -> pi/60    return step after the charge
+
+// Blast speed and size ramps, found 2026-09-30 for issue #109. A blast's
+// parameters can ramp its speed (FUN_001519F8: params+0x2C -> +0x30 -> +0x34 over
+// params+0x38 seconds, the first leg taking the fraction at +0x3C) and the size
+// of its hit volume (FUN_001518D8: params+0x08 -> +0x0C -> +0x10 over params+0x14
+// seconds, fraction at +0x18). Both turn the seconds into ticks with * 30.0 and
+// step a counter by 1.0 a tick (state+0x2C4 and state+0x2B4), so at 60fps each
+// ramp finished in half its time. Both constants become 60.0. Neither
+// instruction is reached when the duration is 0, so a blast without a ramp never
+// executes them.
+//
+// Every open fix on, 30fps against 60fps:
+//
+//                                              30fps    60fps before   with this group
+//   Devilman's Kaikosen, save state 6
+//     speed at v39 (6 -> 13 -> 18 in 0.5 s)    13.33    18.00          13.33
+//     top speed reached                        v53      v38            v53
+//     launch to contact, Gohan 227 units away  34       29             33 vsyncs
+//     Gohan paralysed                          v61      v54            v58
+//   Vegeta (Scouter)'s Explosive Wave, save state 9
+//     size at v27 (20 -> 30 -> 50 in 0.5 s)    27.62    50.00          27.62
+//     first damage, opponent at 39.7 units     v35      v23            v34
+//     first damage, opponent at 54.5 units     v41      v27            v42
+//   Super 17's Android Barrier, save state 4
+//     full size (10 -> 11.8 -> 12 in 1 s)      v70      v41            v71
+//
+// Kaikosen's speed and Explosive Wave's size equal the 30fps value on all 15 of
+// the 30Hz ticks of their ramps. The 3 vsyncs Kaikosen still leads by are not the
+// ramp: the cast launches it 1 vsync early (v24 against v25), its half-size steps
+// find contact 1 vsync sooner, and the paralysis starts one tick after contact,
+// which is 1 vsync instead of 2.
+//
+// Left alone: with a duration of 0 the size ramp instead adds params+0x1C once a
+// tick (001519A8). None of 70 inputs tried across the ten rig save states has a
+// non-zero step there.
+[60FPS - blast ramp clock]
+description=Ramp a blast's speed and size over their real time, so Explosive Wave spreads and a beam that speeds up arrives when they do at 30fps.
+patch=1,EE,00151A10,word,3C014270 // lui $at, 0x41F0 -> 0x4270   speed ramp: seconds * 60
+patch=1,EE,001518F0,word,3C014270 // lui $at, 0x41F0 -> 0x4270   size ramp: seconds * 60
+
+// Arc effects, found 2026-09-30 for issue #111. One effect class (vtable
+// 002C3F80) draws the lightning arcs that crackle over Explosive Wave and over
+// the barrier moves. Its update, FUN_0018C4E8, runs once a tick on the object at
+// node+0x38: a start delay (+0x3A4) and a fade (+0x3AC) count down by 1.0, the
+// age (+0x3A0) counts up by 1.0 to a lifetime of seconds * 30 (0018C678), and
+// each arc steps a counter of its own (0018D1C0). At 60fps Explosive Wave's arcs
+// were gone in half their time. The update opens with the game's freeze check
+// (0018C524) and skips all of it while frozen; the arcs are drawn by a separate
+// method (vtable+0x14, FUN_0018C7C8). The wrapper below answers "frozen" on odd
+// ticks, the same fix [60FPS - thrown object rate] uses, so the whole update
+// runs at 30Hz and the arcs are still drawn every frame.
+//
+// L2 + Circle, every open fix on:
+//
+//                                             30fps      60fps before   with this group
+//   Explosive Wave, Vegeta (Scouter), save state 9
+//     age 1 -> 26                             v13-v63    v12-v37        v13-v63
+//     vsyncs v10-v80 with the 30fps age       -          20 of 71       71 of 71
+//   Android Barrier, Super 17, save state 4
+//     age when the barrier ends               63 (v136)  123 (v134)     63 (v136)
+//     vsyncs v10-v270 with the 30fps age      -          3 of 261       261 of 261
+[60FPS - arc effect rate]
+description=Run the lightning arcs of Explosive Wave and the barrier moves at the game's own 30Hz, so they last their real time instead of vanishing early.
+patch=1,EE,000F1C50,word,27BDFFF0 // addiu $sp, $sp, -16
+patch=1,EE,000F1C54,word,AFBF0000 // sw $ra, 0($sp)
+patch=1,EE,000F1C58,word,0C04B474 // jal 0x0012D1D0          the game's own freeze check
+patch=1,EE,000F1C5C,word,00000000 // nop
+patch=1,EE,000F1C60,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1C64,word,8D081D64 // lw $t0, 0x1D64($t0)     frame counter
+patch=1,EE,000F1C68,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C6C,word,00481025 // or $v0, $v0, $t0        odd tick: frozen too
+patch=1,EE,000F1C70,word,8FBF0000 // lw $ra, 0($sp)
+patch=1,EE,000F1C74,word,03E00008 // jr $ra
+patch=1,EE,000F1C78,word,27BD0010 // addiu $sp, $sp, 16
+patch=1,EE,0018C524,word,0C03C714 // jal 0012D1D0 -> jal 000F1C50   arc class update
+
+// Ki blast homing, found 2026-10-02 for issue #117. The ki blast launcher
+// (001D1A58) takes the blast's turn rate from the character's ki blast table in
+// degrees a second and FUN_00210050 makes it radians a tick with / 30.0
+// (00210064). The projectile update (FUN_00176980, 001769E4) turns the blast
+// toward its target by up to that much once a tick, so at 60fps it turned twice
+// as fast and curved onto an opponent who sidesteps it at 30fps. The divisor
+// becomes 60.0. FUN_00210050 has no other caller.
+//
+// Cell 2nd Form, save state 7, backed away under the 30fps words; Ultimate
+// Gohan holds Left from the Triangle tap; every open fix on:
+//
+//                                     30fps          60fps before   with this group
+//   heading change, first 12 vsyncs   9.8 deg        14.6 deg       9.8 deg
+//   from 200 units                    miss, 37.0     miss, 14.1     miss, 38.2      (closest approach)
+//   from 300 units                    miss, 28.9     hit v53        miss, 32.8
+//   from 400 units                    miss, 17.3     hit v60        miss, 19.1
+[60FPS - ki blast homing]
+description=Turn a ki blast toward its target at its real rate, so sidestepping one works at 60fps as it does at 30fps.
+patch=1,EE,00210064,word,3C014270 // lui $at, 0x41F0 -> 0x4270   turn rate: degrees a second / 60
+
+// The shots of a Barrage Blast 2, found 2026-10-08 for issue #40. Super 17's
+// Hell's Storm and Goten's Full Power Energy Blast Volley fire up to 30 homing
+// shots from one controller, FUN_0014C2B8 (slots of 0x50 at +0x5C0: position,
+// +0x600 flags, +0x604 age, +0x608 the shot's blast object). Once a tick its loop
+// runs each shot's script by age (FUN_001AF0C8: turn rate, speed, wobble), turns
+// and moves it 37 units along its heading (FUN_001AEE98), hands the position to
+// the shot's blast object (FUN_0016AB08) and ages it by 1.0. Nothing in it is
+// paced, so at 60fps the shots crossed the gap twice as fast and the hits came
+// early. The blast object's own update, FUN_0016A400 (vtable 002C3AD0), draws the
+// tracer as a streak from last tick's head to this tick's, and also counts down
+// a start delay and a lifetime once a tick.
+//
+// Two wrappers, both even ticks only. 0014C3B8 -> 000F1CB0: the controller's shot
+// loop is skipped on odd ticks; the fire events above it still run every vsync.
+// 0016A440 -> 000F1C80: on odd ticks the blast object skips its movement and
+// countdowns, which keeps the 37-unit streak on screen on both vsyncs instead
+// of a zero-length one on the odd one. The odd tick (000F2280) only latches the
+// one-tick fired (bit 4) and abort (0x400) events, runs the attached effects and
+// returns: the stop -> dying -> dead steps, the size ramp (FUN_001518D8, also the
+// hit radius) and the hit volume run on even ticks, as at 30fps. Run every vsync,
+// a dying shot cleared in 2 vsyncs, not 4, and its volley ended early.
+//
+// EftVolleyAim_Steer (001AEF74) leads a moving target by its last frame's move
+// x shot steps x 0.5. Shot steps are 30Hz ticks here, but the move is one vsync's,
+// half a 30fps frame's (5.19 -> 2.59 units walking), so the 0.5 becomes 1.0.
+//
+// Hell's Storm, save state 4, Super 17 walked back under the 30fps words, 30 hits
+// in every arm:
+//
+//   fired from      30fps hits     60fps before     with this group
+//   225 units       v106-v224      v100-v217        v106-v224
+//   666 units       v130-v248      v113-v230        v131-v249
+//
+// All 30 hits land on the 30fps vsyncs. Super 17 returns to idle at v277 at
+// 30fps, v271 before, v273 with it; the 4 left are the one-tick hand-offs of #127.
+[60FPS - barrage shot rate]
+description=Fly the shots of Barrage Blast 2s such as Super 17's Hell's Storm at their real speed, so they land when they do at 30fps and their tracers look the same.
+patch=1,EE,000F1C80,word,3C080033 // lui  $t0, 0x0033
+patch=1,EE,000F1C84,word,8D081D64 // lw   $t0, 0x1D64($t0)   frame counter
+patch=1,EE,000F1C88,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1C8C,word,15000003 // bnez $t0, +3            odd tick: draw only
+patch=1,EE,000F1C90,word,00000000 // nop
+patch=1,EE,000F1C94,word,0805A911 // j    0x0016A444         even tick: the whole update
+patch=1,EE,000F1C98,word,8E220580 // lw   $v0, 0x580($s1)    (delay) replay displaced
+patch=1,EE,000F1C9C,word,0803C8A0 // j    0x000F2280         odd tick: events, attached effects, return
+patch=1,EE,000F1CA0,word,00000000 // nop
+patch=1,EE,0016A440,word,0803C720 // lw $v0,0x580($s1) -> j 000F1C80   blast object update
+patch=1,EE,000F1CB0,word,3C080033 // lui  $t0, 0x0033
+patch=1,EE,000F1CB4,word,8D081D64 // lw   $t0, 0x1D64($t0)   frame counter
+patch=1,EE,000F1CB8,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1CBC,word,15000003 // bnez $t0, +3            odd tick: skip the shot loop
+patch=1,EE,000F1CC0,word,00000000 // nop
+patch=1,EE,000F1CC4,word,080530EF // j    0x0014C3BC         even tick: the shot loop
+patch=1,EE,000F1CC8,word,3C013F80 // lui  $at, 0x3F80        (delay) replay displaced
+patch=1,EE,000F1CCC,word,08053113 // j    0x0014C44C         past the loop
+patch=1,EE,000F1CD0,word,00000000 // nop
+patch=1,EE,0014C3B8,word,0803C72C // lui $at,0x3F80 -> j 000F1CB0   shot controller loop
+patch=1,EE,000F2280,word,8E220580 // lw   $v0, 0x580($s1)    odd tick: catch the one-tick events
+patch=1,EE,000F2284,word,30422000 // andi $v0, $v0, 0x2000   animated shot?
+patch=1,EE,000F2288,word,10400009 // beqz $v0, 000F22B0
+patch=1,EE,000F228C,word,00000000 // nop
+patch=1,EE,000F2290,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F2294,word,0C052A30 // jal  EftShot_TestBits
+patch=1,EE,000F2298,word,24050004 // li   $a1, 4             fired
+patch=1,EE,000F229C,word,10400004 // beqz $v0, 000F22B0
+patch=1,EE,000F22A0,word,00000000 // nop
+patch=1,EE,000F22A4,word,8E220580 // lw   $v0, 0x580($s1)
+patch=1,EE,000F22A8,word,34424000 // ori  $v0, $v0, 0x4000   FIRED
+patch=1,EE,000F22AC,word,AE220580 // sw   $v0, 0x580($s1)
+patch=1,EE,000F22B0,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F22B4,word,0C052A30 // jal  EftShot_TestBits
+patch=1,EE,000F22B8,word,24050400 // li   $a1, 0x400         abort
+patch=1,EE,000F22BC,word,10400004 // beqz $v0, 000F22D0
+patch=1,EE,000F22C0,word,00000000 // nop
+patch=1,EE,000F22C4,word,8E220580 // lw   $v0, 0x580($s1)
+patch=1,EE,000F22C8,word,34420002 // ori  $v0, $v0, 2        STOP
+patch=1,EE,000F22CC,word,AE220580 // sw   $v0, 0x580($s1)
+patch=1,EE,000F22D0,word,8E840000 // lw   $a0, 0($s4)
+patch=1,EE,000F22D4,word,02A0282D // move $a1, $s5
+patch=1,EE,000F22D8,word,8E260030 // lw   $a2, 0x30($s1)
+patch=1,EE,000F22DC,word,0C05A7D2 // jal  EftBlastObj_UpdateParts
+patch=1,EE,000F22E0,word,0000382D // move $a3, $zero
+patch=1,EE,000F22E4,word,0805A98C // j    0016A630           return: no dying step, no hit volume
+patch=1,EE,000F22E8,word,00000000 // nop
+patch=1,EE,001AEF74,word,3C013F80 // lui $at,0x3F00 -> 0x3F80     aim lead x 1.0 (EftVolleyAim_Steer)
+
+// A thrown fighter's flight, found 2026-10-08 for issue #125. Ultimate Gohan's
+// Giant Throw (thrower state 132, FUN_001E6DC8) puts the victim in state 212,
+// FUN_001E9218. On entry it sets fighter+0x3D8 to (int)(fighter+0xFC8 * 15.0)
+// (001E926C, lui 0x4170); while the flight's middle animation (0xBE/0xC1) plays
+// it takes 1 off once a tick (001E93BC), and at 0 the victim moves on to land.
+// 15 is a 30Hz tick count, so at 60fps the flight ended in half its time and
+// short. 30.0 doubles the count, the same shape as [60FPS - knockback flight];
+// the counter still runs every tick, so no fighter can be left in the state.
+//
+// Save state 7 (1P vs 2P), Gohan on pad 2: Square x3, Triangle (Cell stunned,
+// 199), Up+Triangle. Cell in state 212, every open fix on:
+//
+//                  30fps        60fps before    with this group
+//   vsyncs          70             57               69
+//   distance        220            181              220
+[60FPS - throw flight]
+description=Hold a thrown fighter's flight for its real time, so Ultimate Gohan's Giant Throw and others like it send the opponent as far as at 30fps instead of dropping them short.
+patch=1,EE,001E926C,word,3C0141F0 // lui $at, 0x4170 -> 0x41F0   flight hold: scale * 15 -> scale * 30 ticks
+
+// The match clock, found 2026-10-09 for issue #133. FUN_00216EF8 is a clock: each
+// call adds 34, 32, 34 ms in turn, exactly 1/30 s, and carries into seconds,
+// minutes and hours. FUN_00217090 ticks two of them, *(gp-0x5738)+0x118 and the
+// time-limit clock at +0x108, then writes the seconds left (+0x108+0xC, the
+// number on the HUD) and returns 1 once the limit is reached. Its only caller is
+// 00217F6C in FUN_00217EF0, the battle's per-tick end-of-match check, so at 60fps
+// a 60-second Duel ran out in 30 real seconds.
+//
+// The call now goes through a wrapper that ticks the clocks on even ticks of the
+// frame counter (00331D64) only, and returns 0, "time not up", on odd ones. The
+// KO checks in FUN_00217EF0 still run every tick.
+//
+// Duel Time 60, Goku (Early) against a COM Ultimate Gohan:
+//
+//                              30fps   60fps before   with this group
+//   vsyncs per shown second    60      30             60
+//   time up, from 0:55         v300    v150           v299
+[60FPS - match timer]
+description=Count a timed match down at its real speed, so a 60-second Duel lasts 60 seconds instead of 30.
+patch=1,EE,00217F6C,word,0C03C850 // jal FUN_00217090 -> jal 000F2140
+patch=1,EE,000F2140,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2144,word,8D081D64 // lw t0,0x1D64(t0)              frame counter
+patch=1,EE,000F2148,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F214C,word,11000002 // beq t0,zero,0xf2158           even: tick the clocks
+patch=1,EE,000F2150,word,00000000 // nop
+patch=1,EE,000F2154,word,03E00008 // jr ra                         odd: hold them, time not up
+patch=1,EE,000F2158,word,0000102D // move v0,zero
+patch=1,EE,000F215C,word,08085C24 // j FUN_00217090
+patch=1,EE,000F2160,word,00000000 // nop
+
+// The lock-on search, found 2026-10-09 for issue #135. A fighter who has lost the
+// lock-on after a knockdown stands in state 54 (FUN_001EB4A8) looking around for
+// the opponent. Once a tick, FUN_001EB2D0 (its only caller is 001EB57C) widens a
+// search cone, fighter+0xD58, by a per-character angle (FUN_0020E648) and a search
+// range, +0xD5C, by a per-character distance (FUN_0020E6F0); FUN_001EB3A0 locks on
+// again once the opponent is inside both. The steps were the same per tick at
+// both rates, so at 60fps the search ended in half its real time.
+//
+// A trampoline at 001EB30C halves both steps before they are added. The cap at pi
+// and the find test are unchanged.
+//
+// Gohan's state 54 after an Ultimate Blast knocks him down:
+//
+//                                      30fps        60fps before   with this group
+//   Super 17's Shocking Death Ball     40 vsyncs    20             39
+//   Devilman's Devilmite Beam          20 vsyncs    10             19
+[60FPS - lock-on search]
+description=Let a fighter who lost the lock-on look around for the opponent for its real time, instead of finding them again in half the time.
+patch=1,EE,001EB30C,word,0803C85C // andi s0,s0,0x1 -> j 000F2170
+patch=1,EE,000F2170,word,32100001 // andi s0,s0,0x1                the original
+patch=1,EE,000F2174,word,3C013F00 // lui at,0x3F00
+patch=1,EE,000F2178,word,44811000 // mtc1 at,f2                    0.5
+patch=1,EE,000F217C,word,4602A502 // mul.s f20,f20,f2              cone step
+patch=1,EE,000F2180,word,46020842 // mul.s f1,f1,f2                range step
+patch=1,EE,000F2184,word,0807ACC5 // j 001EB314
+patch=1,EE,000F2188,word,00000000 // nop
 
 // The Max Power shockwave, found 2026-10-02 and fixed 2026-10-09 for issue #137.
 // Reaching Max Power Mode makes a ring that warps the background as it spreads
