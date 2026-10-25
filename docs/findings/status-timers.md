@@ -2,6 +2,114 @@
 
 The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers.
 
+## 2026-09-17 - issue #28, paralysis: half its published duration
+
+SuperCombo lists 24 paralysis Blast 1s with a duration, "paralyzes opponent for
+N seconds or less". Nothing in this project had ever measured one.
+
+### The scene
+
+Babidi has Demon Eye (4 seconds) and Wizard Barrier (2.5 seconds), so one
+character tests two published timers. He is roster index 60, row 8 column 4,
+five `Down` and one `Right` from Hercule. Save state 6 is Babidi against a
+standing Ultimate Gohan on Rocky Area - Evening, drifted to 60 units apart
+(`work/state-backups/rocky-babidi-vs-standing-gohan.p2s`). At the match-start
+distance of 227 units Demon Eye fires and never arrives.
+
+Demon Eye is `L2` + `Circle`. Babidi casts in state 253; Gohan is paralysed in
+state 211 and recovers through 56.
+
+### Measured
+
+| arm | paralysed from | duration |
+|---|---|---|
+| 30fps | v56 | **240 vsyncs, 4.00s** |
+| `60FPS - battle` only | v32 | 120 vsyncs, 2.00s |
+| every shipped group but beam object travel | v33 | 120 vsyncs |
+| the same plus `state phase timers` | v33 | 120 vsyncs |
+
+The 30fps arm hits the published 4 seconds exactly. The phase-timer group does
+not reach it.
+
+### One decrement, several arming paths
+
+Sampling Gohan's fighter every 20 vsyncs through the paralysis finds one word
+falling by 10 each sample: `fighter+0x0FE0`, 119 to 0. A write watchpoint
+finds the arming at `001CBC18` (from move data via `FUN_00212760`) and the
+decrement at `001E1EE0`. `FUN_00204200` also adjusts it, so the arming value is
+not one site; the decrement is.
+
+```
+001E1ED4  lw    $v0, 0xFE0($s1)
+001E1EE0  addiu $v0, $v0, -1        once a tick while positive
+001E1EE8  sw    $v0, 0xFE0($s1)
+001E1F10  addiu $v0, $v0, -3        and 3 more when FUN_001D4D98(0x100000)
+```
+
+The `-3` is the "or less": mashing shortens it. It fires per press, so it is
+left alone.
+
+`[60FPS - paralysis]` replaces the load at `001E1ED4` with a call to a 6-word
+helper at `000F1700` that adds the tick's parity to the loaded value, so the
+`-1` nets to nothing on odd ticks. `$t0`, which it uses, appears nowhere in the
+function.
+
+| arm, from the pnach | duration |
+|---|---|
+| every shipped group but beam object travel, plus this | 239 vsyncs |
+| `60FPS - battle` plus this | 240 vsyncs |
+
+### The same function holds ten more countdowns
+
+The decrement sits in the fighter's per-tick update (`FUN_001E1D20`, which
+Ghidra calls `FUN_001e23d0`), after the state dispatch and the meter economy.
+It is a block of status timers, every one per tick, none compensated:
+
+| site | field | behaviour |
+|---|---|---|
+| `001E1E3C` | `+0x0D48` | -1 while positive |
+| `001E1E98` | `+0x1036`, 50 bytes | +1 each, capped at 100 |
+| `001E1F3C` | `+0x0FF8` | -1, sets flags 0x93, 0x137, 0x96 while positive |
+| `001E1F88` | `+0x0FE8` | -1 |
+| `001E1FAC` | `+0x0FE4` | -1, sets flag 0x96 |
+| `001E1FD4` | `+0x0DE4` | -1 unless a state flag |
+| `001E1FF8` | `+0x0E40` | -1 on a condition |
+| `001E2008` | `+0x0FF0` | -1 while flag 0x13 |
+| `001E21C4` | `+0x0D88` | +1 in states 0x89-0x8C |
+| `001E2394` | `+0x1580` | -1 in one mode |
+| `001E23AC` | `+0x0964` | +1, the ticks-in-state counter |
+
+Which mechanic each one is has not been established. The 50-byte array climbing
+to 100 is shaped like SuperCombo's "option anti-repetition system", which
+remembers what a combo has already used. Each needs a move that arms it and a
+30fps arm before it is touched.
+
+### Not established
+
+- **Mashing.** The COM does not mash, so the per-press subtraction was read,
+  not measured.
+- **Paralysing Smash Ki Blasts** share the decrement but were not cast.
+- **Demon Eye misses entirely on v23**, because `[60FPS - beam object travel]`
+  halves the beam's speed and not its life. That is #29.
+
+### Re-measured 2026-09-21, with every group the play-test could have had
+
+The 2026-09-17 play-test reported Demon Eye at ~150 frames against ~120 at
+30fps. Save state 6 again, Demon Eye (`L2` + `Circle`), reading Gohan's
+`fighter+0x0FE0` every vsync:
+
+| arm | paralysed | lasts |
+|---|---|---|
+| 30fps | from v42, armed 120 | **240 vsyncs** |
+| `60FPS - battle` + this group | from v19, armed 120 | **240 vsyncs** |
+| v24 | never - Demon Eye misses (#29) | - |
+| v24 + this group | never - Demon Eye misses (#29) | - |
+| v24 + this group + #16, #17, #31 and #35 | from v43, armed 120 | **240 vsyncs** |
+
+Nothing in the candidate set moves the countdown. The group is exact in every
+arm where the beam lands, and on v24 alone the beam does not land at all, so a
+play-test of this group needs #31 in the set, or a closer cast.
+
 ## 2026-09-17 - issue #32, Solar Flare's lock-off: half its time
 
 SuperCombo lists Solar Flare as "causes opponent to lock off, staggers
@@ -60,6 +168,115 @@ Krillin's other Blast 1, "Effect lasts 15 Seconds", arms `+0x0E08` and the
 
 - **Other Solar Flare users.** Only Krillin's was cast; the timer and flags are
   on the victim and shared.
+
+## 2026-09-17 - issue #34, the combat timers
+
+Paralysis (#28) exposed a block of per-tick countdowns in the fighter update,
+`FUN_001E1D20`. Mapping each timer's arming site back to the state table named
+most of them, and exercising the moves SuperCombo describes armed five.
+
+### Which move arms which timer
+
+Save state 4 is Goku (Early) against a standing Ultimate Gohan
+(`work/state-backups/rocky-goku-early-vs-standing-gohan.p2s`); a script dashes in
+(`Up` + `Cross` until 20 units) and then plays an input. Goku's Rushing
+Techniques are, in slot order, Heavy Finish, Kiai Cannon, Flying Kick and Heavy
+Finish, so `Square` then `Triangle` is Heavy Finish.
+
+| field | armed by | what it does |
+|---|---|---|
+| `+0x0D48` | every hit taken; states 250, 252 | combo timer, re-armed to ~32 per hit |
+| `+0x1036`, 50 bytes | hits | a used option's byte drops to 0 and climbs 1 a tick, capped at 100 |
+| `+0x0FF0` | the end of hitstun or stun (states 189-204) | 14 ticks |
+| `+0x0DE4` | the attacker's Ground Slash (states 174-179) | 30 ticks, paused while a state flag holds |
+| `+0x0E40` | the attacker after a Blast 2 cinematic (states 298-306, 313-315) | 59 ticks |
+
+The byte array is the shape of SuperCombo's "option anti-repetition system":
+options that cannot repeat within a combo, a combo being hits that do not drop
+the hit counter.
+
+### Measured
+
+| timer | 30fps | shipped | shipped + `[60FPS - combat timers]` |
+|---|---|---|---|
+| combo `+0x0D48`, Heavy Finish | 204 | 167 | 198 |
+| after hitstun `+0x0FF0`, Heavy Finish | 28 | 14 | 28 |
+| repetition byte back to 100 | 198 | 99 | 199 |
+| `+0x0DE4`, Ground Slash | 68 | 39 | 69 |
+| `+0x0E40`, Frieza's I Might Die This Time rocks from save state 7 | 118 | 59 | 119 |
+
+The combo timer's remaining 6 vsyncs is where the last hit lands: it is
+re-armed per hit, and the stun before it is 116 vsyncs at 30fps and 114 at 60fps.
+
+### Delay slots decide the hook shape
+
+- `+0x0D48` and `+0x0E40`: `addiu` then `sw`. A `jal` on the `addiu` would
+  store before the helper runs, so the helper stores and the `sw` becomes a
+  `nop`.
+- `+0x0FF0`: the decrement is in `blez`'s delay slot. The hook is on the next
+  instruction, whose helper undoes the `-1` on odd ticks, stores, and replays
+  the `dmove`.
+- `+0x0DE4`: decrement and store are reached through a `blezl` and a `bnez`,
+  both with the work in their delay slots, and every nearby instruction is a
+  branch or a call. `001E1FC4`-`001E1FD8` is replayed in a trampoline.
+- The repetition loop's helper sets `$ra` past the loop on odd ticks.
+
+### Not established
+
+- **`+0x0D88`**, +1 a tick in states 0x89-0x8C, and **`+0x1580`**, state 4 in one
+  game mode, were not investigated.
+- **In play.** Whether a combo that drops or connects at 30fps now does the same
+  at 60fps was not scripted.
+
+## 2026-09-22 - issue #34, the last two: a shrugged-off hit and the hurt face
+
+`+0x0FE8` and `+0x0FE4` were left out above because nothing tried armed them.
+Every load and store of either offset in the ELF sits in four functions, and
+both timers turn out to be cosmetic.
+
+| field | armed by | read by | what it does |
+|---|---|---|---|
+| `+0x0FE8` | `001C9FF4`, 3, in the hit resolver `FUN_001C9B50` on hit result 2 | `FUN_001DFE30` | the victim shakes sideways by 0.25 units, the sign flipping with the timer's low bit |
+| `+0x0FE4` | `FUN_001CF220`, 30, on the victim at every step of damage dealt over time | the countdown itself | sets flag `0x96` each tick; `FUN_001D1808` puts the face (`model+0x1664`) in mode 5 while it is set |
+
+**Hit result 2 is a hit shrugged off, not a guard.** A pad-2 guard blocked a
+five-hit rush, a Rush Ki Blast, a held smash and a rush ending in `Triangle`
+without any of them reaching the result. Result 2 is forced for ordinary hits
+while the victim's `+0x0E18` is positive, and `+0x0E18` is a Blast 1 buff:
+`FUN_002004C8` arms it from skill flag `0x400`. That is False Courage,
+"cannot be stunned by Ki Blasts & Melee Attacks": Hercule's (`L2`+`Circle`,
+state 253) armed it to 224 ticks against SuperCombo's 7.5 seconds. The same result also comes from a resistance
+check (`+0x0E14`, a second buff, and state flags on both sides) that was not
+exercised.
+
+Flag `0x96` is one of the three flags Solar Flare's lock-off sets, and the
+states after Drain Life's launch set it too. Through Drain Life the face was in
+mode 5 on every tick the flag was set and never otherwise. The camera frames
+Cell during the drain, so the face was not seen in a capture.
+
+Both countdowns decrement shortly before a call, so the hook replaces the
+decrement with a `jal` whose delay slot is the `move $a0, $s1` that follows.
+The helper returns the decremented value with the odd tick added back and the
+original store runs.
+
+Save state 7, Cell (2nd Form) against a pad-2 Ultimate Gohan
+(`rocky-vs2p-cell2-near-gohan.p2s`), from the pnach. The shake with `+0x0E18`
+written on Gohan and one `Square`; the face after Drain Life's last drain step
+(the move re-arms it five times at 30fps):
+
+| | 30fps | v24 | v24 + `[60FPS - combat timers]` |
+|---|---|---|---|
+| `+0x0FE8` per vsync after the hit | 3, 3, 2, 2, 1, 1 | 3, 2, 1 | 3, 3, 2, 2, 1, 1 |
+| `+0x0FE4` after Drain Life's last step | 60 vsyncs | 30 | 60 |
+
+The victim stays in idle, state 11, through the shrugged-off hit in every arm.
+
+### A rig trap found on the way
+
+`Roo.input_release()` releases pad 2 as well. A script that holds a pad-2
+guard with `input.set ... pad=1` and then releases pad 1 with `input_release()`
+drops the guard on the same frame; `input_set()` with no buttons releases pad 1
+alone.
 
 ## 2026-10-10 - issue #143: the freeze on guard counters and smash clashes
 
