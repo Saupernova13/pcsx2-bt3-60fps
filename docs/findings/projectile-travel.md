@@ -521,3 +521,116 @@ miss was a second mover, found only by pressing a second button.
   60fps camera it may read as judder. Worth a look in play.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
+
+## 2026-09-21 - issue #43, ki blasts die early: the projectile's life is counted in ticks
+
+The report: ki blasts travel at the right speed but vanish before the 30fps
+game's do - Kid Buu's regular blasts die early, his charged ones do not.
+
+### The life
+
+The effect-node update, `FUN_00176980`, is the one `[60FPS - projectile travel]`
+hooks for the step. Straight after the move it counts the node's life down:
+
+```
+00176A64  lw    $v0, 0x5B4($s1)     life in ticks, armed at spawn from the class (0017688C)
+00176A68  addiu $v0, $v0, -1
+00176A6C  bgtz  $v0, 00176A80
+00176A70  sw    $v0, 0x5B4($s1)
+00176A74  ...   +0x5B0 |= 0x10       dead: the move is skipped from then on (00176A1C)
+```
+
+Krillin's Rush Ki Blast is armed at 118. At 30fps that is 3.9s at 27.8 units a
+tick; at 60fps with the step halved it is 2.0s at 13.9 a tick, so a blast that
+misses gets half the range.
+
+A blast that **hits** never shows it: the impact sets `0x10` itself, and the
+stage caps separation at about 785 units, well inside even the halved range. On
+save state 7 (Krillin 703 units from a standing Ultimate Gohan) the shot ends
+at 663 units in every arm. The shortfall is only visible on a miss, which is
+exactly how the report describes it - a blast that "stops existing sooner".
+
+Moving the opponent to force a miss does not work: `fighter+0x14` is rewritten
+from the model every tick. So the life was set to 10 ticks on the blast's first
+step instead, and the flight timed to the `0x10` flag:
+
+| arm | flies | travels |
+|---|---|---|
+| 30fps | 18 vsyncs | 250 units |
+| v24 | 9 vsyncs | 125 units |
+| v24 + `[60FPS - projectile life]` | 19 vsyncs | 264 units |
+
+### The fix
+
+The decrement is reached two ways: after the move, and from `001769BC`, which
+skips the move for a node flagged `0x100` and branches to `00176A68` with the
+life loaded in its delay slot. The hook therefore replaces the branch after the
+decrement, where both paths meet, with a jump to a helper at `000F1880` that
+adds the tick's parity back, re-stores the life and takes the original branch.
+`$t0` is unused in `FUN_00176980`.
+
+### Not this group
+
+- **Charged ki blasts** are not effect nodes: holding `Triangle` never reaches
+  `00176A34`. They are the spawned-object class, whose end comes from its blast
+  script's events - the clock `[60FPS - blast script clock]` (#31) paces - not
+  from a tick life. That matches the report's own split: Kid Buu's charged
+  blasts last, his regular ones do not.
+- Videl's charged blast was not tested; whether it is an effect node or a
+  scripted object decides which group it needs.
+
+## 2026-09-21 - issue #54, Devilman's fork: a fourth mover
+
+The report: Devilman's thrown fork is faster at 60fps. The issue asked for the
+wind-up and the flight to be timed separately, and they are wrong by different
+amounts for different reasons.
+
+### Not any known mover
+
+Fork Attack is `L2` + `Triangle`, state 262. With a breakpoint on each known
+mover in turn, none runs while the fork is out: not the effect-node stepper
+(`00176A34`), not the rock class (`0015C28C`, `FUN_0015BFB8`), not the beam class
+(`00156004`), not either thrown-object update (`0017797C`, `00178A3C`). A tapped
+ki blast from the same state hits the effect-node breakpoint at once, so the
+probe works.
+
+A memory scan during the flight finds the fork as the third model in the model
+table (`008C2FF0`, its root bone at `+0x970`), copied each frame from an object
+at `01AC8420`. A write watchpoint on that object's `+0x50` lands in a `Vec3Add`
+called from `001550C4`, inside `FUN_00154DE8`: the same layout as the rock class's
+update (freeze check `FUN_0012CE88`, script poll `FUN_0014A8C0`, a phase byte at
+`+1`), a sibling class that nothing hooked.
+
+```
+001550A0  lwc1  $f12, 0x4($s3)       speed
+001550A8  jal   Vec3Scale           vel(+0x70) = dir * speed    (one path)
+001550C4  jal   Vec3Add             pos += vel                  (both paths)
+001550C8  dmove $a1, $a0            (delay slot)
+```
+
+### Measured
+
+Save state 6, Devilman 227 units from a standing Ultimate Gohan
+(`work/state-backups/rocky-devilman-vs-standing-gohan.p2s`), the fork model's x
+each vsync from when it appears:
+
+| arm | fork appears | x per vsync | Gohan hit |
+|---|---|---|---|
+| 30fps | v59 | 47 47 47 47 27 27 8 8 -11 -11 ... -69 | v75 (16 after) |
+| v24 | v56 | 47 47 27 8 -11 -30 -50 -69 | v64 (8 after) |
+| v24 + `[60FPS - weapon object travel]` | v56 | 47 47 37 27 18 8 -1 -11 ... -59 | v69 (13 after) |
+
+The flight step is 37 units a tick in both arms: 2x in real time, the whole
+defect the report names. The group halves it at the add, the same trampoline
+shape as `[60FPS - blast object travel]`.
+
+### What is left, and it is not the flight
+
+- The throw animation's beats land 2 to 4 vsyncs early (anim `0x106` at v13
+  against v15, `0x108` at v63 against v67), so the fork appears 3 vsyncs early.
+- The fork then waits 2 vsyncs at its spawn point where 30fps waits 4 (two
+  ticks in both), before its first step.
+
+That is the pre-launch overshoot the shipped header already lists for Frieza's
+rocks and Buu's charged blast. `[60FPS - blast script clock]` (#31) does not
+move it: with it in the set every beat lands on the same vsync.
