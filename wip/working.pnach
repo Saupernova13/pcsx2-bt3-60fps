@@ -2760,3 +2760,11 @@ patch=1,EE,000F26D0,word,39110001 // xori s1,t0,1               no move on the d
 patch=1,EE,000F26D4,word,0807D183 // j    001F460C
 patch=1,EE,000F26D8,word,00000000 // nop
 patch=1,EE,001F4578,word,0803C9B0 // beqz v0 (IsNew) -> j 000F26C0
+
+// The Sonic Sway window. Holding Circle and tapping Triangle enters the Auto-Counter
+// stance (action 0x67, BtlAct_Action67to69); a Rush Attack landing in its first 10
+// frames (actionFrame < 10, flag 0x4E) plays a Sonic Sway. Counted once a tick, so
+// at 60fps the window was half as long; it now runs 20 ticks.
+[60FPS - sonic sway window]
+description=Keep the Sonic Sway window of the Auto-Counter stance as long as at 30fps, instead of half.
+patch=1,EE,001E7210,word,28420014 // slti $v0, $v0, 10 -> 20    action 0x67: flag 0x4E in its first 10 frames

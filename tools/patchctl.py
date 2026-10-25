@@ -356,12 +356,22 @@ GLOW = ["60FPS - power-up glow rate"]
 # The Max Power vanish dash, found 2026-10-12 for issue #162 in BT3-Decompiled.
 VDASH = ["60FPS - vanish dash"]
 
+# The Sonic Sway window of the Auto-Counter stance, found 2026-10-12 for issue #167.
+SWAY = ["60FPS - sonic sway window"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB + RAMP + ARCS + KIHOMING + BARRAGE + THROWFLIGHT + JITTER + TIMER + SEARCH + SHOCKWAVE + HITSTOP + STORYCLOCK + DISC + GNDDUST + GLOW + VDASH
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY
+                  + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS
+                  + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT
+                  + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST
+                  + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS
+                  + SPRITECLOCK + BOB + RAMP + ARCS + KIHOMING + BARRAGE
+                  + THROWFLIGHT + JITTER + TIMER + SEARCH + SHOCKWAVE + HITSTOP
+                  + STORYCLOCK + DISC + GNDDUST + GLOW + VDASH + SWAY
                   + SPARES)
 
 PRESETS = {
@@ -421,7 +431,14 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB + RAMP + ARCS + KIHOMING + BARRAGE + THROWFLIGHT + JITTER + TIMER + SEARCH + SHOCKWAVE + HITSTOP + STORYCLOCK + DISC + GNDDUST + GLOW + VDASH),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY
+             + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT
+             + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE
+             + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT
+             + BLEND + SPIRAL + RAYS + SPRITECLOCK + BOB + RAMP + ARCS
+             + KIHOMING + BARRAGE + THROWFLIGHT + JITTER + TIMER + SEARCH
+             + SHOCKWAVE + HITSTOP + STORYCLOCK + DISC + GNDDUST + GLOW + VDASH
+             + SWAY),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -436,7 +453,8 @@ PRESETS = {
     # "full" without paralysis, so that group has a named A/B baseline.
     "noparalysis": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                    + STRUGGLE
                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the script clock, so that group has a named A/B baseline.
     "noscript": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -476,7 +494,8 @@ PRESETS = {
     # "full" without the beam charge hold, so that group has a named baseline.
     "nobeamcharge": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                      + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                     + STRUGGLE
                      + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the effect-command ramps, so that group has a named baseline.
     "noramp": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -536,7 +555,8 @@ PRESETS = {
     # "full" without the sprite effect clock, so that group has a named baseline.
     "nospriteclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                       + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                      + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                      + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                      + STRUGGLE
                       + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the camera bob, so that group has a named baseline.
     "nobob": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -564,6 +584,12 @@ PRESETS = {
                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
                 + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
+    # "full" without the Sonic Sway window, so that group has a named baseline.
+    "nosway": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+               + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
@@ -579,8 +605,10 @@ PRESETS = {
     # "full" without the throw flight, so that group has a named baseline.
     "nothrowflight": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                       + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                      + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
-                      + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
+                      + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                      + STRUGGLE
+                      + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN
+                      + CINECAM
                       + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the shake jitter hold, so that group has a named baseline.
     "nojitter": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -603,7 +631,8 @@ PRESETS = {
     # "full" without the Max Power shockwave, so that group has a named baseline.
     "noshockwave": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                    + STRUGGLE
                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
                     + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the hit-stop, so that group has a named baseline.
@@ -615,7 +644,8 @@ PRESETS = {
     # "full" without the story script clock, so that group has a named baseline.
     "nostoryclock": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                      + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                     + STRUGGLE
                      + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
                      + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT),
     # "full" without the disc travel, so that group has a named baseline.
@@ -639,7 +669,8 @@ PRESETS = {
     # "full" without the rush time limit, so that group has a named baseline.
     "norushlimit": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                    + STRUGGLE
                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
                     + TRANSLOAD + FXTRACK + TRANSFLASH),
     # "full" without the two effect clocks, so those groups have a named baseline.
@@ -651,7 +682,8 @@ PRESETS = {
     # "full" without the transformation load, so that group has a named baseline.
     "notransload": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
-                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
+                    + STRUGGLE
                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM),
     # "full" without the cinematic camera, so that group has a named A/B baseline.
     "nocinecam": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER

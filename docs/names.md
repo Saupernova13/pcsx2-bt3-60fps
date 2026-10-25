@@ -41,6 +41,7 @@ from SuperCombo's names to this repo's old terms.
 | dust when dashing or landing, dust clouds | Ground dust, `EftGndDust` (my label) | `ground dust rate`, issue #151 |
 | the flames streaming off a powered-up fighter, power-up glow | The power-up glow, `EftGlow` (BT3-Decompiled's name) | `power-up glow rate`, issue #153 |
 | vanish dash, dashing with Circle in Max Power | Action 0x35, direction + `Circle` in Max Power Mode (no wiki name found; "vanish dash" is this repo's label) | `vanish dash`, issue #162 |
+| Sonic Sway, dodging a rush in the Auto-Counter stance | Sonic Sway: a Rush Attack in the first 10 frames of the Auto-Counter stance (`Circle` held, tap `Triangle`; action 0x67) | `sonic sway window`, issue #167 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
