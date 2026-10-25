@@ -20,6 +20,9 @@ SPARES = 12
 
 
 def main() -> int:
+    if '-h' in sys.argv or '--help' in sys.argv:
+        print(__doc__)
+        return 0
     if '--from' in sys.argv:
         src = sys.argv[sys.argv.index('--from') + 1]
     else:
