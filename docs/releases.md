@@ -90,8 +90,10 @@ of the six groups it shipped.
 | `version.py verify` | at publish | the same, at the point the tag is written |
 | `release.yml` | at publish | a tag with no patch, no note, or a DRAFT note |
 
-Neither PR check can block a merge until it is made a required check on
-`main`; until then they are a red X the owner has to read.
+Both PR checks are required on `main`, which is protected: a change reaches it
+only through a PR whose checks pass, admins included. A release PR the workflow
+opens shows its checks waiting for approval until the rewritten note is pushed
+to it.
 
 ## If a run fails
 
@@ -111,22 +113,26 @@ owed and every run says "nothing". The merge that causes it fails the Version
 run, any later run says so as a warning, and `release-pr.yml` is what stops it
 arising at all.
 
-Doing it by hand is the same steps. **Commit the `wip/working.pnach` change
-first** - the scaffold's commit list comes from `git log`, so an uncommitted
-change is one the note cannot mention:
+Doing it by hand is the same steps, on a `release/` branch. **Commit the
+`wip/working.pnach` change first** - the scaffold's commit list comes from
+`git log`, so an uncommitted change is one the note cannot mention:
 
+    git checkout -b release/v24-something main
     python tools/version.py status                    what state the repo is in
     python tools/version.py phase                     what a run would do now
     python tools/version.py changed                   which groups differ from patch/
     python tools/version.py prepare --pr "#26"        scaffold the note (edit it)
     python tools/export.py --release v24-something    write patch/; refuses without the note
     git add patch/ docs/versions/ && git commit
-    git tag -a v24-something -m "v24-something: <one line from the note>"
-    git push origin main v24-something
+    git push origin release/v24-something             then open its PR into main
+
+Merging that PR publishes exactly as a staged release PR does: the
+`release/<tag>` branch name is what tells `version.yml` to tag it. `main` refuses
+a direct push.
 
 `--release` refuses to run without the note, and `version.py verify` refuses to
 publish one that still says DRAFT, so a version cannot quietly lapse or ship a
-scaffold. A tag pushed by hand does fire `release.yml`, which is the one path
+scaffold. A tag pushed by hand still fires `release.yml`, which is the one path
 the tools have not checked, so it re-checks the note itself before writing the
 release page.
 

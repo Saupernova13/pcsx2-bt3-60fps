@@ -3,7 +3,7 @@
 # Merging a release PR publishes, and version.yml refuses to tag a DRAFT note,
 # leaving a note on main with no tag that nothing later recovers. This catches it
 # on the PR, with the same `tools/version.py verify` used at publish time.
-# Make it a required check on main for it to block the merge.
+# It is a required check on main, so a failing note blocks the merge.
 name: Release PR
 
 on:
