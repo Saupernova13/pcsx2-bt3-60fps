@@ -869,6 +869,262 @@ description=Let a launched or blown-away fighter recover after its real 9 frames
 patch=1,EE,001E8D00,word,28420012 // slti $v0, $v0, 9 -> 18     launched: recovery input from frame 9 (BtlAct_LaunchedHandler)
 patch=1,EE,001E9994,word,28420012 // slti $v0, $v0, 9 -> 18     blown away: air recovery from frame 9 (BtlAct_BlowAwayHandler)
 
+// The fighter's meter economy - ki, the three gauges beside it, and every
+// milestone the game reaches "after a second". FUN_001E16C0 is one tick of it
+// for one fighter, and it has exactly one caller, 001E2584, at the tail of the
+// per-fighter update. Everything inside is authored per 30Hz frame: ki comes in
+// at a flat 3333 a tick while charging plus a computed trickle, the second and
+// third gauges fill by their own constants, fighter+0xD80 runs down by 400 a
+// tick, and - the part that makes this a system rather than a list of constants
+// - fighter+0x132C counts 0..29 and fires the once-a-second blocks when it
+// wraps. That counter IS the game's second. At 60fps it wraps twice as often,
+// so a "per second" bonus arrives every half second, on top of every rate being
+// doubled. FUN_0020EF20 even divides by a literal 30 to get its per-frame
+// share, which is as close to a framerate constant as BT3 has.
+//
+// Gating the single call puts the whole economy back on real time at once -
+// income, drain, and the second itself - instead of halving a dozen constants
+// and still getting the second wrong. Measured from the Rocky Area state, the
+// gated arm lands on the 30fps arm's exact values: after 46 vsyncs ki 259962
+// against 259962, both other gauges equal, and the second-counter at 14 against
+// 14, where the ungated arm reads 340761 and 7. Spending ki on a move is not
+// affected - that happens on the move's own code path, not per tick.
+//
+// The same gate paces the Blast 1 buffs. FUN_00200AA0 counts every buff timer
+// down, and its only caller is inside FUN_001E16C0: After Image Strike lasts
+// 14.88s against 14.88s at 30fps and 7.40s without the gate. Do not also double
+// the buff durations (the old buff duration group, #25) - that makes 29.88s.
+[60FPS - meter economy]
+description=Run the fighter's ki and gauge economy every other frame so ki fills and drains at its real-time speed and the game's one-second milestones still take a second.
+patch=1,EE,000F1580,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1584,word,8D081D64 // lw $t0, 0x1D64($t0)    frame counter
+patch=1,EE,000F1588,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F158C,word,15000003 // bnez $t0, 0x000F159C   odd tick: skip the tick
+patch=1,EE,000F1590,word,00000000 // nop
+patch=1,EE,000F1594,word,080785B0 // j 0x001E16C0           even tick: tail jump, ra kept
+patch=1,EE,000F1598,word,00000000 // nop
+patch=1,EE,000F159C,word,03E00008 // jr $ra
+patch=1,EE,000F15A0,word,00000000 // nop
+patch=1,EE,001E2584,word,0C03C560 // jal 001E16C0 -> jal 000F1580
+
+// The rest of a ki charge, found 2026-10-09 for issue #4. Holding L2 plays the
+// charge state's start animation (0x34), then loops 0x35. Ki during the start
+// comes from the meter economy, which the group above gates. In the loop the
+// charge state's handler (FUN_001EB718) adds FUN_0020EC00's amount (or
+// FUN_0020EC88's with flag 0x11) through FUN_001CEBB8 once a tick, outside the
+// economy: a per-second table value / 30 plus terms, clamped, so it cannot be
+// fixed at a divisor. The call at 001EB8D4 now goes through a wrapper that adds
+// the frame counter's low bit and halves: 795 becomes 397 and 398 on alternate
+// ticks, 795 per two ticks as at 30fps, and the bar still moves every frame.
+//
+// Krillin (save state 3) holding L2 from 20000 ki, ki gained per 10 vsyncs:
+//
+//                          v0-v50    v50 on
+//   30fps                  5425      3975
+//   60fps before           5425      7950
+//   with this group        5425      3975
+[60FPS - ki charge loop]
+description=Fill ki at its real speed for the whole of a held charge, not only its first second.
+patch=1,EE,001EB8D4,word,0C03C848 // jal 001CEBB8 -> jal 000F2120
+patch=1,EE,000F2120,word,3C080033 // lui t0,0x33
+patch=1,EE,000F2124,word,8D081D64 // lw t0,0x1D64(t0)
+patch=1,EE,000F2128,word,31080001 // andi t0,t0,0x1
+patch=1,EE,000F212C,word,00A82821 // addu a1,a1,t0
+patch=1,EE,000F2130,word,08073AEE // j 0x1CEBB8
+patch=1,EE,000F2134,word,00052843 // sra a1,a1,1
+
+// Max Power Mode's charge, found 2026-09-17, the other half of issue #4.
+// SuperCombo: Max Power Mode is "activated by charging while both having a full
+// Ki gauge and at least one Blast Stock", shown as a blue gauge over the Ki bars.
+//
+// That gauge is the meter object's +0x1C (fighter+0x0A00), capped at 30000. The
+// charge state's handler (state 55, FUN_001EB718) adds to it once a tick at
+// 001EB90C, and the amount comes from FUN_0020F000, which spreads 30000 over a
+// charge time in seconds at a hard-coded 30 ticks a second:
+//
+//   0020F028  lui   $at, 0x41F0          30.0
+//   0020F03C  div.s $f20, $f20, $f0
+//   0020F040  mul.s $f20, $f20, $f1       seconds * 30.0 = ticks
+//   0020F04C  div   $v0, $v1              30000 / ticks = amount a tick
+//
+// [60FPS - meter economy] does not reach it: the add is in the state handler, not
+// in FUN_001E16C0. It fixes the DRAIN after activation, not the fill. One word
+// makes the divisor 60.0, so the amount halves and the tick count doubles.
+// FUN_0020F000 has one caller.
+//
+// Save state 4, Goku (Early) at full Ki, L2 held, first add to 30000 ("MAX
+// POWER!"), from the pnach:
+//
+//   30fps                                112 vsyncs   535 a tick
+//   60fps, shipped + meter economy        56 vsyncs   535 a tick
+//   60fps, the same + this group         113 vsyncs   265 a tick
+[60FPS - max power charge]
+description=Fill the Max Power Mode gauge at its real-time speed while charging, so Max Power Mode takes as long to reach at 60fps as on a real PS2.
+patch=1,EE,0020F028,word,3C014270 // lui $at, 0x41F0 -> 0x4270   30.0 -> 60.0 ticks a second
+
+
+// The smash charge. SuperCombo's BT3 wiki names the mechanic: a Smash Attack
+// is Square held with a direction, level 3 is "indicated by your character
+// flashing white", and a Perfect Smash is "releasing the attack button at the
+// exact moment your character reaches level three of charge". The same page
+// states BT3's frame as a 30th of a second, which is this whole project in one
+// line.
+//
+// FUN_001E33E0 is the charge step: it reads gp-0x6D80 (002FD4F0, 0.0444444 =
+// 1/22.5), scales it, adds it to the raw charge at fighter+0xD7C and stores the
+// normalised 0..1 copy at fighter+0xD78. The constant has exactly one reader,
+// so it is halved in data the way the gravity group's acceleration is, and one
+// word covers all eleven charge states: 71-76, the six Smash directions
+// (FUN_001E4330), and 83-87 (FUN_001E4D80) both call it.
+//
+// The charge then takes 44 vsyncs to fill instead of 22, which is the same real
+// time as 30fps and the same sequence sample for sample: 0.04 0.09 0.13 ...
+// 0.98 1.00.
+//
+// The Perfect Smash window. fighter+0xD84 counts TICKS since the charge hit
+// maximum and 001E4804 grants the Perfect Smash only when it reads exactly 1,
+// which is one tick of release timing: 2 vsyncs at 30fps, 1 at 60fps. Releasing
+// on each vsync in turn and breakpointing the grant at 001E4810, in the full test
+// build of 2026-10-09: 30fps accepts v59 and v60, the charge fix alone only v58.
+// (An earlier note here said the charge fix alone restored 2 vsyncs; in the full
+// build it does not.) The test now accepts 1 or 2 through 000F1CE0, which gives
+// v58 and v59 - the 30fps width, one vsync earlier because the charge state
+// starts 2 vsyncs earlier. Every other value takes the original branch with a0
+// untouched, so the ordinary Full Power smash is unchanged.
+//
+// The Perfect Smash then dashes on a counter of its own (work[2] in
+// BtlAct_SmashChargeHandler, BT3-Decompiled): the dash starts at frame 2 and the
+// attack moves on at frame 6, counted once a tick. Both compares are doubled, so
+// the Perfect Smash lasts its 30fps time: 62 vsyncs after the Perfect at 30fps,
+// 55 before, 61 with them (Goku (Early), rig slot 0).
+//
+// Needs the meter economy group (PR #16). The step is scaled by Momentum
+// (fighter+0xD80, which rush hits fill), and Momentum drains 400 a tick inside
+// the economy that group gates. Without it a charge started after a rush fills
+// late: 22 vsyncs against 20 from half Momentum.
+[60FPS - smash charge]
+description=Charge a smash attack at its real-time speed at 60fps, which also makes the Perfect Smash release window as wide in real time as it is at 30fps.
+patch=1,EE,002FD4F0,word,3CB60B60 // 0.0444444 -> 0.0222222   smash charge per tick
+patch=1,EE,000F1CE0,word,2481FFFF // addiu $at, $a0, -1        a0 = fighter+0xD84
+patch=1,EE,000F1CE4,word,2C210002 // sltiu $at, $at, 2         1 or 2?
+patch=1,EE,000F1CE8,word,10200003 // beqz $at, +3
+patch=1,EE,000F1CEC,word,00000000 // nop
+patch=1,EE,000F1CF0,word,08079203 // j 0x001E480C               Perfect Smash
+patch=1,EE,000F1CF4,word,00000000 // nop
+patch=1,EE,000F1CF8,word,08079208 // j 0x001E4820               the original non-perfect path
+patch=1,EE,000F1CFC,word,00000000 // nop
+patch=1,EE,001E4804,word,0803C738 // bne $a0, $v0, 001E4820 -> j 000F1CE0   Perfect Smash test
+patch=1,EE,001E4644,word,28620004 // slti $v0, $v1, 2 -> 4        Perfect Smash dash starts at frame 2
+patch=1,EE,001E4664,word,28620004 // slti $v0, $v1, 2 -> 4
+patch=1,EE,001E466C,word,2862000C // slti $v0, $v1, 6 -> 12       and ends at frame 6
+patch=1,EE,001E4694,word,2862000C // slti $v0, $v1, 6 -> 12
+
+// The charge flash, found 2026-09-22 for issue #6. Level 3 is "indicated by your
+// character flashing white", and the flash is a pulse. While the fighter holds
+// flag 0x1E, FUN_001D1558 cycles fighter+0x134C through 0-3 once a tick and, each
+// time it wraps to 0, calls FUN_0024E5B8 to set a model flash slot's intensity
+// to 0.2 ($gp-0x5C10); FUN_0024E6B0 takes 0.0333 ($gp-0x5C0C) off it every tick.
+// So the flash fires every 4 ticks and fades 0.167 / 0.133 / 0.1 / 0.067, and at
+// 60fps it pulsed twice as fast. FUN_001D15E0 runs the same pulse for flag 0x1F
+// through +0x1350, and FUN_001D14F8 re-fires a steady glow every tick for 0x1D.
+//
+// Both counters now cycle 0-7, the decay is halved, and the start intensity is
+// 0.1833 so the first frame shows 0.167 as at 30fps. Every 30fps sample of the
+// pulse is then reproduced at the matching vsync, the in-between frames are the
+// halfway values, and the steady glow stays at 0.167. Both constants have one
+// reader, and only these three routines trigger a model flash.
+//
+// Cell 1st Form, Square held from rocky-cell1-near-standing-gohan.p2s, mean
+// brightness of Cell's body: the pulse repeats every 8 vsyncs at 30fps, every 4
+// with every group on, and every 8 with this group.
+[60FPS - charge flash]
+description=Pulse the white flash that marks a Level 3 charge at its real-time rate, so the Perfect Smash cue flashes as fast as it does at 30fps instead of twice as fast.
+patch=1,EE,001D15A8,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1E pulse: count 0-7
+patch=1,EE,001D15B8,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D15BC,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,001D1630,word,24A50008 // addiu $a1, $a1, 4 -> 8     flag 0x1F pulse: count 0-7
+patch=1,EE,001D1640,word,000210C3 // sra $v0, $v0, 2 -> 3
+patch=1,EE,001D1644,word,000210C0 // sll $v0, $v0, 2 -> 3
+patch=1,EE,002FE664,word,3C888888 // flash fade 0.0333 -> 0.0167 per tick ($gp-0x5C0C, one reader 0024E6D4)
+patch=1,EE,002FE660,word,3E3BBBBC // flash start 0.2 -> 0.1833 ($gp-0x5C10, one reader 0024E5D8)
+
+// Paralysis, found 2026-09-17 for issue #28. SuperCombo lists Babidi's Demon Eye
+// as "paralyzes opponent for 4 seconds or less", and the 30fps game gives 4.00s
+// exactly. At 60fps it gave 2.00s.
+//
+// fighter+0x0FE0 is the victim's paralysis in ticks, armed from move data at
+// 001CBC18 and in FUN_00204200 - several arming paths, one decrement:
+//
+//   001E1ED4  lw    $v0, 0xFE0($s1)
+//   001E1EE0  addiu $v0, $v0, -1         once a tick while positive
+//   001E1EE8  sw    $v0, 0xFE0($s1)
+//   001E1F10  addiu $v0, $v0, -3         and 3 more per mashed button
+//
+// The hook replaces the load with a call that adds the tick's parity, so the
+// -1 after it does nothing on odd ticks. The mash subtraction is untouched, so
+// each press still shortens the paralysis by the same real time.
+//
+// Save state 6, Babidi 60 units from a standing Ultimate Gohan, L2 + Circle.
+// Gohan's state 211, paralysed, from the pnach:
+//
+//   30fps                                        240 vsyncs  4.00s
+//   60fps, every shipped group but beam travel   120 vsyncs  2.00s
+//   60fps, the same plus this group              239 vsyncs  3.98s
+//   60fps, 60FPS - battle plus this group        240 vsyncs  4.00s
+[60FPS - paralysis]
+description=Count paralysis down in real time, so a 4-second paralysis lasts 4 seconds at 60fps instead of 2.
+patch=1,EE,000F1700,word,8E220FE0 // lw $v0, 0xFE0($s1)       paralysis ticks left
+patch=1,EE,000F1704,word,3C080033 // lui $t0, 0x0033
+patch=1,EE,000F1708,word,8D081D64 // lw $t0, 0x1D64($t0)      frame counter
+patch=1,EE,000F170C,word,31080001 // andi $t0, $t0, 1
+patch=1,EE,000F1710,word,03E00008 // jr $ra
+patch=1,EE,000F1714,word,00481021 // addu $v0, $v0, $t0       odd tick: +1, so the -1 after it does nothing
+patch=1,EE,001E1ED4,word,0C03C5C0 // lw $v0, 0xFE0($s1) -> jal 000F1700
+
+// Scripted blast events, found 2026-09-17 for issue #29. Babidi's Demon Eye
+// paralyses a standing opponent 60 units away at 30fps and missed entirely on
+// v23.
+//
+// A blast's beam or projectile object asks a controller object whether an
+// event has fired - 0x400 ends the beam - through FUN_0014A8C0(id, mask). The
+// controller (FUN_00158980, one call per tick) gets its events from
+// FUN_00158F58 in one of two modes, chosen by controller+0x18:
+//
+//   mode 0   events are pulses from the owning fighter's animation, already
+//            paced correctly. Frieza's rocks and Buu's charged blast.
+//   mode 1   events fire when the controller's age, +0x14 and +1 a tick,
+//            EQUALS a scripted tick number. Demon Eye.
+//
+// So in mode 1 every event came at half its real time. [60FPS - beam object
+// travel] made that visible: it halves the beam's speed, the end event still
+// came after 16 ticks, and the beam died 30 units out.
+//
+// The hook replaces the age load in the mode-1 branch. On an even age it
+// compares age / 2, so each event fires once at its real time; on an odd age it
+// compares 0x40000000, which no event can hold (unset ones may be -1). Mode 0
+// never reaches this branch.
+//
+// Gating the whole object family, or only the controller, was tried first and
+// is WRONG: mode-0 pulses land on odd ticks and a gated controller never sees
+// them, so Frieza's rocks and Buu's charged blast stopped hitting at range.
+//
+// Opponent's first reaction, from the pnach:
+//
+//                                  30fps   v23     v23 + this
+//   Demon Eye, 60 units            v56     miss    v56
+//   Frieza's rocks, 125/474/628    v109/129/137   v105/125/133   v105/125/133
+//   Buu's charged blast, 86/657    v51/81  v46/77  v46/77
+[60FPS - blast script clock]
+description=Fire a blast's scripted events at their real time, so Demon Eye and every blast on the same script reach as far as at 30fps instead of ending halfway.
+patch=1,EE,000F1740,word,8C850014 // lw $a1, 0x14($a0)        the controller's age in ticks
+patch=1,EE,000F1744,word,30A80001 // andi $t0, $a1, 1
+patch=1,EE,000F1748,word,11000002 // beq $t0, $zero, +3      even age: keep age / 2
+patch=1,EE,000F174C,word,00052843 // sra $a1, $a1, 1          (delay) age / 2
+patch=1,EE,000F1750,word,3C054000 // lui $a1, 0x4000          odd age: an age no event has
+patch=1,EE,000F1754,word,03E00008 // jr $ra
+patch=1,EE,000F1758,word,00000000 // nop
+patch=1,EE,00159010,word,0C03C5D0 // lw $a1, 0x14($a0) -> jal 000F1740
+
 // Combat timers, found 2026-09-17 for issue #34. The fighter's per-tick update,
 // FUN_001E1D20, runs a block of countdowns after the state dispatch and the
 // meter economy. None is compensated. Paralysis (#28) and Solar Flare (#32) are
