@@ -2421,3 +2421,102 @@ patch=1,EE,000F217C,word,4602A502 // mul.s f20,f20,f2              cone step
 patch=1,EE,000F2180,word,46020842 // mul.s f1,f1,f2                range step
 patch=1,EE,000F2184,word,0807ACC5 // j 001EB314
 patch=1,EE,000F2188,word,00000000 // nop
+
+// The Max Power shockwave, found 2026-10-02 and fixed 2026-10-09 for issue #137.
+// Reaching Max Power Mode makes a ring that warps the background as it spreads
+// from the fighter. It lives in a 10-object pool, *(gp-0x566C), that
+// FUN_002454E0 updates once a tick. FUN_00244E20 ticks one object: life +0x08
+// -= 1, radius +0x0C += speed +0x10, speed += +0x14, width +0x18 += +0x1C, and in
+// the last 6 ticks alpha +0x20 += +0x24. FUN_00245740 makes one (7 call sites;
+// the Max Power one is in FUN_00175F40) with life = seconds * 30.0 and the speed
+// and width steps divided by that life. At 60fps the ring spread and faded in
+// half its real time.
+//
+// The ring is scaled for 60 ticks a second where it is made: life = seconds *
+// 60, the starting speed halved and the slow-down quartered (the life doubling
+// halves it once, the extra 0.5 on its numerator again), and the width step
+// halves on its own. The fade starts 12 ticks from the end with half the step;
+// 002FE624 has one reader. A 30Hz gate on the pool update gives the same curve,
+// but the draw (FUN_00245668) does not wait for an object's first update and
+// the allocator clears nothing, so a ring made on an odd tick would be drawn
+// for a frame with its slot's old shape.
+//
+// Goku (Early) holding L2 into Max Power Mode:
+//
+//                        30fps         60fps before   with this group
+//   ring alive           46 vsyncs     23             47
+//   radius, 10 in        68            113            63
+//   radius at the end    208           208            211
+//
+// The Shenron wish screen runs its own 30fps loop and spawns and steps a ring of
+// its own (shen_scene.c, ScrWarp_Spawn from 0026237C), so the four changes are
+// chosen at run time: 000F2630 (speed, slow-down), 000F2660 (life) and 000F2690
+// (fade start) apply them while a battle is loaded (gBtlChars set) and keep the
+// PS2 values otherwise, the fade step's data word doubled back. Max Power from
+// rig slot 6: every call takes the battle path; the ring lives 47 vsyncs, as
+// before.
+[60FPS - max power shockwave]
+description=Spread and fade the Max Power Mode shockwave ring over its real time instead of half of it.
+patch=1,EE,002FE624,word,BD2B5600 // -0.0837 -> -0.0418            fade step
+patch=1,EE,000F2630,word,3C010030 // lui  at,0x30               ScrWarp_Spawn: speed and slow-down
+patch=1,EE,000F2634,word,8C21EB14 // lw   at,-0x14EC(at)       gBtlChars: a battle is loaded
+patch=1,EE,000F2638,word,10200004 // beqz at,000F264C
+patch=1,EE,000F263C,word,00000000 // nop
+patch=1,EE,000F2640,word,4604C602 // mul.s f24,f24,f4          battle: starting speed * 0.5
+patch=1,EE,000F2644,word,080915FE // j    002457F8
+patch=1,EE,000F2648,word,46040002 // mul.s f0,f0,f4            slow-down numerator * 0.5
+patch=1,EE,000F264C,word,080915FE // j    002457F8             no battle (Shenron screen, 30fps): as the PS2
+patch=1,EE,000F2650,word,46021080 // add.s f2,f2,f2            fade step back to its 30fps value
+patch=1,EE,002457F0,word,0803C98C // nop -> j 000F2630
+patch=1,EE,002457F4,word,00000000 // nop
+patch=1,EE,000F2660,word,3C0141F0 // lui  at,0x41F0             ScrWarp_Spawn: life, seconds * 30
+patch=1,EE,000F2664,word,3C020030 // lui  v0,0x30
+patch=1,EE,000F2668,word,8C42EB14 // lw   v0,-0x14EC(v0)       gBtlChars
+patch=1,EE,000F266C,word,10400002 // beqz v0,000F2678
+patch=1,EE,000F2670,word,00000000 // nop
+patch=1,EE,000F2674,word,3C014270 // lui  at,0x4270             battle: seconds * 60
+patch=1,EE,000F2678,word,44810000 // mtc1 at,f0
+patch=1,EE,000F267C,word,080915E7 // j    0024579C
+patch=1,EE,000F2680,word,00000000 // nop
+patch=1,EE,00245794,word,0803C998 // lui at,0x41F0 -> j 000F2660
+patch=1,EE,000F2690,word,3C010030 // lui  at,0x30               ScrWarp_Step: fade start
+patch=1,EE,000F2694,word,8C21EB14 // lw   at,-0x14EC(at)
+patch=1,EE,000F2698,word,10200003 // beqz at,000F26A8
+patch=1,EE,000F269C,word,3C0140C0 // lui  at,0x40C0             6 ticks before the end
+patch=1,EE,000F26A0,word,10000001 // b    000F26A8
+patch=1,EE,000F26A4,word,3C014140 // lui  at,0x4140             battle: 12
+patch=1,EE,000F26A8,word,44810000 // mtc1 at,f0
+patch=1,EE,000F26AC,word,08091432 // j    002450C8
+patch=1,EE,000F26B0,word,00000000 // nop
+patch=1,EE,002450C0,word,0803C9A4 // lui at,0x40C0 -> j 000F2690
+patch=1,EE,000F2700,word,E6000014 // swc1 f0,0x14(s0)          (displaced)
+patch=1,EE,000F2704,word,3C010030 // lui  at,0x30
+patch=1,EE,000F2708,word,8C21EB14 // lw   at,-0x14EC(at)       gBtlChars
+patch=1,EE,000F270C,word,10200018 // beqz at,000F2770          no battle: life as spawned
+patch=1,EE,000F2710,word,00000000 // nop
+patch=1,EE,000F2714,word,C6010008 // lwc1 f1,0x8(s0)           life (seconds * 60)
+patch=1,EE,000F2718,word,3C013F00 // lui  at,0x3F00
+patch=1,EE,000F271C,word,44811000 // mtc1 at,f2
+patch=1,EE,000F2720,word,00000000 // nop
+patch=1,EE,000F2724,word,46020842 // mul.s f1,f1,f2            L = the 30fps life
+patch=1,EE,000F2728,word,460008E4 // cvt.w.s f3,f1             trunc(L)
+patch=1,EE,000F272C,word,44081800 // mfc1 t0,f3
+patch=1,EE,000F2730,word,468018E0 // cvt.s.w f3,f3
+patch=1,EE,000F2734,word,46011834 // c.olt.s f3,f1
+patch=1,EE,000F2738,word,45000002 // bc1f 000F2744
+patch=1,EE,000F273C,word,00000000 // nop
+patch=1,EE,000F2740,word,25080001 // addiu t0,t0,1             ceil(L)
+patch=1,EE,000F2744,word,00084040 // sll  t0,t0,1
+patch=1,EE,000F2748,word,2508FFFF // addiu t0,t0,-1            2 * ceil(L) - 1
+patch=1,EE,000F274C,word,44881800 // mtc1 t0,f3
+patch=1,EE,000F2750,word,00000000 // nop
+patch=1,EE,000F2754,word,468018E0 // cvt.s.w f3,f3
+patch=1,EE,000F2758,word,E6030008 // swc1 f3,0x8(s0)           life
+patch=1,EE,000F275C,word,C6010010 // lwc1 f1,0x10(s0)          speed (half the authored speed)
+patch=1,EE,000F2760,word,C6030014 // lwc1 f3,0x14(s0)          slow-down a (a quarter of the 30fps one)
+patch=1,EE,000F2764,word,460218C2 // mul.s f3,f3,f2
+patch=1,EE,000F2768,word,46030841 // sub.s f1,f1,f3            speed - a/2: the radius after 2k steps = after k at 30fps
+patch=1,EE,000F276C,word,E6010010 // swc1 f1,0x10(s0)
+patch=1,EE,000F2770,word,0809160A // j    00245828
+patch=1,EE,000F2774,word,00000000 // nop
+patch=1,EE,00245820,word,0803C9C0 // swc1 f0,0x14(s0) -> j 000F2700 (after the speed and width maths)
