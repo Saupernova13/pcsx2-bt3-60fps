@@ -2,7 +2,7 @@
 
 Copies every group of a test-build pnach into the rig's cheat file under its real name (comments stripped), adds 12
 empty spare groups, and enables every name in the rig's ini. The rig reads its ini at boot only: restart it after a
-new group name appears (trap 12 in docs/rig.md).
+new group name appears (trap 14 in docs/rig.md).
 
     python tools/rigsync.py [--from PNACH] [--dry]
 
