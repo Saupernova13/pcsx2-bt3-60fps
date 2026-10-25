@@ -1,6 +1,6 @@
 # Blasts: hit cadence, effects, sequences and Flame Shower Breath
 
-Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock.
+Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock, the beam charge hold.
 
 ## 2026-09-05 - ki blasts are cut short: four hypotheses, all wrong
 
@@ -805,3 +805,277 @@ move is to find the node that *owns* a live blast and walk its fields, rather
 than scanning RAM blind again.
 
 **No fix. Nothing shipped from this session's blast work.**
+
+## 2026-09-17 - issue #29, Demon Eye misses: a blast's script runs on ticks
+
+Found while measuring paralysis (#28). From save state 6 - Babidi 60 units from
+a standing Ultimate Gohan - Demon Eye paralyses Gohan at v56 at 30fps and never
+reaches him on v23.
+
+### Bisecting the shipped groups
+
+Adding shipped groups one at a time, Gohan is paralysed with every group up to
+`blast object travel` and never once `beam object travel` is added. Dumping the
+beam object per vsync shows why: it moves 4.0 units a tick at 30fps and 2.0
+with the group, but it is destroyed after the same 16 ticks either way, 30
+units out.
+
+### What ends the beam
+
+The beam polls a controller object: `00156068 jal FUN_0014A8C0(id, 0x400)` reads
+a shared flag table the controller fills, and `0x400` starts the beam's end.
+The controller, `FUN_00158980`, runs once a tick and gets its events from
+`FUN_00158F58`, which has two modes on `controller+0x18`:
+
+| mode | events come from | used by |
+|---|---|---|
+| 0 | pulses from the owning fighter, `FUN_00207A90(fighter, mask)` | Frieza's I Might Die This Time rocks, Buu's Super Kamehameha |
+| 1 | `controller+0x14`, the age in ticks, **equal to** a scripted number | Demon Eye |
+
+Mode 1 is a tick clock with no compensation. At 60fps every scripted event
+comes at half its real time. Without the travel group the beam flies twice as
+fast and dies twice as soon, so it still hits, 23 vsyncs early; with the group
+it flies at the right speed and dies halfway.
+
+### Two gates that looked right and were not
+
+Both tested live, both failed the same way:
+
+| candidate | Demon Eye | rocks at 474 / 628 | Buu's blast at 657 |
+|---|---|---|---|
+| gate all 25 callers of the object freeze check `FUN_0012CE88`, travel groups removed | v56 | **never hit** | **never hits** |
+| gate only the controller's two callers | v57 | **never hit** | **never hits** |
+
+Mode 0 relays one-tick pulses from the fighter. A controller that skips odd
+ticks never sees the pulses that land on them, so the rocks are never launched.
+This is the same trap as gating an effect update (2026-09-06), from a different
+direction: gating is only safe for a system that owns all of its own inputs.
+
+### The fix
+
+`[60FPS - blast script clock]` replaces the age load at `00159010`, which only
+the mode-1 branch reaches, with a call to a 7-word helper at `000F1740`. On an
+even age it returns age / 2; on an odd age it returns `0x40000000`, which no
+16-bit scripted tick can equal (unset events may be -1, so -1 is not safe).
+Each event fires once, at twice its tick number.
+
+Opponent's first reaction, from the pnach:
+
+| move | gap | 30fps | v23 | v23 + this |
+|---|---|---|---|---|
+| Demon Eye | 60 | v56 | never | **v56** |
+| Frieza's I Might Die This Time rocks | 125 / 474 / 628 | v109 / v129 / v137 | v105 / v125 / v133 | v105 / v125 / v133 |
+| Buu's Super Kamehameha | 86 / 657 | v51 / v81 | v46 / v77 | v46 / v77 |
+
+Rocks and Buu's blast are byte-for-byte unaffected: they never take the mode-1
+branch. Their remaining ~4 vsyncs early is the summon-phase defect recorded
+under v17.
+
+### Not established
+
+- **Which other moves use mode 1.** Demon Eye is the only one measured. Every
+  scripted blast shares this code, so it is covered by construction.
+- **The Beam Struggle.** v22's known gap blames beam travel for where a clash
+  forms; this group does not touch mode-0 beams, but the clash was not re-run.
+
+### Re-measured 2026-09-21, with the whole candidate set
+
+The play-test note on PR #31 asked for this group to be re-checked with every
+other candidate applied, not `full` plus one. Save state 6, Babidi's Demon Eye
+on a standing Ultimate Gohan, the vsync Gohan's paralysis timer arms:
+
+| arm | Demon Eye lands |
+|---|---|
+| 30fps | v42 |
+| v24 | never (the beam dies short) |
+| v24 + this group + #16, #17, #30, #35 | **v43** |
+
+One vsync from the 30fps arm, and the paralysis that follows lasts 240 vsyncs
+in both. Nothing else in the candidate set moves it.
+
+## 2026-09-22 - issue #72, a quickly released beam charges one count short
+
+Found measuring #13, Imperfect Cell's Special Beam Cannon. Every beam Blast 2
+runs state 272, `FUN_001F7860`, and holds its charge in animation `0x106`,
+`0x128` or `0x14A`, one per Blast 2 slot.
+
+### The charge hold
+
+| site | what it does |
+|---|---|
+| `001F7A00` | counts `fighter+0x3D8`; gated to even ticks by `[60FPS - state phase timers]` |
+| `001F7A44` | charge `fighter+0xE44 = 2 * count / max`, capped at 1.0 |
+| `001F7ACC`-`001F7AD4` | leaves the hold when `fighter+0x3D0` bit 1 is set, by the release (input condition `0x6F`) or by full charge |
+
+A breakpoint on the handler shows each tick runs the input phase (`a1 = 2`)
+before the per-tick phase (`a1 = 1`). At 30fps a release seen at a tick also
+counts that tick before leaving, and a tap leaves after two counts, since the
+first input phase runs under the previous animation. The exit test is not
+gated: at 60fps a release seen on an odd tick left before the next count, and a
+tap left after one.
+
+Training refills health, so damage here is the lowest HP reached.
+
+| | 30fps | v24 |
+|---|---|---|
+| Special Beam Cannon, tapped: charge, damage | 0.067, 7860 | 0.033, 7660 |
+| Kamehameha (Goku (Early), save state 0), tapped | 0.067, 7020 | 0.033, 6900 |
+| full charge | 1.000, 13430 | 1.000, 13430 |
+
+### The fix, and which variant
+
+`[60FPS - beam charge]` replaces the exit branch with a jump to a helper that
+leaves only on an even tick and only once the count is at least 2. Full charge
+lands on an even tick, so it still leaves at once.
+
+A second variant, which left only if the release had already been seen on the
+odd tick before, was tried against it over eleven holds of 40-70 vsyncs:
+
+| scene | 30fps ticks against the gate's even ticks | this group | the odd-tick variant | v24 |
+|---|---|---|---|---|
+| Goku, 6 holds | the same vsyncs | 6 of 6 exact | 3 of 6 | 3 of 6 |
+| Special Beam Cannon, 5 holds | one vsync apart | 2 of 5 | 5 of 5 | 0 of 5 |
+
+In the Special Beam Cannon's save state the 30fps arm ticks one vsync off from
+the 60fps gate, so no rule can match it on every hold. Where the two line up,
+this group is exact; the other variant only adds a vsync of latency.
+
+From the pnach:
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Special Beam Cannon, tapped | 0.067, 7860, fires v62 | 0.033, 7660, v60 | 0.067, 7860, v62 |
+| Kamehameha, tapped | 0.067, 7020 | 0.033, 6900 | 0.067, 7020 |
+| Kamehameha, held 61 vsyncs | 0.833, 9600 | 0.800, 9540 | 0.833, 9600 |
+| Kamehameha, held 62 vsyncs | 0.867, 9720 | 0.833, 9600 | 0.867, 9720 |
+| Special Beam Cannon, full | 1.000, 13430 | 1.000, 13430 | 1.000, 13430 |
+
+With every group on, the nine smoke scenes end in idle.
+
+### What else the Special Beam Cannon trace established (#13)
+
+- **The charge and firing animations run at real speed.** `0x127` and `0x129`
+  last the same vsyncs in both arms, and the firing loop `0x12A` advances one
+  animation frame a vsync at 60fps against two a tick at 30fps.
+- **The beam phase ends when the beam object dies.** Its destructor, `00155C10`
+  in class `002C38E0`, sets flag `0xA8` on Cell, and case `0x12A` leaves on that
+  flag (or after 150 ticks). The beam is ended by its collision callback,
+  `FUN_001561F8`, setting bits `0x21` 43 vsyncs into firing at 30fps and 42 on
+  v24. So the beam's life is right.
+- **The rest of the lead is per-tick pipeline latency.** From the beam's end
+  bits to Cell's next animation takes 9 vsyncs at 30fps and 4 at 60fps: about
+  four one-tick hand-offs (end bit, destroy flag, the object sweep, the
+  animation change). The beam's start is the same, two ticks from the fire cue
+  to the first hit. None of these is a counter; each is a tick of delay, so
+  60fps halves them.
+- **The `0x400` event on animation `0x129` is the fire cue**, not the beam's
+  end: it fires once, before the beam object exists.
+- With this group the tapped Special Beam Cannon fires on the 30fps vsync, hits
+  2 vsyncs early and ends 6 early; photographed, the beam's own effects run at
+  the 30fps pace, a few vsyncs ahead.
+
+## 2026-09-30 - issue #109, a blast's speed and size ramps count seconds as 30 ticks
+
+Found re-measuring `[60FPS - paralysis]` and `[60FPS - blast script clock]` with
+every open fix applied. Save state 6 is Devilman 227 units from a standing
+Ultimate Gohan; `L2 + Circle` is Kaikosen, a beam that paralyses. Gohan entered
+state 211 at v61 at 30fps and at v54 in the build. Removing any one group other
+than `blast script clock` left it at v54, so nothing shipped was the cause.
+
+### Finding the mover
+
+The battle keeps a per-tick list of effect events at `018704A0` (0x20 bytes
+each, count at `01870520`, filled by `FUN_001D9B78`). It logs the beam's launch
+(type 0x26) and its contact (type 0x12), which turns "the paralysis is early"
+into two timestamps:
+
+| | 30fps | build |
+|---|---|---|
+| launch | v25 | v24 |
+| contact | v59 | v53 |
+| launch to contact | 34 vsyncs | 29 |
+
+The contact's caller chain gives the hit record the beam registers each tick
+(`FUN_00155588`, which copies the beam's position and velocity out of its state
+block), and the velocity in that record tells the rest:
+
+    30fps  -3.602@v25 -4.087@v27 -4.572@v29 ... -9.352@v53     one step every 2 vsyncs
+    build  -3.602@v24 -4.087@v25 -4.572@v26 ... -9.352@v38     the same steps, one a vsync
+
+`[60FPS - beam object travel]` halves the distance a beam covers per tick. It
+does not touch how fast the speed itself changes, and this beam accelerates.
+
+### The two ramps
+
+`FUN_001519F8(params, state)` is the speed ramp and `FUN_001518D8` the size
+ramp. They are the same code over different fields:
+
+| | speed | size |
+|---|---|---|
+| duration in seconds | `params+0x38` | `params+0x14` |
+| fraction of it spent on the first leg | `params+0x3C` | `params+0x18` |
+| start, middle, end value | `params+0x2C`, `+0x30`, `+0x34` | `params+0x08`, `+0x0C`, `+0x10` |
+| tick counter, stepped 1.0 a tick | `state+0x2C4` | `state+0x2B4` |
+| current value | `state+0x2B8` | `state+0x2A8` |
+| the conversion | `00151A10  lui $at, 0x41F0` | `001518F0  lui $at, 0x41F0` |
+| callers | 3 | 11 |
+
+    ticks = seconds * 30.0
+    counter < ticks * fraction   value = start  + (middle - start) * counter / (ticks * fraction)
+    counter < ticks              value = middle + (end - middle) * (counter - first leg) / (rest)
+    otherwise                    value = end
+
+The speed becomes the beam's velocity (`001560E0`: direction times speed). The
+size is multiplied into the hit volume `FUN_00155588` registers, so it decides
+who is hit and when; the picture of Explosive Wave's sphere does not change with
+it.
+
+These are two of the 145 `lui rX, 0x41F0` sites. The earlier sweep of that
+family (2026-09-06, above) was scored against one beam's hit cadence, which
+neither ramp affects, so both were crossed off with the rest.
+
+### The fix
+
+`[60FPS - blast ramp clock]` changes both immediates to `0x4270`, 60.0. A ramp
+needs twice the ticks, and on each 30Hz tick boundary it holds the value it has
+at 30fps.
+
+Three of the 70 inputs tried across the ten rig save states run a ramp:
+
+| | 30fps | build | with the group |
+|---|---|---|---|
+| **Kaikosen** (state 6): speed 6 -> 13 -> 18 over 0.5 s | | | |
+| speed at v39 | 13.33 | 18.00 | 13.33 |
+| top speed reached | v53 | v38 | v53 |
+| launch to contact at 227 units | 34 vsyncs | 29 | 33 |
+| Gohan paralysed | v61 | v54 | v58 |
+| **Explosive Wave**, Vegeta (Scouter) (state 9): size 20 -> 30 -> 50 over 0.5 s | | | |
+| size at v27 | 27.62 | 50.00 | 27.62 |
+| first damage, opponent at 39.7 units | v35 | v23 | v34 |
+| first damage, opponent at 54.5 units | v41 | v27 | v42 |
+| **Android Barrier**, Super 17 (state 4): size 10 -> 11.8 -> 12 over 1 s | | | |
+| full size reached | v70 | v41 | v71 |
+
+Kaikosen's speed and Explosive Wave's size equal the 30fps value on all 15 of
+the 30Hz ticks of their ramps. Android Barrier's first tick falls on the other
+vsync parity, so it runs half a tick behind: 0.06 of a size unit at most.
+
+The 3 vsyncs Kaikosen still leads by are not the ramp. The cast launches the
+beam 1 vsync early, the half-size steps find contact 1 vsync sooner (30fps
+steps 9.35 units past the last miss, the build 4.68), and the paralysis starts
+one tick after contact, which is 1 vsync instead of 2.
+
+For the two Explosive Wave distances the opponent has to be inside the wave's
+reach. Writing a fighter's position does not hold (all 13 copies in the struct
+were back at the old value 20 vsyncs later), so the scene walks Vegeta toward the
+opponent with `Up` under the 30fps words, waits 60 vsyncs, then applies the arm
+under test. The stop is repeatable: 39.688 units twice running.
+
+### Left alone
+
+- **The size ramp's other branch.** With a duration of 0, `001519A8` adds
+  `params+0x1C` to the size once a tick and caps it at `params+0x10`. That is a
+  per-tick rate too, but none of the 70 inputs has a non-zero step, so there was
+  nothing to measure a fix against.
+- **Which other moves ramp.** The parameters come from each character's blast
+  file, and only the ten characters in the rig's save states were tried.
