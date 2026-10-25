@@ -955,6 +955,17 @@ every dust puff lived half as long. The class now steps at 30Hz.
 
 **Not confirmed in play.**
 
+## Proposed - the power-up glow (#153)
+
+Adds `[60FPS - power-up glow rate]`. The glow off a powered-up fighter spawned
+about twice as many flames that lived half as long. Its step now runs at 30Hz.
+
+| Goku (Early) | 30fps | 60fps before | with it |
+|---|---|---|---|
+| flames spawned / mean life | 837 / 20.4 v | 1447 / 11.2 v | 841 / 20.1 v |
+
+**Not confirmed in play.**
+
 ## v26 - a rushing Blast 2's time limit (#115)
 
 Adds `[60FPS - rushing Blast 2 time limit]` (one word). The rush of a rushing Blast 2
