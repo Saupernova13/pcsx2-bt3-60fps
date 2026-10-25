@@ -910,3 +910,18 @@ drawn every frame.
 | spawn countdown steps | 73 | 150 | 72 |
 
 **Not confirmed in play.**
+
+## Proposed - motion blends (#98)
+
+Adds `[60FPS - motion blend]` (one word). The crossfade from one motion into the
+next counted its weight down once a tick with a 30Hz step, so at 60fps poses
+snapped in half the time and states that wait for the blend ended early. The
+step is now set for 60 ticks a second.
+
+| Krillin, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| ki blast: firing state ends | v31 | v25 | v31 |
+| three tapped ki blasts | one chain to v78 | idle between shots | one chain to v78 |
+| ki charge ends | v216 | v212 | v216 |
+
+**Not confirmed in play.**

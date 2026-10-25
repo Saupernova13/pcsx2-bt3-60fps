@@ -41,6 +41,7 @@ from SuperCombo's names to this repo's old terms.
 | screen shake on a hit | The camera shake, four timed slots per camera | `camera shake`, issue #80 |
 | vibration, rumble | Controller rumble, two motors per fighter | `controller rumble`, issue #80 |
 | blinking, eyes flickering | The face's random blink timer | `eye blink`, issue #90 |
+| poses snapping, ki blasts not chaining | Motion crossfade (no wiki name) | `motion blend`, issue #98 |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
 | voice lines, grunts and shouts repeating | Voice categories and their cooldowns | `voice cooldown`, issue #86 |
