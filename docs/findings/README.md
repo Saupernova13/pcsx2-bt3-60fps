@@ -31,6 +31,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Sound: voice line cooldowns](sound.md) | Each fighter's 57 voice categories and the per-tick cooldown between clips. | 1 |
 | [Faces: eye blinks](blink.md) | Each model's random blink timer and the eye image it switches. | 1 |
 | [Swirl effects](swirl-effects.md) | The effect class behind the wind swirls of a ki charge and a transformation, and its per-tick update. | 1 |
+| [Lightning effects](lightning-effects.md) | The effect class behind the lightning round a transforming fighter, and its per-tick update. | 1 |
 
 ## The original introduction
 

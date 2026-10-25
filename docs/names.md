@@ -52,6 +52,7 @@ from SuperCombo's names to this repo's old terms.
 | Vegeta's energy ball, the flash before the Great Ape | A scripted effect with timed tracks (small flash, then the ball) | `effect track clock`, issue #10 |
 | the white before a transformation reveal | The transformation flash that covers the model swap | `transformation flash`, issue #10 |
 | white wind swirling round a fighter charging ki or transforming | Swirl effect (one effect class) | `swirl effect rate`, issue #94 |
+| purple lightning round Goten as he transforms | Lightning effect (one effect class) | `lightning effect rate`, issue #96 |
 
 `effect rotation` is the spin of aura and effect swirls. It is not the aura's
 playback speed; that is `aura update rate`.
