@@ -63,6 +63,7 @@ from SuperCombo's names to this repo's old terms.
 | purple lightning round Goten as he transforms | Lightning effect (one effect class) | `lightning effect rate`, issue #96 |
 | Special Beam Cannon twirl, the spiral round the beam | Spiral effect (one effect class) | `spiral effect rate`, issue #101 |
 | menus scrolling, holding a direction in a list | Menu auto-repeat: the delay before a held direction repeats, and the repeat rate (my label; the wiki has no name for it) | `input repeat timing`, issue #88 |
+| the screen shaking on a big hit looks jittery or buzzy | The camera shake's random offset, redrawn once a tick (my label; the wiki does not cover it) | `camera shake jitter`, issue #129 |
 
 `effect rotation` is the sway of a model's dangling pieces, such as a hair
 lock (issue #113; it was first taken for the spin of aura swirls). It is not
