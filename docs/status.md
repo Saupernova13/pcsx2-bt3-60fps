@@ -342,6 +342,122 @@ smoke-test moves return to idle.
 
 **Confirmed in play 2026-10-05**, in the test build.
 
+## Proposed - the combat timers (#34)
+
+Adds `[60FPS - combat timers]`. The fighter update counts seven timers down
+once a tick, so each ran out in half its real time: the combo timer, the
+move-repetition memory, the windows after hitstun, a Ground Slash and a Blast 2
+cinematic, the shake of a hit shrugged off under False Courage, and the hurt
+face after drain damage. Each now counts on even ticks only.
+
+| timer, vsyncs | 30fps | shipped | shipped + this group |
+|---|---|---|---|
+| combo `+0x0D48`, Heavy Finish | 204 | 167 | 198 |
+| after hitstun `+0x0FF0` | 28 | 14 | 28 |
+| repetition byte back to 100 | 198 | 99 | 199 |
+| `+0x0DE4`, Ground Slash | 68 | 39 | 69 |
+| `+0x0E40`, after a Blast 2 cinematic | 118 | 59 | 119 |
+| `+0x0FE8`, False Courage shake | 6 | 3 | 6 |
+| `+0x0FE4`, after Drain Life's last step | 60 | 30 | 60 |
+
+**Not confirmed in play.**
+
+## Proposed - projectile life (#43)
+
+Adds `[60FPS - projectile life]`. A ki blast's life, `node+0x5B4`, is counted in
+ticks by the same update whose step `projectile travel` halves, so a blast that
+misses died at half its 30fps range. The decrement now nets to nothing on odd
+ticks.
+
+| Rush Ki Blast, life set to 10 ticks | flies | travels |
+|---|---|---|
+| 30fps | 18 vsyncs | 250 units |
+| v24 | 9 vsyncs | 125 units |
+| **v24 + this group** | **19 vsyncs** | **264 units** |
+
+**Not confirmed in play.** Measured on Krillin's tapped Rush Ki Blast. A blast
+that hits is unchanged. Charged ki blasts are a different class and are not
+touched.
+
+## Proposed - the clouds (#52)
+
+Adds `[60FPS - sky scroll]`. The clouds are a scrolling texture on a global sky
+object that `FUN_001350E0` advances once a tick, outside the stage keyframe graph
+`[60FPS - stage animation]` fixed. The rate is halved where it is loaded.
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Rocky Area, scroll over 240 vsyncs | -0.192 | -0.384 | **-0.192** |
+| World Tournament sky at vsync 400, difference from 30fps | 0.0 | 20.3 | **2.3** |
+
+**Not confirmed in play.**
+
+## Proposed - Devilman's fork (#54)
+
+Adds `[60FPS - weapon object travel]`. The fork is a spawned object on a class
+of its own (`FUN_00154DE8`) that moves `pos += vel` once a tick at `001550C4`;
+no other travel group reaches it. The add now takes half the velocity.
+
+| Fork Attack, save state 6 | fork appears | Gohan hit |
+|---|---|---|
+| 30fps | v59 | v75 |
+| v24 | v56 | v64 |
+| **v24 + this group** | v56 | **v69** |
+
+The flight is fixed; the 6 vsyncs left are the throw's wind-up and the hold
+before launch, the same pre-launch overshoot as Frieza's rocks. **Not confirmed
+in play.**
+
+## Proposed - the defensive windows (#18)
+
+Adds `[60FPS - defence windows]`. `FUN_001DFFE0` counts seven press-armed windows
+once a tick, the vanish window among them, so at 60fps a Defensive Vanish
+or Z-Counter had half its real time.
+
+| window, 1P vs 2P against a pad-2 smash | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Defensive Vanish (Circle) | 8 vsyncs | 4 | **8** |
+| Z-Counter (Up + Square) | 2 vsyncs | 1 | **2** |
+| lockout on vanish-behind after a guard press (`+0x1080`, added 2026-10-10) | 32 vsyncs | 16 | **31** |
+
+**Not confirmed in play.**
+
+## Proposed - the knockdown tumble (#42)
+
+Adds `[60FPS - knockdown tumble]`. After a throw or a finishing blow, the
+victim tumbles along the ground in state 216. The game swaps in the slowing
+animation once the per-tick position change drops to a 30Hz speed, and the CPU
+gets up the moment that animation starts. At 60fps the step is half as long, so
+the slide stopped at twice the real speed and the CPU got up early. The same
+state also gets an idle fighter up after 91 ticks, which took half the time.
+One constant is halved and one count doubled.
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Drain Life Cell's ending: slide, time lying | 22.9 units, 182 vsyncs | 6.2, 91 | 23.0, 182 |
+| Giant Throw on a CPU, clear of rocks: tumble | 392 units, 96 vsyncs | 356, 71 | 411, 103 |
+
+On uneven ground a tumble can still stop at a rock ledge that 30fps climbs.
+That is #69, a separate collision issue.
+
+**Not confirmed in play.**
+
+## Proposed - the beam charge (#72)
+
+Adds `[60FPS - beam charge]`. A beam Blast 2 counts its charge on even ticks,
+but left the charge hold on any tick, so a quickly released beam stored one
+count less and fired early. It now leaves on an even tick, after at least two
+counts. Charge and damage (lowest HP reached):
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Special Beam Cannon, tapped | 0.067, 7860 | 0.033, 7660 | 0.067, 7860 |
+| Kamehameha, tapped | 0.067, 7020 | 0.033, 6900 | 0.067, 7020 |
+| Kamehameha, held 62 vsyncs | 0.867, 9720 | 0.833, 9600 | 0.867, 9720 |
+| full charge | 1.000, 13430 | 1.000, 13430 | 1.000, 13430 |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
@@ -423,6 +539,29 @@ Recorded as fixed because the user played it. **Recorded as unattributed
 because it is: an unattributed fix can regress without anyone knowing why.** If
 a transformation ever runs long again, this is the note to come back to.
 
+## Proposed - effect-command ramps (#77)
+
+Adds `[60FPS - effect command ramp]`. The runner that plays a move's scripted
+effects, `FUN_0014FF90`, animates each command's parameter - the effect's scale
+among them - once a tick, by a rate per tick or by a timer against seconds *
+30.0. At 60fps hit flashes grew twice as fast. The timer steps 0.5 and the rate
+is halved.
+
+| Dynamic Mess Em Up Punch's first hit flash, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| scale step per 30Hz tick | -0.516 | -1.03 | -0.516 |
+| scale when the flash ends (v119) | -2.12 | -5.73 | -2.64 |
+| looks like | medium flash | fills the screen | medium flash |
+
+Best-match pixel difference against 30fps at Dynamic Mess Em Up Punch's hits: v112 37.9 ->
+21.6, v116 68.0 -> 25.9, v200 19.2 -> 9.6, v250 26.0 -> 11.3. GS2's rush hit: the
+fireball is the 30fps size instead of filling the view. The ramp starts two game
+ticks after its effect in both arms, so at 60fps it runs one 30Hz step longer
+(-2.64 against -2.12). Vegeta (Scouter)'s transformation is unchanged; all 13
+smoke-test moves return to idle.
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the stage's own animation
 
 Adds `[60FPS - stage animation]`, one data word. Closes issue #9: the World
@@ -443,6 +582,104 @@ lives at `node+0x1C` and is advanced by a bare `2.0` immediate at `001153C8` -
 all on Rocky Area, so **issue #11's Rocky Area wind is a different system** and is
 untouched by this.
 
+## v24 (proposed) - the meter economy
+
+Adds `[60FPS - meter economy]`, one gate and ten lines. Closes issue #4: ki
+fills and empties twice as fast at 60fps, and so does every milestone the game
+reaches "after a second".
+
+`FUN_001E16C0` is one tick of one fighter's whole economy - ki income by two
+paths, three more gauges, a `+0xD80 -= 400` drain, and a 0..29 counter at
+`+0x132C` whose wrap fires the once-a-second blocks. **That counter is the
+game's second**, so at 60fps a per-second bonus arrives every half second on top
+of every rate being doubled. It has exactly one caller, `001E2584`, so one gate
+covers the system.
+
+| after 46 vsyncs, Cell on Rocky Area | `+099C` | `+09F0` | `+09F8` | second |
+|---|---|---|---|---|
+| unpatched 30fps | 94498 | 95520 | 259962 | 14 |
+| v23, no gate | capped | capped | 340761 | 7 |
+| **v23 + this group** | **94498** | **95520** | **259962** | **14** |
+
+Value for value, for both fighters, at every sample over 60 vsyncs. Spending ki
+on a move is untouched - that runs on the move's own path, not per tick.
+
+Also adds `[60FPS - ki charge loop]` (2026-10-09): past a charge's first
+second, the charge state's handler adds ki itself once a tick, outside the gate.
+A wrapper halves each amount, alternating the rounding.
+
+| Krillin holding `L2`, ki per 10 vsyncs after v50 | 30fps | gate only | gate + charge loop |
+|---|---|---|---|
+| ki gained | 3975 | 7950 | 3975 |
+
+**Not confirmed in play.** Max Power mode, which the report names as where the
+drain is most obvious, was never entered; the drain routine is inside the gated
+function, but the mode itself was not watched.
+
+## Proposed - the smash charge (#17)
+
+Adds `[60FPS - smash charge]`, one data word. Closes issue #6: a smash attack
+charges in half the real time at 60fps, and the Perfect Smash - releasing on the
+exact moment level 3 is reached - gets half as long to do it in.
+
+`FUN_001E33E0` adds `gp-0x6D80` (`002FD4F0`, 0.0444444 = 1/22.5) to the charge
+every tick. One reader, so it is halved in data. All eleven charge states use
+it: 71-76, the six Smash directions, and 83-87.
+
+| Cell, Rocky Area, Square held | charge fills in | Perfect Smash accepted on |
+|---|---|---|
+| unpatched 30fps | 44 vsyncs | **2 vsyncs** |
+| v23, no gate | 22 vsyncs | 1 vsync |
+| **v23 + this group** | **44 vsyncs** | **2 vsyncs** |
+
+The charge is not merely the same length - it is the same sequence, 0.04 0.09
+0.13 ... 0.98 1.00, sample for sample against the 30fps arm. The window was
+measured by releasing on each vsync in turn with a breakpoint on the grant at
+`001E4810`.
+
+**Corrected 2026-10-09.** In the full test build the charge fix alone gives the
+Perfect Smash a 1-vsync window (v58), against 2 at 30fps (v59, v60). The group
+now also widens the grant's test at `001E4804` to accept `fighter+0xD84` of 1 or 2,
+which gives v58 and v59: the 30fps width.
+
+**Added 2026-10-10: the Perfect Smash's dash.** After a Perfect release the attack
+dashes on its own counter, which starts the dash at frame 2 and moves on at frame
+6, counted once a tick (BT3-Decompiled, `BtlAct_SmashChargeHandler`). Both
+compares are doubled (`001E4644`, `001E4664`, `001E466C`, `001E4694`).
+
+| Goku (Early), rig slot 0 | vsyncs in the attack after the Perfect |
+|---|---|
+| 30fps | 62 |
+| 60fps, charge fix only | 55 |
+| with the dash compares | 61 |
+
+**Not confirmed in play.** Only the neutral Smash was tested, on one character.
+
+**Ship it with `[60FPS - meter economy]` (#16), never without.** The charge rate
+blends between two per-character rates by Momentum, `fighter+0xD80`, and
+Momentum drains 400 a tick inside the economy #16 gates. Without #16, Momentum
+drains twice as fast during a charge, so a charge started after a rush fills
+late - the late white flash the 2026-09-17 play-test reported. Measured
+2026-09-21, Krillin, from a set starting Momentum:
+
+| starting Momentum | 30fps | v24 + this group | v24 + this group + #16 |
+|---|---|---|---|
+| 0 | 44 vsyncs | 45 | 45 |
+| 50000 | **20** | 22 | **20** |
+| 100000 | **12** | 12 | **12** |
+
+**Adds `[60FPS - charge flash]` (2026-09-22).** The white flash that marks
+Level 3, the Perfect Smash's cue, is a pulse re-fired every 4 ticks and faded a
+fixed step per tick, so at 60fps it pulsed twice as fast even with the charge
+right. Both pulse counters now cycle 0-7, the fade is halved, and the start
+intensity drops by half a step:
+
+| Cell, Square held, Cell's body brightness | 30fps | #16 + #17 | + charge flash |
+|---|---|---|---|
+| flash repeats every | 8 vsyncs | 4 | 8 |
+| one pulse | 81 81 75 75 69 69 63 63 | 83 78 73 66 | 83 81 78 75 73 70 67 65 |
+
+
 ## v20 - the shipped header caught up
 
 **No patch change.** The patch at the `v20-known-issues-refresh` tag has the
@@ -458,6 +695,22 @@ pacing, and the never-re-checked camera on a body-erasing death.
 
 Cut as its own version rather than rewriting v19 in place - a release is a
 record, and v19's file stays as it shipped.
+
+## Proposed - camera shake and controller rumble (#80)
+
+Adds `[60FPS - camera shake]` (one data word) and `[60FPS - controller rumble]`
+(four words). The shake counted its time left down by 1/30 s a tick; the
+rumble timed its motors in seconds * 30.0 ticks and pulsed on a per-tick phase.
+
+| Dynamic Mess Em Up Punch's first hit, every open fix on | 30fps | 60fps before | 60fps with both |
+|---|---|---|---|
+| shake slots reach 0 | v117, v123 | v111, v114 | v117, v123 |
+| vsyncs rumble reaches the pad | 10 | 5 | 11 |
+
+Not covered: the shake's random offsets are drawn once a tick, so the camera
+jitters twice as often as at 30fps. All 13 smoke-test moves return to idle.
+
+**Not confirmed in play.**
 
 ## v21 - the Rush Struggle
 
