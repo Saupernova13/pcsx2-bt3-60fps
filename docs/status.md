@@ -379,6 +379,19 @@ ticks.
 that hits is unchanged. Charged ki blasts are a different class and are not
 touched.
 
+## Proposed - the clouds (#52)
+
+Adds `[60FPS - sky scroll]`. The clouds are a scrolling texture on a global sky
+object that `FUN_001350E0` advances once a tick, outside the stage keyframe graph
+`[60FPS - stage animation]` fixed. The rate is halved where it is loaded.
+
+| | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| Rocky Area, scroll over 240 vsyncs | -0.192 | -0.384 | **-0.192** |
+| World Tournament sky at vsync 400, difference from 30fps | 0.0 | 20.3 | **2.3** |
+
+**Not confirmed in play.**
+
 ## v24 (proposed) - the state phase timers, reinstated
 
 Brings back `[60FPS - state phase timers]`, minus `001E6F40`, at 21 sites and
