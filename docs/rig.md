@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Fourteen traps, most of which cost an hour or more
+## Fifteen traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -79,11 +79,17 @@ Kill every one of them, then `launch`, then read the hook word back after a
 words at a frame boundary, so a read taken immediately after `patchctl.apply`
 shows zeros whether the group applied or not.
 
-**7. Screenshots need the VM running, and an armed breakpoint counts as
+**7. `flush_input()` advances three frames.** It has to - a release issued
+while paused never lands - but it means anything that must observe the frames
+right after a release has to be armed *before* the flush. A breakpoint armed
+after it misses the event entirely and reports a clean "never happened". Use
+`input_release()` plus your own `frame_advance` when the timing matters.
+
+**8. Screenshots need the VM running, and an armed breakpoint counts as
 paused.** This one is in PCSXROO's own agent guide and is still worth repeating,
 because a stray breakpoint makes every capture silently vanish.
 
-**8. A screenshot taken by resuming the VM lands a few frames late, and not
+**9. A screenshot taken by resuming the VM lands a few frames late, and not
 always the same few.** `resume()` then `screenshot()` photographs whatever frame
 the GS presents when the write happens, so two runs of the same arm disagree
 and a fast cinematic looks early or late for no reason. #21's first photographs
@@ -91,23 +97,23 @@ were taken that way. For a frame at an exact vsync, do what `drift.py` does:
 with the VM **paused**, call `screenshot()` to queue it, then `frame_advance(1)`
 to flush it. Two runs of the same arm then match pixel for pixel.
 
-**9. The first menu press after a state load is often dropped.** Load, resume,
+**10. The first menu press after a state load is often dropped.** Load, resume,
 then press `Start` twice if the pause menu has to open, and look before pressing
 anything that selects.
 
-**10. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
+**11. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
 with no pad, which lets go of every pad. A pad-2 guard held with
 `roo.cmd("input.set", buttons=["Circle"], pad=1)` drops on the frame pad 1 is
 released that way, and the victim takes a rush it was meant to block. Release
 pad 1 alone with `roo.input_set()`, no buttons.
 
-**11. A breakpoint on a branch delay slot never fires.** The same script
+**12. A breakpoint on a branch delay slot never fires.** The same script
 stopped 0 times with a breakpoint on `001C9F1C`, the delay slot of a `beq` that
 runs on every pass, and 4 times with it on `001C9F14`, two instructions earlier.
 Put the breakpoint on an instruction that is not in a delay slot and read the
 registers there.
 
-**12. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
+**13. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
 that advances `mark - at - 1` frames and then grabs, which advances one more,
 takes every mark that follows the previous one a frame late: `drift.py --marks
 13,14` scored v14 as 18.2, the v15 value, against 28.6 for `--marks 14` alone. A
@@ -115,14 +121,14 @@ takes every mark that follows the previous one a frame late: `drift.py --marks
 exactly the series that cannot see an odd-frame flicker. Skip the advance when
 it would be zero; #75 does that for `drift.py`.
 
-**13. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
+**14. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
 `stopping: true`, and `status` then says `stopping` indefinitely; `boot` refuses
 with "already running" and `run` with `no_vm`. Stop `pcsxroo-qt` (the rig's own
 process, never the user's PCSX2) and `launch` again. Save states are files on
 disk and survive. Needed whenever the rig's ini gains a name, because it is read
 at boot only.
 
-**14. `tools/export.py` writes to the Desktop unless told otherwise.** A
+**15. `tools/export.py` writes to the Desktop unless told otherwise.** A
 validation run leaves a `428113C2.pnach` there that looks like a deliverable.
 Pass `--to work/export-check` when all you want is the validator.
 
@@ -321,3 +327,21 @@ fixed. Only world quantities can be read straight off the report.
 Check what a candidate belongs to before chasing it. `game.battle.resolve(roo)`
 gives the fighter and model addresses for the current fight; anything outside
 them is the stage, an effect, or the engine.
+
+## The mechanics reference
+
+[SuperCombo's BT3 wiki](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3)
+names the mechanics the user reports in their own words, states blast costs in
+Ki Bars versus Blast Stocks, gives several Blast 1 durations in **seconds**, and
+says outright that a BT3 frame is **a 30th of a second**. Read it before hunting
+a mechanic by experiment.
+
+The normal pages are behind an Anubis proof-of-work wall, so WebFetch and curl
+both get "Making sure you're not a bot". **`/api.php` at the root is not walled**
+(`/w/api.php` is):
+
+    curl -A "Mozilla/5.0 ..." "https://wiki.supercombo.gg/api.php?action=query"
+      # ... &prop=revisions&rvprop=content&rvslots=main&format=json&titles=<page>
+
+`action=query&list=allpages&apprefix=Dragon Ball Z: Budokai Tenkaichi 3` lists
+all 168 pages. `/Offense`, `/Defense` and `/Miscellaneous` are the system ones.
