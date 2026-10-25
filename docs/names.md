@@ -12,8 +12,11 @@ from SuperCombo's names to this repo's old terms.
 | ki charging, ki draining, 5 bars of ki | Ki Charge (`L2`) and Ki Bars | `meter economy` (PR #16) |
 | max power, the blue bars | Max Power Mode | `meter economy`, `max power charge` (PR #16) |
 | blast stock, the gold number | Blast Stock: pays for Blast 1s and transformations | regen not measured |
+| the red part of the health bar | The displayed health, draining toward the real health after a hit | `health bar drain`, issue #84 |
+| the health bar shaking on a hit | The bar's shake slots, set by the damage handler | `health bar shake`, issue #84 |
 | buffs | Timed Blast 1s: stat boosts, After Image Strike | `buff duration` (PR #25) |
-| blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration` |
+| blasts, ki blasts like a Kamehameha or Galick Gun | Blast 2 (`L2`+`Triangle`, `Up` for the second) | `blast hit cadence`, `blast effect duration`; a beam's charge, `beam charge` (#72) |
+| light rays round a charging Kamehameha | Ray effect (one effect class) | `ray effect rate`, issue #103 |
 | ult, ultimate attack | Ultimate Blast (`L2`+`Down`+`Triangle`, in Max Power Mode) | same, plus `camera pacing` |
 | regular ki blast, tap Triangle | Rush Ki Blast; held Triangle is a Smash Ki Blast | `projectile travel` |
 | Hercule's rocks, grenades | Grenade: Hercule's Rush and Smash Ki Blasts | `thrown object rate` (PR #26) |
@@ -21,27 +24,57 @@ from SuperCombo's names to this repo's old terms.
 | Buu's charge blast | Super Kamehameha (Majin Buu, `L2`+`Up`+`Triangle`) | `beam object travel` |
 | Buu's breath | Flame Shower Breath (Majin Buu, `L2`+`Triangle`) | `beam object travel` |
 | heavy smash, hold Square | Smash Attack; flashing white means a Full Power (Level 3) charge | `smash charge` (PR #17) |
-| frame-perfect smash release | Perfect Smash: release at the exact moment Level 3 is reached | issue #6, PR #17 |
+| frame-perfect smash release; the white flash | Perfect Smash: release at the exact moment Level 3 is reached, which the white flash marks | issue #6, PR #17 (`smash charge`, `charge flash`) |
 | guard broken | Guard Crush; the exhausted state after it is Fatigue | not measured |
 | sending them flying | Hard Knockback | `knockback flight` |
+| a throw or grab landing floaty, not sent far | The knockdown tumble after a throw (state 216), and the CPU getting up | `knockdown tumble` (#42); rock ledges #69 |
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
 | recovering after being launched or blown away | The recovery windows of states 206 and 213 / 214 / 223 | `recovery windows`, issue #158 |
+| the timer, the clock at the top of the screen | Duel Time, the match time limit (Battle Settings) | `match timer`, issue #133 |
+| looking around after being blasted away, losing the lock | The lock-on search, fighter state 54 (my label; the wiki says "lock off" for what causes it) | `lock-on search`, issue #135 |
+| the ripple when Max Power kicks in | The Max Power Mode shockwave ring (my label) | `max power shockwave`, issue #137 |
+| the pause when a Z-Counter or a clash lands, hit-stop | The freeze on guard counters, push-stop guards and smash clashes (hit-stop is my label) | `hit-stop`, issue #143 |
+| story mode dialogue, story lines vanish early | The Dragon History battle script (GSC) and its lines | `story script clock`, issue #145 |
+| Krillin's discs, Destructo Disc, the saw blades | The disc object, `EftDisc` (class `002C3B38`) | `disc travel`, issue #147 |
+| dust when dashing or landing, dust clouds | Ground dust, `EftGndDust` (my label) | `ground dust rate`, issue #151 |
+| the flames streaming off a powered-up fighter, power-up glow | The power-up glow, `EftGlow` (BT3-Decompiled's name) | `power-up glow rate`, issue #153 |
+| vanish dash, dashing with Circle in Max Power | Action 0x35, direction + `Circle` in Max Power Mode (no wiki name found; "vanish dash" is this repo's label) | `vanish dash`, issue #162 |
+| Sonic Sway, dodging a rush in the Auto-Counter stance | Sonic Sway: a Rush Attack in the first 10 frames of the Auto-Counter stance (`Circle` held, tap `Triangle`; action 0x67) | `sonic sway window`, issue #167 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
+| the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
 | fade to white (Final Galick Cannon) | The fullscreen fade service | `screen fade` |
 | Drain Life stopping short of a far opponent | A rushing Blast 2's time limit (the wiki calls Drain Life a Target Rush Blast 2; a "Rush Blast" there is a tapped ki blast) | `rushing Blast 2 time limit`, issue #115 |
+| grabs looking floaty on the knockback (Ultimate Gohan's grab) | Giant Throw: the thrown fighter's flight, state 212 | `throw flight`, issue #125 |
 | fusing, the fusion controls | Fusion: a direction plus `R3`, with `R3` held for 12 game ticks (about 0.4 s); a tap does nothing | not a 60fps defect, issue #51 |
+| blasts that speed up or grow (Kaikosen, Explosive Wave, Android Barrier) | A blast's speed and size ramps (no wiki name) | `blast ramp clock`, issue #109 |
+| lightning crackling over Explosive Wave and barriers | Arc effect (one effect class) | `arc effect rate`, issue #111 |
+| ki blasts curving onto you when you sidestep | Ki blast homing | `ki blast homing`, issue #117 |
+| Hell's Storm's bullets (Super 17) | The shots of a Barrage Blast 2 (the wiki types Hell's Storm as Barrage, 4 Ki Bars) | `barrage shot rate`, issue #40 |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
+| screen shake on a hit | The camera shake, four timed slots per camera | `camera shake`, issue #80 |
+| vibration, rumble | Controller rumble, two motors per fighter | `controller rumble`, issue #80 |
+| blinking, eyes flickering | The face's random blink timer | `eye blink`, issue #90 |
+| poses snapping, ki blasts not chaining | Motion crossfade (no wiki name) | `motion blend`, issue #98 |
+| camera bobbing while charging a smash | Smash charge camera bob (no wiki name) | `camera bob`, issue #106 |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
-| speed lines (Hercule's Present Bomb) | Speed-line effect | issue #8 |
+| voice lines, grunts and shouts repeating | Voice categories and their cooldowns | `voice cooldown`, issue #86 |
+| speed lines (Hercule's Present Bomb) | Speed-line sprites of the sprite effect class | `sprite effect clock`, issue #8 |
+| hit flashes, the white burst on Dynamic Mess Em Up Punch's hit | Scripted hit effects whose size ramps once a tick | `effect command ramp`, issue #77 |
 | World Tournament helicopter, blimp | Stage props | issue #9, PR #19 |
 | desert wind | Rocky Area stage wind | issue #11 |
 | transformations (Cell, Vegeta (Scouter)'s Great Ape) | Transformation (`R3`, costs Blast Stock) | issues #7, #10 |
 | Vegeta's energy ball, the flash before the Great Ape | A scripted effect with timed tracks (small flash, then the ball) | `effect track clock`, issue #10 |
 | the white before a transformation reveal | The transformation flash that covers the model swap | `transformation flash`, issue #10 |
+| white wind swirling round a fighter charging ki or transforming | Swirl effect (one effect class) | `swirl effect rate`, issue #94 |
+| purple lightning round Goten as he transforms | Lightning effect (one effect class) | `lightning effect rate`, issue #96 |
+| Special Beam Cannon twirl, the spiral round the beam | Spiral effect (one effect class) | `spiral effect rate`, issue #101 |
+| menus scrolling, holding a direction in a list | Menu auto-repeat: the delay before a held direction repeats, and the repeat rate (my label; the wiki has no name for it) | `input repeat timing`, issue #88 |
+| the screen shaking on a big hit looks jittery or buzzy | The camera shake's random offset, redrawn once a tick (my label; the wiki does not cover it) | `camera shake jitter`, issue #129 |
 
-`effect rotation` is the spin of aura and effect swirls. It is not the aura's
-playback speed; that is `aura update rate`.
+`effect rotation` is the sway of a model's dangling pieces, such as a hair
+lock (issue #113; it was first taken for the spin of aura swirls). It is not
+the aura's playback speed; that is `aura update rate`.

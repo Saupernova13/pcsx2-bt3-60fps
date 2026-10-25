@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Fourteen traps, most of which cost an hour or more
+## Twenty-one traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -79,11 +79,17 @@ Kill every one of them, then `launch`, then read the hook word back after a
 words at a frame boundary, so a read taken immediately after `patchctl.apply`
 shows zeros whether the group applied or not.
 
-**7. Screenshots need the VM running, and an armed breakpoint counts as
+**7. `flush_input()` advances three frames.** It has to - a release issued
+while paused never lands - but it means anything that must observe the frames
+right after a release has to be armed *before* the flush. A breakpoint armed
+after it misses the event entirely and reports a clean "never happened". Use
+`input_release()` plus your own `frame_advance` when the timing matters.
+
+**8. Screenshots need the VM running, and an armed breakpoint counts as
 paused.** This one is in PCSXROO's own agent guide and is still worth repeating,
 because a stray breakpoint makes every capture silently vanish.
 
-**8. A screenshot taken by resuming the VM lands a few frames late, and not
+**9. A screenshot taken by resuming the VM lands a few frames late, and not
 always the same few.** `resume()` then `screenshot()` photographs whatever frame
 the GS presents when the write happens, so two runs of the same arm disagree
 and a fast cinematic looks early or late for no reason. #21's first photographs
@@ -91,23 +97,23 @@ were taken that way. For a frame at an exact vsync, do what `drift.py` does:
 with the VM **paused**, call `screenshot()` to queue it, then `frame_advance(1)`
 to flush it. Two runs of the same arm then match pixel for pixel.
 
-**9. The first menu press after a state load is often dropped.** Load, resume,
+**10. The first menu press after a state load is often dropped.** Load, resume,
 then press `Start` twice if the pause menu has to open, and look before pressing
 anything that selects.
 
-**10. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
+**11. `Roo.input_release()` releases pad 2 as well.** It sends `input.release`
 with no pad, which lets go of every pad. A pad-2 guard held with
 `roo.cmd("input.set", buttons=["Circle"], pad=1)` drops on the frame pad 1 is
 released that way, and the victim takes a rush it was meant to block. Release
 pad 1 alone with `roo.input_set()`, no buttons.
 
-**11. A breakpoint on a branch delay slot never fires.** The same script
+**12. A breakpoint on a branch delay slot never fires.** The same script
 stopped 0 times with a breakpoint on `001C9F1C`, the delay slot of a `beq` that
 runs on every pass, and 4 times with it on `001C9F14`, two instructions earlier.
 Put the breakpoint on an instruction that is not in a delay slot and read the
 registers there.
 
-**12. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
+**13. `frame_advance(0)` advances one frame.** It is not a no-op. A capture loop
 that advances `mark - at - 1` frames and then grabs, which advances one more,
 takes every mark that follows the previous one a frame late: `drift.py --marks
 13,14` scored v14 as 18.2, the v15 value, against 28.6 for `--marks 14` alone. A
@@ -115,16 +121,51 @@ takes every mark that follows the previous one a frame late: `drift.py --marks
 exactly the series that cannot see an odd-frame flicker. Skip the advance when
 it would be zero; #75 does that for `drift.py`.
 
-**13. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
+**14. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
 `stopping: true`, and `status` then says `stopping` indefinitely; `boot` refuses
 with "already running" and `run` with `no_vm`. Stop `pcsxroo-qt` (the rig's own
 process, never the user's PCSX2) and `launch` again. Save states are files on
 disk and survive. Needed whenever the rig's ini gains a name, because it is read
 at boot only.
 
-**14. `tools/export.py` writes to the Desktop unless told otherwise.** A
+**15. `tools/export.py` writes to the Desktop unless told otherwise.** A
 validation run leaves a `428113C2.pnach` there that looks like a deliverable.
 Pass `--to work/export-check` when all you want is the validator.
+
+**16. `fk` is whatever the rig's cheat file holds, not the test build.** `hs`'s
+`fk` arm and `patchctl` read `<pcsxroo>/bin/cheats/428113C2.pnach`. Until
+2026-10-12 that file held only the merged groups plus spares, so every `fk` run
+silently lacked the open PRs' groups. `python tools/rigsync.py` copies the test
+build into it under the real group names and enables every name in the rig's
+ini; restart the rig when a new name appears (trap 14).
+
+**17. The EE's FPU has no `c.lt.s` (`0x3C`) form.** A trampoline compare encoded
+`4602003C` (`c.lt.s`) never sets the condition, so its `bc1t` is never taken. Use
+`c.olt.s` (`0x34`, e.g. `46020034`), as the game's own code does. Single-step a
+new cave (`roo.step()`) before trusting a measurement with it.
+
+**18. Menu presses need about 2 seconds each, and a pause menu remembers its
+cursor.** `menu.py press A B C` sends them too close together for the pause menu:
+only the first registers. Press one at a time with a 2 s gap. The pause cursor
+is part of the save state: in `rocky-super17-vs-standing-gohan.p2s` it opens on
+`COM Settings`, so `Return to Main Menu` is 3 `Down`s away, not 5.
+
+**19. A state saved inside the menu program does not reload.** Saved on the main
+menu, it loads with the EE pc at `0x3F000000` and never runs. Start every menu
+scene from a battle state and drive the menus live (see `Getting to any scene`).
+
+**20. A press sent with `input.set` while frame-advancing can be lost on a
+menu.** Shenron's `Cross` registered at 30fps but not in the full build that
+way. Press menu buttons with `menu.py` while the VM runs, then pause.
+
+**21. The CPU's outcomes depend on its start phase.** Writing the same CPU
+patch one frame later turned a Beam Struggle from 81 to 91 CPU rotations.
+Compare CPU behaviour as a distribution over several start delays
+(`aistats.py` `DELAYS=`), never one run against one run.
+
+A breakpoint does not end a frame: after a stop at one, `frame_advance(1)` runs
+on to the next breakpoint or to the end of the same frame (`reason: user`).
+Counting every hit per vsync is a loop on that.
 
 ## Getting to any scene
 
@@ -166,6 +207,15 @@ The roster is **15 rows of 7**, and both axes wrap. Rows seen so far, in Down
 order: Goku (Early), Goku (Mid), Goku (End), Goku (GT), Master Roshi, Captain
 Ginyu, Frieza, Cell, Majin Buu, Bardock, Cooler, Pikkon, Demon King Piccolo,
 Kid Goku, Password Character. Map Select has the same shape, six rows.
+
+**The Shenron wish screen** runs its own 30fps loop and is reachable from any
+battle: pause, `Return to Main Menu`, `Up` then `Cross` at `EXIT?`, four `Down`s
+on the main menu to `Shenron`, `Cross`. Shenron appears about 660 vsyncs later.
+`work/tools-scratch/wishmeasure.py` drives it and times the screen's shockwave
+ring and camera shake (#81, #138).
+
+**1P vs 2P:** main menu, `Up` three times to `Duel`, `1P VS 2P`, `Single Battle`;
+pad 2 confirms its own fighter.
 
 ### Do not browse the roster - compute the cell
 
@@ -214,10 +264,14 @@ group off:
 | `rocky-vegeta-scouter-standing.p2s` | Vegeta (Scouter) vs a standing COM, Rocky Area - Evening | transformations; he has 3 Blast Stocks and Great Ape costs 3 |
 | `world-tournament-noon-vegeta.p2s` | the same pair on World Tournament Stage - Noon | the only map so far with animated scenery |
 | `rocky-goten-trunks-team-vs-gohan.p2s` | Team Battle: Goten + Kid Trunks against a COM Ultimate Gohan (the COM fights) | transformations (`R3` is Super Saiyan), fusion set-up |
+| `rocky-devilman-vs-standing-gohan.p2s` | Devilman against a standing Ultimate Gohan, 227 units, full Ki, Rocky Area - Evening | Fork Attack, his rush (#53) |
+| `rocky-krillin-703-from-standing-gohan.p2s` | Krillin backed off to 703 units from a standing Ultimate Gohan | ki blast range; the stage caps separation near 785 |
+| `rocky-vs2p-cell2-near-gohan.p2s` | **1P vs 2P** versus: Cell 2nd Form 12 units from Ultimate Gohan, no regen, no CPU | anything needing an opponent that attacks on demand (drive pad 2 with `input.set ... pad=1`), health and ki measurements |
 | `rocky-super17-vs-standing-gohan.p2s` | Super 17 225 units from a standing Ultimate Gohan, full Ki | Hell's Storm (#40) |
 | `rocky-gs2-vs-standing-gohan.p2s` | Great Saiyaman 2 against a standing Ultimate Gohan | Justice Finishing Pose 2 turns Max Power Mode on, then her Ultimate (#44) |
 | `rocky-cell1-near-standing-gohan.p2s` | Cell 1st Form 11 units from a standing Ultimate Gohan | Giant Throw, Special Beam Cannon, Heavy Finish (#42, #13) |
 | `owner-ssj4-vegeta-fusion-native.p2s` | the owner's own save, cut with their test build on (patchctl puts back the words of any group an arm leaves off): Team Battle, SSJ4 Vegeta with SSJ4 Goku as partner, 6 Blast Stocks, a COM that attacks within seconds | fusion (#51): hold `Right`+`R3` 24 vsyncs or more |
+| `rocky-s17-vs-gohan-1p2p.p2s` | Duel, 1P vs 2P: Super 17 against Ultimate Gohan, 225 units, both pads human (pad 2 is `input.set` with `pad=1`) | anything two players must do at once: a smash clash, rushing into the Auto-Counter stance (#144, #167) |
 
 Copy one over a slot before using it, and back up whatever that slot held.
 
@@ -270,6 +324,14 @@ If the off arm ticks 180, the A/B is fiction - usually a group name missing from
 the rig's `[Cheats] Enable` list, which applies nothing and reports nothing.
 `patchctl` warns about this; do not ignore the warning.
 
+**Rocky Area's rocks decide any test that slides a fighter.** A tumble that
+meets a rock face climbs it at 30fps and stops against it at 60fps (#69), so a
+throw or knockdown A/B there can measure the ledge instead of the fix. Check the
+victim's height against the 30fps arm. To aim the throw somewhere clear,
+strafe first: from `rocky-cell1-near-standing-gohan.p2s`, holding right on the
+left stick for 30 vsyncs before Heavy Finish sends Giant Throw clear of the
+rocks.
+
 Presets take `preset+extra,groups`, so a single group can be added to the
 shipped set without editing anything:
 
@@ -321,3 +383,21 @@ fixed. Only world quantities can be read straight off the report.
 Check what a candidate belongs to before chasing it. `game.battle.resolve(roo)`
 gives the fighter and model addresses for the current fight; anything outside
 them is the stage, an effect, or the engine.
+
+## The mechanics reference
+
+[SuperCombo's BT3 wiki](https://wiki.supercombo.gg/w/Dragon_Ball_Z:_Budokai_Tenkaichi_3)
+names the mechanics the user reports in their own words, states blast costs in
+Ki Bars versus Blast Stocks, gives several Blast 1 durations in **seconds**, and
+says outright that a BT3 frame is **a 30th of a second**. Read it before hunting
+a mechanic by experiment.
+
+The normal pages are behind an Anubis proof-of-work wall, so WebFetch and curl
+both get "Making sure you're not a bot". **`/api.php` at the root is not walled**
+(`/w/api.php` is):
+
+    curl -A "Mozilla/5.0 ..." "https://wiki.supercombo.gg/api.php?action=query"
+      # ... &prop=revisions&rvprop=content&rvslots=main&format=json&titles=<page>
+
+`action=query&list=allpages&apprefix=Dragon Ball Z: Budokai Tenkaichi 3` lists
+all 168 pages. `/Offense`, `/Defense` and `/Miscellaneous` are the system ones.
