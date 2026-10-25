@@ -733,3 +733,53 @@ clusters on consecutive vsyncs. Goten's `L2`+`Triangle` (save state 8) is the on
 other move in the ten save states that runs either function; it returns to idle
 at v135 / v128 / v130. The remaining 6-vsync lead in Super 17's state is not in
 these two functions.
+
+## 2026-10-10 - issue #147: discs (EftDisc, class `002C3B38`)
+
+Found by reading BT3-Decompiled (`src/battle/eft_body_fx.c`, `eft_disc.c`). Kinds
+0, 1, 3 are ki blast discs, 2 and 4 technique pieces (Krillin's Ultimate throws
+kind 2). Per update the disc moves `pos += dir * speed`, `EftDisc_Home` turns it
+by at most `turn` (spreading the turn over the frames left once more than 2,
+leading the target by its per-frame move for at most 15 frames), spins by `spin`,
+bobs by `cos(timer * 0.04 * pi)`, and its age, grow, roll and fade count frames
+set at init as seconds x 30.0 (one register, `0016B76C`).
+
+The disc is read through a probe (`work/tools-scratch/discprobe.lines` stores the
+first updating disc's task at `000F23F0`; `disctl.py`). Krillin's Ultimate, rig
+slot 5:
+
+| | 30fps | 60fps before | with `[60FPS - disc travel]` |
+|---|---|---|---|
+| first disc's life | 60 frames | 60 | 120 (per vsync) |
+| step | 27.78 a tick | 27.78 a vsync | 13.89 a vsync |
+| flight | 8 vsyncs | 4 | 8 |
+| hits vs 30fps (`ultcmp.py`) | - | 5-6 early | 1-2 early |
+
+The 1-2 vsyncs left are the throw's launch, which follows the fighter's
+animation event (#127's hand-off class).
+
+### 2026-10-12: a second disc user, and the technique pieces' spin
+
+Android 18's Destructo Disc (Blast 2, `L2`+`Up`+`Triangle`; the wiki calls it a
+Barrage) also throws kind 2 pieces. New rig state
+`work/state-backups/rocky-android18-vs-com-gohan-v570.p2s` (Rocky Area - Evening,
+COM Ultimate Gohan, controllable):
+
+| | 30fps | without the group | with it |
+|---|---|---|---|
+| hits | v98, v114 | v90, v107 | v97, v114 |
+| discs gone | v100, v116 | - | v98, v115 |
+| technique over (`EftMulti_Term`, raises 0xA8) | v120 | - | v117 |
+
+The technique ends two ticks after its last disc in both modes, and the fighter
+leaves its firing loop two ticks after that: 1-vsync hand-offs (#127), not
+disc travel. The item's own linger timer (`00153FB4`, +1.0 a tick) was tried at
+0.5 and changed nothing, because the item waits for its discs here.
+
+Kind 4 (technique pieces fired from the muzzle, `EftMulti_FirePiece`) shares
+every counted step with kind 2. Its one step of its own is `rotX += spin`, and
+only technique 0x202 sets a spin (`EftDisc_SetSpin`, `-(rand * 0.01 + 0.13) *
+pi` a tick). That pi is its own word with one reader (`002FC78C`, read at
+`001537C4`), so it is halved. No kind 4 user was found among the rig's saved
+characters (Krillin, Android 18, Frieza Final Form, Super 17, Cell, Hercule and
+ten more fire none).
