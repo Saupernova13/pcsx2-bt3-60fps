@@ -9,20 +9,30 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [State of play and the user's reports](state-of-play.md) | The running summary, the user's defect lists and every play-test. | 5 |
 | [The engine, the frame routine and the first 60fps patch](engine.md) | How BT3 runs a frame, where 60fps comes from, and the early probes. | 13 |
 | [Tooling, the rig and the measurement method](tooling-and-method.md) | Instruments, the 30fps oracle, and how a shipped group is A/B'd. | 5 |
-| [Input timing](input.md) | The input subsystem, the combat input counters and the fusion command. | 3 |
+| [Input timing](input.md) | The input subsystem, the combat input counters and the fusion command. | 5 |
 | [Airborne motion, gravity and the hovering idle](airborne-and-hover.md) | Flight, gravity, the airborne idle animation and the hover bob. | 9 |
 | [Effects, the ki aura and particles](effects-aura-particles.md) | The effect-node system, the aura, effect rotation and the particle system. | 8 |
 | [Tweens, fades and staged sequences](tweens-fades-and-staging.md) | The tween service, the scripted-sequence clocks and the screen fade service. | 4 |
-| [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock. | 13 |
-| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, and the rush time limit. | 4 |
-| [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams. | 6 |
-| [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 1 |
+| [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock, the beam charge hold. | 14 |
+| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, and the rush time limit. | 5 |
+| [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams. | 7 |
+| [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 6 |
 | [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing and the second clip player behind the mouths. | 6 |
 | [Rush Struggle and Beam Struggle](struggles.md) | Both stick-rotation contests, their tick clocks and the CPU's synthetic stick. | 2 |
 | [Widescreen](widescreen.md) | The widescreen model and every aspect group. | 2 |
-| [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 1 |
-| [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 1 |
+| [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 2 |
+| [Fighter status timers](status-timers.md) | The per-tick status timer block: paralysis, Solar Flare's lock-off, the combat timers. | 4 |
 | [Effect classes and their clocks](effect-classes.md) | The 28 effect-node classes that share the freeze check, and which of them count 30Hz ticks. | 1 |
+| [The ki economy, meters and Blast Stock](meter-economy.md) | Ki income and drain, Max Power Mode, and the game's per-second clock. | 1 |
+| [Scripted effect commands](effect-commands.md) | The runner that plays a move's scripted effects, and the parameter ramps it steps once a tick. | 1 |
+| [Hit feedback: camera shake and controller rumble](hit-feedback.md) | The camera's shake slots and each fighter's rumble, both timed in 30Hz ticks. | 1 |
+| [Burst effects](burst-effects.md) | Two effect classes behind beam-impact bursts and transformation sparks, and their per-tick updates. | 1 |
+| [The HUD: the health bar's drain and shake](hud.md) | The health bar update: the red section's drain speed and the bar's shake slots, both per tick. | 1 |
+| [Sound: voice line cooldowns](sound.md) | Each fighter's 57 voice categories and the per-tick cooldown between clips. | 1 |
+| [Faces: eye blinks](blink.md) | Each model's random blink timer and the eye image it switches. | 1 |
+| [Swirl effects](swirl-effects.md) | The effect class behind the wind swirls of a ki charge and a transformation, and its per-tick update. | 1 |
+| [Lightning effects](lightning-effects.md) | The effect class behind the lightning round a transforming fighter, and its per-tick update. | 1 |
+| [Motion blends](motion-blend.md) | The crossfade between two motions, and the states that wait for it. | 1 |
 | [Spiral effects](spiral-effects.md) | The effect class behind the Special Beam Cannon's spiral, and its per-tick update. | 1 |
 
 ## The original introduction
