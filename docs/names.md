@@ -38,6 +38,7 @@ from SuperCombo's names to this repo's old terms.
 | the pause when a Z-Counter or a clash lands, hit-stop | The freeze on guard counters, push-stop guards and smash clashes (hit-stop is my label) | `hit-stop`, issue #143 |
 | story mode dialogue, story lines vanish early | The Dragon History battle script (GSC) and its lines | `story script clock`, issue #145 |
 | Krillin's discs, Destructo Disc, the saw blades | The disc object, `EftDisc` (class `002C3B38`) | `disc travel`, issue #147 |
+| dust when dashing or landing, dust clouds | Ground dust, `EftGndDust` (my label) | `ground dust rate`, issue #151 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |

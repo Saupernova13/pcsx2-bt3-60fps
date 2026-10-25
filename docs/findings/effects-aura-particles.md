@@ -927,3 +927,24 @@ as at 30fps, where the build has them at about 0.4. The second phase set is
 stepped by the same term. Neither setting matches 30fps, so none is shipped.
 The same table for the cape (save state 2) has the mode closer to 30fps than
 the build when idle and no further from it when flying.
+
+## 2026-10-10 - issue #151: ground dust
+
+Found by reading BT3-Decompiled (`src/battle/eft_ground_dust.c`). The census of
+the clock audit's unpaced classes showed it in nearly every scene. Six dust kinds
+(puff, slide, dash, land, impact, debris) share `EftGndDust_UpdateParts`, which
+steps each particle once per update: `life--`, colour by life, `size += grow`
+with `grow *= growDamp`, `angle += spin`, `vel *= drag; vel += accel; pos += vel`,
+then `fade--` once the life is out. Slide and dash dust (fighter fx bits 0x30 and
+0x33, raised by `BtlAct_DashMoveHandler` and `BtlAct_LieDownHandler` while
+grounded) also count `tick++` and spawn every 5th update.
+
+`[60FPS - ground dust rate]` returns from the particle step on odd vsyncs and
+makes the two emitters read their emit flag as clear on odd vsyncs. Live
+particles (`gEftGndDust` `0x002FEAA0` + `0x62B4`, `work/tools-scratch/dusttl.py`):
+
+| Scene | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| slot 7, `Down` + `Cross` 100 vsyncs: puffs / mean life | 14 / 36.0 | 28 / 18.0 | 14 / 36.0 |
+| slot 7, rush string: puffs / mean life | 48 / 50.6 | 48 / 25.6 | 48 / 51.1 |
+| slot 5, Krillin's Ultimate: puffs / mean life | 41 / 48.1 | 41 / 24.0 | 41 / 48.3 |
