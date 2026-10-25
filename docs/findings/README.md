@@ -29,6 +29,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Burst effects](burst-effects.md) | Two effect classes behind beam-impact bursts and transformation sparks, and their per-tick updates. | 1 |
 | [The HUD: the health bar's drain and shake](hud.md) | The health bar update: the red section's drain speed and the bar's shake slots, both per tick. | 1 |
 | [Sound: voice line cooldowns](sound.md) | Each fighter's 57 voice categories and the per-tick cooldown between clips. | 1 |
+| [Faces: eye blinks](blink.md) | Each model's random blink timer and the eye image it switches. | 1 |
 
 ## The original introduction
 
