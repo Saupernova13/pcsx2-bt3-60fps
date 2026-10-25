@@ -33,6 +33,7 @@ from SuperCombo's names to this repo's old terms.
 | beam clash | Beam Struggle | `beam clash` |
 | recovering after being launched or blown away | The recovery windows of states 206 and 213 / 214 / 223 | `recovery windows`, issue #158 |
 | the timer, the clock at the top of the screen | Duel Time, the match time limit (Battle Settings) | `match timer`, issue #133 |
+| looking around after being blasted away, losing the lock | The lock-on search, fighter state 54 (my label; the wiki says "lock off" for what causes it) | `lock-on search`, issue #135 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |

@@ -14,7 +14,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Effects, the ki aura and particles](effects-aura-particles.md) | The effect-node system, the aura, effect rotation and the particle system. | 9 |
 | [Tweens, fades and staged sequences](tweens-fades-and-staging.md) | The tween service, the scripted-sequence clocks and the screen fade service. | 4 |
 | [Blasts: hit cadence, effects, sequences and Flame Shower Breath](blasts.md) | Blast 2 and Ultimate Blast timing: hit cadence, effect duration, the sequence clock, the beam charge hold, the speed and size ramps. | 14 |
-| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, and the rush time limit. | 5 |
+| [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, the rush time limit and the lock-on search. | 5 |
 | [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams, the ki blast homing turn and the homing shots of a Barrage Blast 2. | 7 |
 | [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 6 |
 | [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing, the second clip player behind the mouths, and the smash charge camera bob. | 7 |
