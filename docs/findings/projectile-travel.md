@@ -522,6 +522,218 @@ miss was a second mover, found only by pressing a second button.
 - **#8, the speed lines on Present Bomb**, is a separate effect and is not
   addressed here.
 
+## 2026-09-21 - issue #43, ki blasts die early: the projectile's life is counted in ticks
+
+The report: ki blasts travel at the right speed but vanish before the 30fps
+game's do - Kid Buu's regular blasts die early, his charged ones do not.
+
+### The life
+
+The effect-node update, `FUN_00176980`, is the one `[60FPS - projectile travel]`
+hooks for the step. Straight after the move it counts the node's life down:
+
+```
+00176A64  lw    $v0, 0x5B4($s1)     life in ticks, armed at spawn from the class (0017688C)
+00176A68  addiu $v0, $v0, -1
+00176A6C  bgtz  $v0, 00176A80
+00176A70  sw    $v0, 0x5B4($s1)
+00176A74  ...   +0x5B0 |= 0x10       dead: the move is skipped from then on (00176A1C)
+```
+
+Krillin's Rush Ki Blast is armed at 118. At 30fps that is 3.9s at 27.8 units a
+tick; at 60fps with the step halved it is 2.0s at 13.9 a tick, so a blast that
+misses gets half the range.
+
+A blast that **hits** never shows it: the impact sets `0x10` itself, and the
+stage caps separation at about 785 units, well inside even the halved range. On
+save state 7 (Krillin 703 units from a standing Ultimate Gohan) the shot ends
+at 663 units in every arm. The shortfall is only visible on a miss, which is
+exactly how the report describes it - a blast that "stops existing sooner".
+
+Moving the opponent to force a miss does not work: `fighter+0x14` is rewritten
+from the model every tick. So the life was set to 10 ticks on the blast's first
+step instead, and the flight timed to the `0x10` flag:
+
+| arm | flies | travels |
+|---|---|---|
+| 30fps | 18 vsyncs | 250 units |
+| v24 | 9 vsyncs | 125 units |
+| v24 + `[60FPS - projectile life]` | 19 vsyncs | 264 units |
+
+### The fix
+
+The decrement is reached two ways: after the move, and from `001769BC`, which
+skips the move for a node flagged `0x100` and branches to `00176A68` with the
+life loaded in its delay slot. The hook therefore replaces the branch after the
+decrement, where both paths meet, with a jump to a helper at `000F1880` that
+adds the tick's parity back, re-stores the life and takes the original branch.
+`$t0` is unused in `FUN_00176980`.
+
+### Not this group
+
+- **Charged ki blasts** are not effect nodes: holding `Triangle` never reaches
+  `00176A34`. They are the spawned-object class, whose end comes from its blast
+  script's events - the clock `[60FPS - blast script clock]` (#31) paces - not
+  from a tick life. That matches the report's own split: Kid Buu's charged
+  blasts last, his regular ones do not.
+- Videl's charged blast was not tested; whether it is an effect node or a
+  scripted object decides which group it needs.
+
+## 2026-09-21 - issue #54, Devilman's fork: a fourth mover
+
+The report: Devilman's thrown fork is faster at 60fps. The issue asked for the
+wind-up and the flight to be timed separately, and they are wrong by different
+amounts for different reasons.
+
+### Not any known mover
+
+Fork Attack is `L2` + `Triangle`, state 262. With a breakpoint on each known
+mover in turn, none runs while the fork is out: not the effect-node stepper
+(`00176A34`), not the rock class (`0015C28C`, `FUN_0015BFB8`), not the beam class
+(`00156004`), not either thrown-object update (`0017797C`, `00178A3C`). A tapped
+ki blast from the same state hits the effect-node breakpoint at once, so the
+probe works.
+
+A memory scan during the flight finds the fork as the third model in the model
+table (`008C2FF0`, its root bone at `+0x970`), copied each frame from an object
+at `01AC8420`. A write watchpoint on that object's `+0x50` lands in a `Vec3Add`
+called from `001550C4`, inside `FUN_00154DE8`: the same layout as the rock class's
+update (freeze check `FUN_0012CE88`, script poll `FUN_0014A8C0`, a phase byte at
+`+1`), a sibling class that nothing hooked.
+
+```
+001550A0  lwc1  $f12, 0x4($s3)       speed
+001550A8  jal   Vec3Scale           vel(+0x70) = dir * speed    (one path)
+001550C4  jal   Vec3Add             pos += vel                  (both paths)
+001550C8  dmove $a1, $a0            (delay slot)
+```
+
+### Measured
+
+Save state 6, Devilman 227 units from a standing Ultimate Gohan
+(`work/state-backups/rocky-devilman-vs-standing-gohan.p2s`), the fork model's x
+each vsync from when it appears:
+
+| arm | fork appears | x per vsync | Gohan hit |
+|---|---|---|---|
+| 30fps | v59 | 47 47 47 47 27 27 8 8 -11 -11 ... -69 | v75 (16 after) |
+| v24 | v56 | 47 47 27 8 -11 -30 -50 -69 | v64 (8 after) |
+| v24 + `[60FPS - weapon object travel]` | v56 | 47 47 37 27 18 8 -1 -11 ... -59 | v69 (13 after) |
+
+The flight step is 37 units a tick in both arms: 2x in real time, the whole
+defect the report names. The group halves it at the add, the same trampoline
+shape as `[60FPS - blast object travel]`.
+
+### What is left, and it is not the flight
+
+- The throw animation's beats land 2 to 4 vsyncs early (anim `0x106` at v13
+  against v15, `0x108` at v63 against v67), so the fork appears 3 vsyncs early.
+- The fork then waits 2 vsyncs at its spawn point where 30fps waits 4 (two
+  ticks in both), before its first step.
+
+That is the pre-launch overshoot the shipped header already lists for Frieza's
+rocks and Buu's charged blast. `[60FPS - blast script clock]` (#31) does not
+move it: with it in the set every beat lands on the same vsync.
+
+## 2026-10-02 - issue #117: a ki blast's homing turn is per tick
+
+From the audit of the `lui $at, 0x41F0` sites (see `state-machine.md`,
+2026-09-30). `00210064` is in `FUN_00210050`, which the ki blast launcher calls
+at `001D1A58`:
+
+    turn = table+0x14 / 30.0 * pi / 180      degrees a second -> radians a tick
+
+The launcher puts it at `+0x24` of the blast. While the blast's flag 4 is set,
+the projectile update (`FUN_00176980`) hands it to `FUN_00131030` (`001769E4`),
+which turns the blast's direction toward its target by up to that angle, once a
+tick. `[60FPS - projectile travel]` halves the distance a blast covers per tick;
+nothing halved the turn. Cell 2nd Form's rate is 50 degrees a second.
+
+A blast at a standing opponent barely turns, so the scene needs the target to
+move. Save state 7 is a 1P vs 2P match: Cell backs away under the 30fps words,
+the arm under test is applied, and Ultimate Gohan (pad 2,
+`roo.cmd('input.set', buttons=['Left'], pad=1)`) holds `Left` from the moment
+Cell taps `Triangle`. `fk/kihome.py` and `fk/kihead.py` in the scratch tools.
+
+| | 30fps | 60fps before | `00210064` at 60.0 |
+|---|---|---|---|
+| heading change, first 12 vsyncs of flight, from 300 units | 9.8 deg | 14.6 deg | 9.8 deg |
+| from 200 units: closest approach | 37.0, miss | 14.1, miss | 38.2, miss |
+| from 300 units | 28.9, miss | hit at v53 | 32.8, miss |
+| from 400 units | 17.3, miss | hit at v60 | 19.1, miss |
+| `Triangle` at a standing opponent (save state 3): damage at | v16 | v16 | v16 |
+
+`[60FPS - ki blast homing]` is that one word. `FUN_002100A0` and
+`FUN_002100F8` are copies of the getter that nothing calls.
+
+Not covered: after a blast's life runs out it counts `+0x5C8` up by 1.0 a tick
+toward `+0x5CC` before it is removed (`00176ABC`). That count was not measured.
+
+## 2026-10-08 - issue #40, the homing shots of a Barrage Blast 2
+
+#40 was filed as "Hell's Storm renders no bullets". It does render them: from
+behind Super 17 they are small yellow tracer streaks flying off toward a distant
+opponent, easy to miss in a shrunken screenshot, and they show in the hardware
+and the software renderer alike. What is wrong is their speed.
+
+### The shots
+
+A RAM scan for float triples that lie on the line between the fighters and move
+toward the target (a scratch script, not in the repo) finds them at 37.03 units
+a tick, one new shot a tick, at 30fps. At 60fps the same 37.03 units come every
+vsync. They are owned by **`FUN_0014C2B8`**, a controller with 30 slots of 0x50
+bytes from `+0x5C0` of its node:
+
+| slot field | what |
+|---|---|
+| `+0x00` | position |
+| `+0x30` | offset fed to the shot's script |
+| `+0x40` | flags (4 = moving, 2 = script variant) |
+| `+0x44` | age, `+1.0` a tick (`0014C438`) |
+| `+0x48` | the shot's blast object |
+
+Once a tick, for each live shot, it runs `FUN_001AF0C8` (the shot's script,
+keyed by age: turn-rate and speed ramps, random wobble), which calls
+`FUN_001AEE98`: aim at the target's bone `0x11`, lead it by its velocity, turn by
+at most `+0x28`, then move `+0x24` along the heading. `FUN_0016AB08` hands the
+position to the shot's blast object, whose update **`FUN_0016A400`** (vtable
+`002C3AD0`, entry 2) copies it to its head, keeps last tick's head as the tail,
+and draws the streak between them (`FUN_001699D0`). The same update counts down
+a start delay (`+0x590`) and a lifetime (`+0x588`) by 1.0 a tick.
+
+The hits are not timed by a script alone: they land when the shots arrive, so
+at 60fps they came early in proportion to distance (6 vsyncs from 225 units, 17
+from 666).
+
+### The fix
+
+`[60FPS - barrage shot rate]`, two wrappers on frame parity:
+
+- `0014C3B8` -> `000F1CB0`: the shot loop runs on even ticks only. The fire
+  events above it (`FUN_0014A8C0` checks, `FUN_0014BDF8`) and the tail call to
+  `FUN_0014C250` still run every vsync.
+- `0016A440` -> `000F1C80`: on odd ticks the blast object goes straight to
+  `0016A5C8` - its attached effects (`FUN_00169F48`) and its draw - skipping
+  movement, the head/tail copy and both countdowns. Without this half the head
+  and tail are equal on odd vsyncs and the streaks flicker.
+
+Gating `FUN_0016A400` alone changes nothing: its head is copied from the
+controller every tick, so it only samples a position that still moves 74 units
+in two vsyncs.
+
+| Hell's Storm from save state 4 | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| hits from 225 units | v106-v224 | v100-v217 | v106-v224 |
+| hits from 417 units | v116-v234 | v106-v223 | - |
+| hits from 666 units | v130-v248 | v113-v230 | v131-v249 |
+| Super 17 back to idle | v277 | v264 | v271 |
+
+Photographed from 650 units at v116-v125, the group shows the 30fps tracer
+clusters on consecutive vsyncs. Goten's `L2`+`Triangle` (save state 8) is the only
+other move in the ten save states that runs either function; it returns to idle
+at v135 / v128 / v130. The remaining 6-vsync lead in Super 17's state is not in
+these two functions.
+
 ## 2026-10-10 - issue #147: discs (EftDisc, class `002C3B38`)
 
 Found by reading BT3-Decompiled (`src/battle/eft_body_fx.c`, `eft_disc.c`). Kinds
