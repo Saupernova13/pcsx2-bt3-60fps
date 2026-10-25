@@ -21,9 +21,10 @@ from SuperCombo's names to this repo's old terms.
 | Buu's charge blast | Super Kamehameha (Majin Buu, `L2`+`Up`+`Triangle`) | `beam object travel` |
 | Buu's breath | Flame Shower Breath (Majin Buu, `L2`+`Triangle`) | `beam object travel` |
 | heavy smash, hold Square | Smash Attack; flashing white means a Full Power (Level 3) charge | `smash charge` (PR #17) |
-| frame-perfect smash release | Perfect Smash: release at the exact moment Level 3 is reached | issue #6, PR #17 |
+| frame-perfect smash release; the white flash | Perfect Smash: release at the exact moment Level 3 is reached, which the white flash marks | issue #6, PR #17 (`smash charge`, `charge flash`) |
 | guard broken | Guard Crush; the exhausted state after it is Fatigue | not measured |
 | sending them flying | Hard Knockback | `knockback flight` |
+| a throw or grab landing floaty, not sent far | The knockdown tumble after a throw (state 216), and the CPU getting up | `knockdown tumble` (#42); rock ledges #69 |
 | stomp, teleport above them | Lightning Attack (`Circle` during a Dragon Smash) | `pursuit timing` |
 | rush attacks colliding, spinning the sticks | Rush Struggle | `rush struggle` |
 | beam clash | Beam Struggle | `beam clash` |
