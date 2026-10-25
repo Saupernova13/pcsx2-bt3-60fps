@@ -33,6 +33,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Swirl effects](swirl-effects.md) | The effect class behind the wind swirls of a ki charge and a transformation, and its per-tick update. | 1 |
 | [Lightning effects](lightning-effects.md) | The effect class behind the lightning round a transforming fighter, and its per-tick update. | 1 |
 | [Motion blends](motion-blend.md) | The crossfade between two motions, and the states that wait for it. | 1 |
+| [Spiral effects](spiral-effects.md) | The effect class behind the Special Beam Cannon's spiral, and its per-tick update. | 1 |
 
 ## The original introduction
 
