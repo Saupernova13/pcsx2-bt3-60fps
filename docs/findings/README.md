@@ -36,6 +36,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [Spiral effects](spiral-effects.md) | The effect class behind the Special Beam Cannon's spiral, and its per-tick update. | 1 |
 | [Ray effects](ray-effects.md) | The effect class behind the light rays of a charging Kamehameha, and its per-tick update. | 1 |
 | [Speed lines](speed-lines.md) | The sprite effect class behind the speed lines round a hit, and why halving its timers left them spawning too often. | 1 |
+| [Arc effects](arc-effects.md) | The effect class behind the lightning arcs of Explosive Wave and the barrier moves, and its per-tick update. | 1 |
 
 ## The original introduction
 
