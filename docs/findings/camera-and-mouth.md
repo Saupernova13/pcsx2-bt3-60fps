@@ -591,6 +591,109 @@ because `FUN_00265298` has 13 callers including the menus.
 Vegeta's picture does not change: his cinematic waits for a later signal
 (`+0x264` = 4 at v397/398 in every arm), so his early load was invisible.
 
+## 2026-09-29 - issue #106, the camera bob in a smash charge
+
+Found by `hunt2.py` on a held Square: while Krillin charges a smash (state 75,
+165 vsyncs in both arms), fighter+0x4B0 rose 0.0419 a tick in both arms.
+
+### What it is
+
+`FUN_001C4E88(fighter)` keeps a phase at fighter+0x4B0 and returns
+`sin(phase) * 1.5`. Its three callers (`001C5C18`, `001C6200`, `001C63B0`) add
+that to the Y of the camera they build. Multiplying the 1.5 by 32 moves the
+camera by about half the screen, so the camera is what moves.
+
+| Condition | What happens to the phase | Constant, only reader |
+|---|---|---|
+| `FUN_001D63A8()` true, or fighter+0x4B8 == 0 | set to 0 | - |
+| motion flag 14 set (fighter+0x1086 bit 6) | += pi/75, wrapped to ±pi | `002FD074`, `001C4EDC` |
+| otherwise | folded into ±pi/2, then moved to 0 by pi/30 | `002FD088`, `001C4F38` |
+
+At 30fps the phase covers a 5 second period. At 60fps it covered 2.5 seconds, so
+through a full charge the camera rose, sank below its start and came back up.
+At 30fps the camera only rose and began to come back down.
+
+### The fix
+
+`[60FPS - camera bob]` halves both steps, as exact float halves (the exponent
+drops by one). With it, the phase equals the 30fps value at every even vsync of
+the charge (0 mismatches over 180 vsyncs).
+
+### Measured and left alone
+
+- **The aim blend, `FUN_001D6580` and `FUN_001D6C08`.** Both move two weights at
+  model+0xD50/+0xD54 toward a target by 0.3 a tick (`002FD2D4`, `002FD300`).
+  That is a per-tick lerp. But no code reads either weight except these two lerps.
+  Freezing them at 1.0 or snapping them to 0 changes the frame at v80 by 0.25 and
+  0.0000005 mean pixel, against 0.0 for determinism. Not shipped.
+- **Flag 14 clears 7 vsyncs after the state at 60fps.** At 30fps, flag 14 and the
+  state change on the same vsync. At 60fps flag 15 is set 7 vsyncs after the state
+  changes, in every arm including v24. `001CD7B0` sets it from a condition in s4, not a counter. The
+  bob moves 7 more small steps. Not chased.
+- **The charge ends 3 vsyncs early** (v178 against v181; 162 ticks against 82).
+  This is the one-tick hand-off seen elsewhere. The hit on the opponent lands
+  at v137 against v139.
+
+## 2026-10-09 - issue #129: the shake's jitter, held for two ticks
+
+`FUN_0023F478(slots, out3, out2)` takes the shake slot with the largest size,
+zeroes both outputs, and, if anything is shaking, draws five random numbers
+(`FUN_002A9C78`) into a position offset (`out3`) and an angle offset (`out2`),
+scaled by `time left * k * size`. It runs once a tick whether or not anything
+shakes. In battle its only caller is `001C6B48` in the camera update, once per
+fighter camera (slot arrays `01870B30` and `01872130` in save state 0), with
+the outputs on the stack at `01FFEC30` / `01FFEC40`. The two callers in the
+camera clip code, `0023D63C` and `0023D7C4`, did not run in any rig scene.
+
+At 60fps the camera got a new offset every frame. Gating the call would leave
+the outputs zeroed on odd ticks and strobe the camera between shaken and still
+(see the 2026-09 note on render requests). So the call goes through a wrapper
+at `000F1D90` instead. On even ticks it calls the function and saves the five
+outputs under the slot array's address. On odd ticks it copies the saved values
+back and draws nothing. The two cameras share the call site, so the values sit
+in a table at `000F1F00`: four entries of the key plus five floats, a new key
+taking the entry the round-robin index at `000F1F80` points at. No patch line
+may write the table, because the patch rewrites its words every frame. It
+starts zero because the scratch zone is.
+
+Goku's Kamehameha on Ultimate Gohan (save state 0, `L2`+`Triangle` held 60
+vsyncs), each camera's outputs at every return to `001C6B50`, through the rig's
+own patch path (`spare 6`):
+
+| | 30fps | without the group | with it |
+|---|---|---|---|
+| new offsets during the shake, per camera | 11 | 21 | 11 |
+| vsyncs each offset is held | 2 | 1 | 2 |
+
+The first odd tick after a state load misses the empty table and calls the
+function, which shows as one 1-vsync gap in a run started from a state; in play
+the table fills on the battle's first tick, because the function runs every
+tick. Seven smoke moves give the same state timelines with and without the
+group. Odd ticks also draw no random numbers now, so the shake uses the shared
+random sequence at its 30fps rate.
+
+### 2026-10-12: the cinematic camera's shake
+
+`DemoCam_Update` (the cinematic and story-script camera) makes its own
+`CamShake_Calc` call, one per path: `0023D5D0` for a fixed pose, `0023D788` for
+an animated one. A story script shakes this camera (`BtlScriptCmd_ShakeCamera`,
+command 1204, and the kept-up `gBtlScript.shakeTime`), so those shakes still
+redrew every vsync. Both calls now go through a guard at `000F26E0` into the
+same wrapper; the demo camera's shake slots are a new key in the table. The
+guard sends the call straight to `CamShake_Calc` when `gBtlChars` (`002FEB14`) is
+0, because the Shenron wish screen runs this camera in its own 30fps loop.
+
+| Raditz intro (Saiyan saga, Common Enemy), script shake held at 2.0 for 120 vsyncs | 30fps | without | with |
+|---|---|---|---|
+| new offsets | 60 | 120 | 60 |
+| vsyncs each is held | 2 | 1 | 2 |
+| largest position offset | 6.40 | 6.40 | 6.40 |
+
+| Check | Result |
+|---|---|
+| Shenron wish screen | 30 offsets over a 59-vsync shake, as without; guard took the outside-battle path 681 of 681 calls |
+| Spirit Bomb cinematic (the animated path, shake 0) | 273 calls, no offset, as without |
+
 ## 2026-10-09 - the body-erasing death camera, checked
 
 The oldest unchecked item on the user's list (item 2 in
