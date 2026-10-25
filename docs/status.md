@@ -955,3 +955,18 @@ every frame.
 | rays gone | v103 | v100 | v103 |
 
 **Not confirmed in play.**
+
+## Proposed - speed lines (#8)
+
+Adds `[60FPS - sprite effect clock]` (a wrapper at `000F1C20`, one hook and six
+one-word step loads). The sprite effect class spawns the speed lines round a hit
+on countdowns that `[blast effect duration]` halves; that kept each timer's
+length but not the update's order, so lines spawned every 3 vsyncs instead of 4.
+The whole update now runs at 30Hz with full steps.
+
+| Dynamic Mess Em Up Punch, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| speed lines spawned, v100-v300 | 47 | 78 | 47 |
+| spacing between spawns | 4 vsyncs | 3 | 4 |
+
+**Not confirmed in play.**
