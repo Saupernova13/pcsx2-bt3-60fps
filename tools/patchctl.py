@@ -207,12 +207,18 @@ DEFENCE = ["60FPS - defence windows"]
 # the CPU got up early, and the second came in half the time.
 TUMBLE = ["60FPS - knockdown tumble"]
 
+# The beam charge hold, found 2026-09-22 for issue #72. State 272 leaves a
+# beam's charge hold on the tick after the release. At 60fps that test ran on
+# odd ticks too, so a quickly released beam left one count of charge short and
+# fired early. It now leaves only on an even tick, after at least two counts.
+BEAMCHARGE = ["60FPS - beam charge"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE
                   + SPARES)
 
 PRESETS = {
@@ -272,7 +278,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -324,6 +330,11 @@ PRESETS = {
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the beam charge hold, so that group has a named baseline.
+    "nobeamcharge": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
