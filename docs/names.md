@@ -41,6 +41,7 @@ from SuperCombo's names to this repo's old terms.
 | blasts that speed up or grow (Kaikosen, Explosive Wave, Android Barrier) | A blast's speed and size ramps (no wiki name) | `blast ramp clock`, issue #109 |
 | lightning crackling over Explosive Wave and barriers | Arc effect (one effect class) | `arc effect rate`, issue #111 |
 | ki blasts curving onto you when you sidestep | Ki blast homing | `ki blast homing`, issue #117 |
+| Hell's Storm's bullets (Super 17) | The shots of a Barrage Blast 2 (the wiki types Hell's Storm as Barrage, 4 Ki Bars) | `barrage shot rate`, issue #40 |
 | mouth movements | Face tracks in cut-ins and intros | `mouth clock` |
 | screen shake on a hit | The camera shake, four timed slots per camera | `camera shake`, issue #80 |
 | vibration, rumble | Controller rumble, two motors per fighter | `controller rumble`, issue #80 |
