@@ -2549,3 +2549,31 @@ patch=1,EE,001C7F2C,word,24020006 // li v0,3 -> 6   guard result 7: defender fre
 patch=1,EE,001C7F3C,word,24020006 // li v0,3 -> 6   guard result 8: defender freeze
 patch=1,EE,001C9144,word,2402000C // li v0,6 -> 12  same-kind smash clash: both freeze
 patch=1,EE,001C9190,word,24020004 // li v0,2 -> 4   mixed smash clash: both freeze
+
+// The battle script clock, found 2026-10-10 for issue #145 by reading
+// BT3-Decompiled. Story mode (Dragon History) battles run a script (the GSC
+// engine, src/sys/gsc.c), stepped once a frame by Battle_Loop. Its time is 10 a
+// frame: a waiting command adds 10 to its task's time (Gsc_StepTask), the wait
+// command compares that with seconds x 300, "talk" (command 1603) holds 60
+// frames after its voice by counting 600 down by 10, a said line's text stays
+// 60 frames the same way (BtlScript_UpdateLines), and the script camera steps
+// 10 a frame between keys timed in seconds x 300 (BtlScript_UpdateView). At
+// 60fps each of these took half its time.
+//
+// The four steps become 5. The engine is not run at 30Hz instead: the "wait
+// button" command and the triggers read one-frame edges (gamePressed,
+// BtlEvent_IsNew) that a 30Hz engine would miss on odd vsyncs. Fades are paced
+// already: they run on Ramp_Step ([60FPS - tween duration]).
+//
+// Frieza saga, first mission, mid-fight; battle event 0x48 for side 0 starts
+// the scripted event, action 10001:
+//
+//                                   30fps    60fps before    with this group
+//   its talk command ends           v344     v283            v343
+//   a said line's text clears       v88      v44             v88
+[60FPS - story script clock]
+description=Hold story-mode lines, texts, scripted waits and script cameras for their real time, instead of half of it.
+patch=1,EE,00257D64,word,24420005 // addiu v0,v0,10 -> 5   Gsc_StepTask: a waiting command's time
+patch=1,EE,0025B0E0,word,2442FFFB // addiu v0,v0,-10 -> -5 BtlScriptCmd_Talk: the hold after the voice
+patch=1,EE,00259A74,word,24630005 // addiu v1,v1,10 -> 5   BtlScript_UpdateLines: a said line's text
+patch=1,EE,00259110,word,24420005 // addiu v0,v0,10 -> 5   BtlScript_UpdateView: the script camera

@@ -36,6 +36,7 @@ from SuperCombo's names to this repo's old terms.
 | looking around after being blasted away, losing the lock | The lock-on search, fighter state 54 (my label; the wiki says "lock off" for what causes it) | `lock-on search`, issue #135 |
 | the ripple when Max Power kicks in | The Max Power Mode shockwave ring (my label) | `max power shockwave`, issue #137 |
 | the pause when a Z-Counter or a clash lands, hit-stop | The freeze on guard counters, push-stop guards and smash clashes (hit-stop is my label) | `hit-stop`, issue #143 |
+| story mode dialogue, story lines vanish early | The Dragon History battle script (GSC) and its lines | `story script clock`, issue #145 |
 | hovering idle in the air | The airborne idle's bob (no wiki name) | `hover bob` |
 | falling, gravity | Vertical airborne motion | `gravity`, `airborne vertical` |
 | the explosion where a beam lands, sparks round Vegeta's energy ball | Burst effects (two effect classes) | `burst effect rate`, issue #82 |
