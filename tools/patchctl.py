@@ -225,12 +225,18 @@ FXRAMP = ["60FPS - effect command ramp"]
 # half their time. One data word for the shake, four for the rumble.
 FEEDBACK = ["60FPS - camera shake", "60FPS - controller rumble"]
 
+# Burst effects, found 2026-09-28 for issue #82. Two effect classes - beam-impact
+# bursts and the sparks round Vegeta's energy ball - step delays, fades and
+# random emission once a tick. The game's own freeze check answers "frozen" on
+# odd ticks for those two updates, so they run at 30Hz and still draw at 60.
+BURST = ["60FPS - burst effect rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST
                   + SPARES)
 
 PRESETS = {
@@ -290,7 +296,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -357,6 +363,11 @@ PRESETS = {
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the burst effects, so that group has a named baseline.
+    "noburst": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

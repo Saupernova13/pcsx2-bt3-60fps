@@ -26,6 +26,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [The ki economy, meters and Blast Stock](meter-economy.md) | Ki income and drain, Max Power Mode, and the game's per-second clock. | 1 |
 | [Scripted effect commands](effect-commands.md) | The runner that plays a move's scripted effects, and the parameter ramps it steps once a tick. | 1 |
 | [Hit feedback: camera shake and controller rumble](hit-feedback.md) | The camera's shake slots and each fighter's rumble, both timed in 30Hz ticks. | 1 |
+| [Burst effects](burst-effects.md) | Two effect classes behind beam-impact bursts and transformation sparks, and their per-tick updates. | 1 |
 
 ## The original introduction
 
