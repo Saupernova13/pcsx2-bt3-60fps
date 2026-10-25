@@ -499,7 +499,7 @@ Checked on 2026-10-02:
 | `001795D4`, `00179B9C` | called only from the lightning class | gated with it |
 | `00192EF4` | called only from the swirl class | gated with it |
 | `001A11E0`, `001A1738` | called from the beam-impact burst class | gated with it |
-| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Not fixed. |
+| `00245794` | `FUN_00245740` makes one of ten objects that `FUN_002454E0` updates once a tick: a life in ticks (`+0x08`, seconds * 30) and values that grow and fade over it | **runs at double speed**: a ki charge's object lives v164-v209 at 30fps and v164-v188 in the build. With the pool switched off the picture loses a faint ring round the charge, a 2.7 mean pixel change. Fixed under #137: it is the Max Power shockwave. |
 
 Not checked yet: `001374E0`, `0014B284`, `0014B638`, `0014BA5C`, `0014C06C`,
 `0014D708`, `00160168`, `0016A2D4`, `0019522C`, `00195514`, `00195F90`,
@@ -532,6 +532,261 @@ Covered elsewhere: the lie-down get-up (`slti 91`, #70) and the beam struggle's
 mash start (`slti 16`, `[60FPS - beam clash]`). Left for later, no rig scene yet:
 `BtlAct_VanishDashHandler` (action 0x35, `slti 13` and `slti 7`) and
 `BtlAct_Action67to69` (`slti 10`).
+
+## 2026-09-22 - the knockdown tumble (#42), and how the CPU decides to get up
+
+Issue #42: Cell (1st Form)'s grab throws the opponent "floaty instead of far".
+The throw is Giant Throw (`Up` + `Triangle` on a stunned opponent). Its flight
+phases already matched 30fps: state 221 is 44 vsyncs in both arms, and 219 is
+28 against 27. What differed was the tumble along the ground afterwards, state
+216 (`FUN_001E9EC8`). It lasted 136 vsyncs at 30fps and 41 on v24.
+
+### What ends the tumble
+
+State 216 has two ways out, and both were authored in 30Hz units.
+
+| exit | site | 30fps | v24 |
+|---|---|---|---|
+| the victim presses a direction to get up (`FUN_00204748`) | - | whenever | whenever |
+| an idle victim gets up once `fighter+0x964` reaches 91 | `001EA1B4` `slti $v0, $v0, 91` | 182 vsyncs | 91 vsyncs |
+
+`fighter+0x964` is the generic ticks-in-state counter, so the second exit came
+in half the time.
+
+The first exit is how the CPU leaves. Each tick `FUN_001E7F38` picks the state's
+animation: tumbling (`0xD2`/`0xD3`) while `|fighter+0x50| > 2.7777774`
+(`$gp-0x6B80`), slowing (`0xD5`/`0xD6`) once it is at or below. `fighter+0x50` is
+not a stored velocity. `FUN_001D82E0` writes it each tick from `FUN_001C2570` as
+the position minus last tick's position, after collision. The airborne groups
+halve that step at 60fps, so the test tripped at twice the real speed. The
+slowing animation ends the slide, and the CPU gets up on the next tick.
+
+From Drain Life Cell's ending, where the victim is a human who presses nothing
+and the ground is flat (`rocky-vs2p-cell2-near-gohan.p2s`, `L2`+`Up`+`Triangle`):
+
+| | 30fps | v24 | v24, threshold halved | v24, both fixed |
+|---|---|---|---|---|
+| animations in 216 | `D2`, then `D5` at v14 | `D5` from the start | `D2`, then `D5` at v12 | `D2`, then `D5` at v12 |
+| slide | 22.9 units | 6.2 | 23.0 | 23.0 |
+| time lying | 182 vsyncs | 91 | 91 | 182 |
+
+The threshold fix alone lets a full-length slide run into the 91-tick get-up
+(the Giant Throw below ended in state 225 at exactly 91 vsyncs), so the two are
+one group, `[60FPS - knockdown tumble]`.
+
+### How the CPU decides to get up
+
+This had not been traced before, and it is the path any CPU reaction timing
+will go through.
+
+- `FUN_001D4370` branches on `fighter+0x1278`, the human/AI flag. For the CPU it
+  reads buttons from `fighter+0x127C` instead of the pad.
+- `FUN_00208198` writes `+0x127C`. Its only caller is `FUN_001B6CD8`, which is
+  step four of the AI update `FUN_001BB620`, run once a tick from the battle
+  loop. The AI objects sit at `*(0x002FEB10) + 0x10`, `0x520` apart. The CPU's is
+  `0x01873990` in these scenes. Its buttons are at `+0x268`.
+- `FUN_001BFF70` clears and rebuilds a 64-bit situation mask at `AI+0x2C0` every
+  tick.
+- `FUN_001BA760` walks a rule list of `0x1C`-byte rules: an id, up to eight
+  condition opcodes dispatched through `0x002C4768` via `0x002EDA70`, their
+  arguments, then an action. A rule is only considered while bit *id* of the
+  mask is set. Eight random rolls at `AI+0x2FC`..`+0x334` are redrawn as the
+  rules are walked, so every tick.
+- Getting up is rule id `0x2A`. `FUN_001BF6F8` sets mask bit 42 when the
+  fighter's current animation has category 2 in a per-animation byte table at
+  `*(*(*0x002FEB10) + 0xA4) + 0x388 + fighter+0x974`, and
+  bit 44 while it is 1 to 6. `D3` reads category 1 and `D6` category 2.
+
+So in the tumble the CPU does not count anything. It waits for the animation,
+which is why the fix belongs in the animation test and not in the AI.
+
+### Measured on the throw itself
+
+Rocky Area is uneven, and a tumble that meets a rock face diverges for another
+reason, filed as #69: 30fps's 13.5-unit step climbs a ledge that v24's
+6.8-unit step slides along. Strafing Cell right for 30 vsyncs before the combo
+sends the throw clear of the rocks:
+
+| Giant Throw on a CPU | 30fps | v24 | v24 + this group |
+|---|---|---|---|
+| state 216 | 96 vsyncs, 392 units | 71, 356 | 103, 411 |
+
+### The other readers of the ticks-in-state counter
+
+`fighter+0x964` has 59 readers. These compare it to a constant or a register and
+are not yet measured, so each is a candidate for the same defect. The state is
+the nearest handler below the site, which can be wrong for a shared helper.
+Compares against zero, a state's first tick, are left out.
+
+| site | state | test |
+|---|---|---|
+| `001E720C` | 103-105 | `< 10` |
+| `001E8CFC` | 206 | `< 9` |
+| `001E9990` | 213, 214, 223 | `< 9` |
+| `001F46F8`, `001F470C` | 53 | `< 13` |
+| `001F477C` | 53 | `< 7` |
+| `001FFE6C` | 246 | `< 2` |
+| `001E6E84` | 112-173 | `< $v0` |
+| `001F6678`, `001FAFB4`, `001FBB1C`, `001FE060`, `001FE6C0`, `001FEA08`, `001FEEC0`, `001FF340`, `001FF8C4` | 262-264, 298-300, 260, 236, 238-243 | equal to a register: an event on one tick |
+
+`001FB9A4` (`< 16`, the Beam Struggle) is already handled by `beam clash`.
+
+## 2026-10-08 - issue #125, the hold in a thrown fighter's flight
+
+Ultimate Gohan's Giant Throw (save state 7, Gohan on pad 2: `Square` x3 and
+`Triangle` stun Cell in state 199, then `Up`+`Triangle`) puts Gohan in state 132
+and Cell in **state 212**, `FUN_001E9218`. Cell 1st Form's Giant Throw in #42
+took the other path (states 221 and 219, `FUN_001EA5F8`, paced by their
+animations) and measured correct; this one does not.
+
+On entry the handler sets `fighter+0x3D8 = (int)(fighter+0xFC8 * 15.0)`
+(`001E9268`-`001E9280`). While the flight's middle animation (`0xBE`/`0xC1`)
+plays it takes 1 off once a tick (`001E93B0`-`001E93BC`), and at 0 it moves on
+to the landing (`0xBF`/`0xC2`). The speed along the way is right - 3.2 units a
+vsync in both arms - so only the hold is short:
+
+| Cell in state 212 | 30fps | 60fps, every open fix on | `001E926C` at 30.0 |
+|---|---|---|---|
+| vsyncs | 70 | 57 | 69 |
+| distance | 220 | 181 | 220 |
+
+`[60FPS - throw flight]` changes the `15.0` (`lui at, 0x4170`) to `30.0`, the same
+shape as `[60FPS - knockback flight]` for states 213, 214 and 223. The counter
+still runs every tick, so a fighter cannot be left in the state.
+
+`fighter+0xFC8` has two other readers, neither a tick count: `001E8014` (a blend
+factor) and `001E8928` (state 206). States 219-222 also hold a "may recover after
+9 ticks" check on `fighter+0xD44`; it only matters when the victim tries to
+recover early, and is left alone.
+
+## 2026-10-09 - issue #135: the lock-on search, state 54
+
+Found while timing Ultimate Blasts against a standing Ultimate Gohan. After the
+knockdown and the get-up, Gohan stood in state 54 for 40 vsyncs at 30fps and 20
+in the full test build.
+
+State 54 is `FUN_001EB4A8`, the search for an opponent the fighter has lost the
+lock-on to. It plays animation `0x17E` (or `0x17F`, picked by `FUN_0020E818`), and
+once a tick calls `FUN_001EB2D0` from `001EB57C`, its only caller:
+
+| field | step a tick | cap | reset on leaving (phase 3) |
+|---|---|---|---|
+| `fighter+0xD58`, the search cone | `FUN_0020E648(fighter)`, 0.0166 rad for Gohan | pi (`gp-0x6A5C`) | 0.5 |
+| `fighter+0xD5C`, the search range | `FUN_0020E6F0(fighter)`, 19.4 units for Gohan | 1000000 (`gp-0x6A54`) | 500.0 |
+
+Both steps are multiplied by 0.6 (`gp-0x6A58`) when bit 7 of `FUN_001DB730` is
+set. `FUN_001EB3A0` is the find test: the opponent's angle within the cone and
+its distance within the range scaled by the angle. `FUN_001EB2D0` also returns 1
+on the tick the cone passes pi/2, and `FUN_001EB4A8` then calls `FUN_001DC738(fighter, 0x26)`.
+
+The steps were identical per tick in both arms, so the search ended in half its
+real time. `[60FPS - lock-on search]` jumps from `001EB30C` to a trampoline at
+`000F2170` that halves both before they are added:
+
+| Gohan's state 54 | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| after Super 17's Shocking Death Ball (slot 4) | 40 vsyncs | 20 | 39 |
+| after Devilman's Devilmite Beam (slot 6) | 20 vsyncs | 10 | 19 |
+
+Solar Flare's lock-off does not use this state: from Krillin's scene the blinded
+Gohan stays in state 11 for the whole blind in every arm.
+
+## 2026-10-09 - issue #137: the Max Power shockwave
+
+The ring object at `00245794` in the table above. Holding `L2` with Goku
+(Early) at full Ki fills the Max Power gauge at about v164, and `FUN_00175F40`
+makes one ring through `FUN_00245740`. Drawn, it warps the background in a band
+that spreads out from the fighter: photographed at 30fps with and without the
+pool's draw (`FUN_00245668` returning at once), the rocks behind Goku bend
+along the ring.
+
+| what | where |
+|---|---|
+| the pool | 10 objects of `0x470` bytes at `**(gp-0x566C)`; the counts of live ones at `+0xA4` / `+0xA8` of the header |
+| update, once a tick | `FUN_002454E0`, from `FUN_002456E8`, which skips it while paused and always calls the draw |
+| one object's tick | `FUN_00244E20` |
+| the maker | `FUN_00245740`, 7 call sites |
+
+`FUN_00244E20` per tick: life `+0x08` -= 1 (gone at 0); radius `+0x0C` += speed
+`+0x10` while the radius is at most 600; speed += `+0x14`; width `+0x18` +=
+`+0x1C`; and while the life is at most 6, alpha `+0x20` += `+0x24` (clamped at 0).
+The maker sets life = seconds * 30.0 (`00245794`), `+0x14` = -(speed * 0.3) /
+life and `+0x1C` = (width * 3.2) / life, and the alpha 0.502 and its step -0.0837
+(`gp-0x5C50`, `gp-0x5C4C`).
+
+`[60FPS - max power shockwave]` scales the ring where it is made. Life doubles,
+which halves both divided steps; the starting speed and the slow-down's
+numerator are halved as well, so the speed is halved and the slow-down
+quartered, as a per-tick and a per-tick-squared quantity must be. The fade
+starts 12 ticks from the end and its step is halved in `.data` (one reader).
+
+| Goku (Early), from the cheat file | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| ring alive | v164-v209, 46 vsyncs | v165-v187, 23 | v165-v211, 47 |
+| radius 10 vsyncs in | 68 | 113 | 63 |
+| radius at mid-life | 122 | 122 | 121 |
+| radius at the end | 208 | 208 | 211 |
+| fade, 0.50 to 0 | over 14 vsyncs | gone before it starts | over 14 vsyncs, in half-steps |
+
+A 30Hz gate on `FUN_002454E0` gives the same curve and was tried first. It was
+not kept: the draw renders any live object without checking it has had its
+first update, and `FUN_00244D00` hands out a slot without clearing it, so a
+ring made on an odd tick would be drawn for one frame with its slot's previous
+vertices.
+
+A trap met on the way: in this scene two identical 60fps runs photograph
+differently at the same vsync although their RAM is identical, so the ring
+could not be isolated by photographs at 60fps. The 30fps arm photographs
+reproducibly. The comparison above is read from RAM.
+
+### 2026-10-12: exact to the tick
+
+Two residuals were left, and both were discrete-step effects, not float rounding.
+
+| | cause | fix (`000F2700`, hooked at `00245820` after the speed and width maths, battle only) |
+|---|---|---|
+| ring alive 47 vsyncs, not 46 | the step that frees the ring shows nothing: a life of `L` shows `ceil(L) - 1` steps, 2 vsyncs each at 30fps, but `ceil(2L) - 1` vsyncs at 60fps | life = `2 * ceil(L) - 1` (Goku's ring: L = 0.8 * 30 = 23.99999, life 47) |
+| radius 0.7 short at the end | the slow-down summed per half step: after `2k` steps the radius loses `a*k/4` against `k` steps at 30fps | starting speed = `v/2 - a'/2` (`a'` the quartered slow-down): exact for every `k` |
+
+Goku (Early) Max Power, read after every 30fps tick (every second vsync at 60fps):
+
+| | 30fps | with the group |
+|---|---|---|
+| ring alive | v163-v208, 46 vsyncs | v164-v209, 46 vsyncs |
+| radius | 20.0, 29.9 ... 201.1, 208.4 | the same 23 values |
+| width | 56.7, 63.3 ... 203.3 | the same |
+| alpha in the fade | 0.418, 0.335, 0.251, 0.167, 0.084, 0 | the same, with half-steps between |
+
+The 1-vsync later birth is the hand-off of #127. The Shenron wish screen's ring
+is untouched (129 vsyncs, `gBtlChars` is 0 there).
+
+## 2026-10-12 - issue #162: the Max Power vanish dash
+
+Action 0x35, `BtlAct_VanishDashHandler`, is queued by `BtlDecide_Main` (mask
+`0x20000000`) on input condition 49 (a direction held, `L2` not held, guard
+pressed) when `BtlAct_TestPoweredSkill(chr, 8)` is true: Max Power Mode (flag 6)
+and param `flags3 & 8` (param pointer at battle object `+0x91C`, `flags3` at
+`+0x18`). Of the rig's slots only slot 6's Devilman has the bit
+(`work/tools-scratch/flags3scan.py`). "Vanish dash" is this repo's label; the wiki
+names no such move.
+
+The dash runs while `actionFrame` < 13 (`001F4714`), then plays its stop
+animation; from `actionFrame` >= 7 (`001F4780`) the fighter may act.
+`[60FPS - vanish dash]` makes them 26 and 14. Rig slot 6, `L2` 420 vsyncs, then
+`Right` held and `Circle` tapped (`vdash.py`, `vdashwin.py`):
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| state 0x35 lasts | 38 vsyncs | 25 | 38 |
+| travel | 257.8 units | 148.5 | 260.3 |
+| may act after | 14 vsyncs | 7 | 14 |
+
+`Left` instead of `Right`: 247.9 at 30fps, 250.7 with the group. The dash's first
+frame does not move (`BtlAnim_IsNew`, `001F4578`): 2 vsyncs at 30fps, 1 at 60fps,
+which added a half-step (268.9 units); `000F26C0` also holds it while
+`actionFrame` < 2. The 2.5 units left come from the stop slide's deceleration.
+
+`BtlAct_Action67to69` (`slti 10`) is still without a scene.
 
 ## 2026-10-12 - issue #167: the Sonic Sway window
 
