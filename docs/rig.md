@@ -21,7 +21,7 @@ is a comment-stripped copy of `wip/working.pnach` with identical patch lines.
 **After editing `wip/working.pnach`, copy it over the rig's copy** or the next
 measurement runs the old patch.
 
-## Thirteen traps, most of which cost an hour or more
+## Fifteen traps, most of which cost an hour or more
 
 **1. `screenshot` needs a Windows path with BACKSLASHES.** A forward-slash path
 replies `queued: true`, reports the path back, and then no file ever appears.
@@ -121,14 +121,14 @@ takes every mark that follows the previous one a frame late: `drift.py --marks
 exactly the series that cannot see an odd-frame flicker. Skip the advance when
 it would be zero; #75 does that for `drift.py`.
 
-**12. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
+**14. `shutdown` on a paused VM never finishes.** `pcsxroo shutdown` replies
 `stopping: true`, and `status` then says `stopping` indefinitely; `boot` refuses
 with "already running" and `run` with `no_vm`. Stop `pcsxroo-qt` (the rig's own
 process, never the user's PCSX2) and `launch` again. Save states are files on
 disk and survive. Needed whenever the rig's ini gains a name, because it is read
 at boot only.
 
-**13. `tools/export.py` writes to the Desktop unless told otherwise.** A
+**15. `tools/export.py` writes to the Desktop unless told otherwise.** A
 validation run leaves a `428113C2.pnach` there that looks like a deliverable.
 Pass `--to work/export-check` when all you want is the validator.
 
