@@ -848,3 +848,82 @@ over `0198F000`-`01995000` with no single dominant cluster. Several of them step
 count is an upper bound and part of it is noise rather than defect. There is no
 second obvious particle pool; the next one will have to be picked out
 individually.
+
+## 2026-09-30 - issue #113: effect rotation's fourth word was an offset, not a rate
+
+An audit of the `lui $at, 0x41F0` sites that run in battle reached `00251ACC`,
+the top of `FUN_00251A48`, and with it the question of what that function is.
+
+### What `FUN_00251A48` is
+
+`FUN_00250D38(model)` runs once a tick and calls `FUN_002526E0`, which walks the
+pieces at `model+0x1010` (0x40 bytes each, count at `model+0x1410`) and calls
+`FUN_00251A48` for each. `FUN_00252568` builds the list from the model's bones
+numbered 0x47 and up that the table at `model+0x940` names. A piece holds:
+
+| field | what |
+|---|---|
+| `+0x00` | the piece's rotation, a quaternion |
+| `+0x10` | a motion term built from the model's velocity (`model+0x1630`) |
+| `+0x20`, `+0x21`, `+0x22` | table index, bone number, depth in its chain |
+| `+0x24` | parent piece, or 0 |
+| `+0x28`, `+0x2C`, `+0x30` | three sway phases |
+| `+0x34`, `+0x38`, `+0x3C` | three more, stepped by the motion term with a random factor |
+
+With `FUN_002526E0` made to return at once, the one change above noise in an
+idle view of save state 3 is Ultimate Gohan's forehead lock. These are a
+model's dangling pieces, not "auras and effect swirls", which is what the group
+and this file called them. `FUN_00250DE8`, the cape's simulator (#92), is its
+sibling and works on `model+0x1420`.
+
+### The fourth word
+
+A piece with no parent steps its three phases by 0.10, 0.23 and 0.27 a tick.
+A piece with a parent does not step at all:
+
+    00251EB0  lwc1  $f20, -0x5b38($gp)      0.90
+    00251EB8  sub.s $f12, $f12, $f20        parent's phase - 0.90
+    00251EBC  swc1  $f0, 0x28($s4)          (and +0x2C, +0x30 the same way)
+
+`002FE738` is the lag between a link and the one above it. The 2026-09-05 rate
+scan measured the three rates; the fourth was taken to be one because it sat in
+the same table. Halved, it put every second link 0.45 rad behind its parent.
+
+Save state 3, idle, every open fix on, Gohan's bones 80 (parent) and 81:
+
+| at v21 | 30fps | build | with `002FE738` left alone |
+|---|---|---|---|
+| parent phases | -3.049, -2.614, -0.063 | the same | the same |
+| child phases | 2.334, 2.769, -0.963 | 2.784, -3.064, -0.513 | 2.334, 2.769, -0.963 |
+| child - parent | -0.90 | -0.45 | -0.90 |
+| 30Hz ticks of v1-v121 where the child equals 30fps | - | 0 of 61 | 61 of 61 |
+
+`[60FPS - effect rotation]` now writes three words.
+
+### Measured and left alone: the simulator's motion settings
+
+`FUN_00251A48` opens with the same switch as the cape's simulator. With
+`model+0xA40` bit 24 set it steps phases by half, doubles the motion term and
+divides a per-tick speed limit by 60 instead of 30. No battle model sets the
+bit. `[60FPS - cape flutter]` takes that mode for capes; for these pieces the
+three halved rates do the first of its three jobs and the other two are not
+done.
+
+The motion term (`+0x10`) of Krillin's pieces, and how far they deflect (RMS of
+the quaternion's angle over v10-v190):
+
+| | 30fps | build | 60Hz mode taken, rates put back |
+|---|---|---|---|
+| motion term, flying up at full speed | 1.870 | 0.935 | 1.870 |
+| motion term, idle | 0.093 | 0.023 | 0.046 |
+| deflection, flying | 5.9 deg | 2.5 | 9.8 |
+| deflection, idle | 31.7 deg | 28.4 | 30.3 |
+| deflection, dashing | 9.3 deg | 10.2 | 6.8 |
+
+The idle motion term is gravity's one-tick push into the ground, which is a
+quarter per tick at 60Hz, so the mode's doubling leaves it at half. While flying
+the mode makes the term exact and the pieces then swing about 1.6 times as far
+as at 30fps, where the build has them at about 0.4. The second phase set is
+stepped by the same term. Neither setting matches 30fps, so none is shipped.
+The same table for the cape (save state 2) has the mode closer to 30fps than
+the build when idle and no further from it when flying.
