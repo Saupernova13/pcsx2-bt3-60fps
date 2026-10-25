@@ -1,107 +1,133 @@
-# v28-meter-economy - DRAFT
+# v28 - ki, the combat windows, effects and the match clock
 
 | | |
 |---|---|
 | Tag | `v28-meter-economy` |
 | Date | 2026-10-25 |
 | Built on | [v27-recovery-windows](v27-recovery-windows.md) |
-| Groups | 3 shipped group(s) changed |
-| Confidence | **DRAFT - fill this in** |
+| Groups | 84 (1277 patch lines) |
+| Confidence | **MERGED AT 99%** - the owner merged 44 PRs on 2026-10-25, each at 99% confidence; every changed group ran together in the owner's 2026-10-16 test build |
 
-> **DRAFT.** Every other note on this page is written for a player: what this
-> version changes over the last one, and what was discovered on the way. Rewrite
-> this before the release PR merges - its merge is what publishes the release.
+## What it changed over v27
 
-## What it changed
+The biggest version so far: 45 new groups and 2 changed ones, from 42 fix PRs,
+plus two docs PRs. Each fix is for something that counted 30fps frames, so at
+60fps it ran at double speed or for half its time.
 
-Shipped groups this version carries that the last release did not:
+**Ki, Max Power and the smash charge.**
 
-- `60FPS - ki charge loop`
-- `60FPS - max power charge`
-- `60FPS - meter economy`
+- Ki fills and drains at its real speed, Max Power Mode takes its full charge and
+  lasts its full time, and Blast 1 buffs last their published time (#16:
+  `meter economy`, `ki charge loop`, `max power charge`).
+- Holding Square charges a smash at its real speed. The Perfect Smash release
+  window is its full length again, and the Level 3 flash pulses at its real rate
+  (#17: `smash charge`, `charge flash`).
+- The camera's bob while you charge a smash runs at its real speed (#107:
+  `camera bob`).
+- The ripple when a fighter hits Max Power Mode grows and fades at PS2 speed
+  (#138: `max power shockwave`). The Max Power dash (hold a direction, tap
+  Circle) travels its full distance (#163: `vanish dash`).
 
-The commits to `wip/working.pnach` it carries since v27-recovery-windows:
+**Combat timing.**
 
-- fix(patch): fill ki at its real speed past a charge's first second (f6ab39a)
-- docs(patch): name PR #25's buff duration without its group header (e9860c5)
-- docs(meter): record that the economy gate also fixes the Blast 1 buffs (56962bf)
-- fix(patch): fill the Max Power Mode gauge at its real-time speed (df2f081)
-- fix(patch): gate the fighter meter economy to even ticks (2c689b6)
+- The vanish and Z-Counter windows are as long as at 30fps (#65:
+  `defence windows`). So is the Auto-Counter stance's Sonic Sway window (#168:
+  `sonic sway window`).
+- Combos no longer drop, and moves no longer come back twice as soon. The windows
+  after hitstun, a Ground Slash and a Blast 2 cinematic last their full time
+  (#35: `combat timers`).
+- Paralysis (Demon Eye, Psychokinesis, Kaikosen) lasts its full time (#30:
+  `paralysis`).
+- The freeze when a Z-Counter, a push-stop guard or two colliding smashes land
+  lasts as long as on a PS2 (#144: `hit-stop`).
+- A knocked-down fighter slides as far as at 30fps and stays down the full 3
+  seconds (#70: `knockdown tumble`). Thrown fighters fly as far (#126:
+  `throw flight`).
+- Fighters blend between poses over their real time, so tapped ki blasts chain
+  again (#99: `motion blend`).
+- A fighter who loses the lock-on searches for its real time (#136:
+  `lock-on search`).
+
+**Blasts and projectiles.**
+
+- Babidi's Demon Eye, and blasts on the same kind of script, reach the opponent
+  again (#31: `blast script clock`).
+- Ki blasts that miss fly their full range (#59: `projectile life`), and curve at
+  their real homing rate, so a sidestep dodges them as on a PS2 (#118:
+  `ki blast homing`).
+- These all fly at their real speed: Devilman's fork (#61: `weapon object
+  travel`), the shots of Super 17's Hell's Storm and Goten's volley (#122:
+  `barrage shot rate`), and discs such as Krillin's Destructo Disc (#148:
+  `disc travel`).
+- A quickly released beam charges and hits as hard as at 30fps, and fires on the
+  same frame (#73: `beam charge`).
+- Blasts that speed up or grow, such as Explosive Wave, Kaikosen and Android
+  Barrier, do so over their real time (#110: `blast ramp clock`).
+
+**Effects.** Each runs at its 30fps speed now:
+
+- hit flashes such as Hercule's Dynamic Mess Em Up Punch (#78: `effect command
+  ramp`)
+- beam-impact bursts and transformation sparks (#83: `burst effect rate`)
+- the wind swirls of a ki charge or a transformation (#95: `swirl effect rate`)
+- transformation lightning (#97: `lightning effect rate`)
+- the Special Beam Cannon's spiral (#102: `spiral effect rate`)
+- the Kamehameha's charge rays (#104: `ray effect rate`)
+- speed lines (#105: `sprite effect clock`)
+- the arcs over Explosive Wave and the barriers (#112: `arc effect rate`)
+- ground dust (#152: `ground dust rate`)
+- the power-up glow (#154: `power-up glow rate`)
+
+The second link of a dangling piece, such as Ultimate Gohan's forehead lock,
+trails the first as at 30fps (#114 changes `effect rotation`).
+
+**Feedback and the HUD.**
+
+- Screen shake and pad rumble last their full time (#81: `camera shake`,
+  `controller rumble`). The shake jitters as often as on a PS2 (#130:
+  `camera shake jitter`).
+- The health bar drains and shakes for its real time (#85: `health bar drain`,
+  `health bar shake`).
+- Grunts and shouts repeat no more often than at 30fps (#87: `voice cooldown`).
+- Fighters blink at their real rate (#91: `eye blink`).
+
+**The match, menus, story mode and stages.**
+
+- A 60-second Duel lasts 60 seconds (#134: `match timer`).
+- A held direction scrolls menus at PS2 speed, both in battle and out (#128
+  changes `input repeat timing`).
+- Story mode's lines, text, waits and script cameras last their real time (#146:
+  `story script clock`).
+- Clouds drift at their real speed (#60: `sky scroll`).
+
+The shipped header's "known not fixed" list is corrected (#141). An Ultimate
+Blast lands its first hit 2-5 frames early and finishes 6-11 frames early (issue
+#127), not half a second early. The camera after a body-erasing KO and the
+pre-fight intro now match the PS2, so both come off the list.
+
+**Not in this version.** These are still open, below the 99% bar:
+
+- the cape flutter (#93)
+- the CPU's decision rate (#131)
+- the ring shot (#150)
+- the 30fps tick grid (#170)
+- the Rush Struggle rework (#71). `rush struggle` ships as it was in v27.
 
 ## What was discovered
 
-fix(patch): gate the fighter meter economy to even ticks
-
-This PR fixes your ki filling up and emptying twice as fast as it should at 60fps - including Max Power Mode arriving after half the charging and running out in half the time - and Blast 1 buffs wearing off in half their published time, along with everything else the game hands you "after a second" of standing there.
-
-`[60FPS - meter economy]` gates `FUN_001E16C0` to even ticks at its single call site, `001E2584`. `[60FPS - max power charge]` changes the 30.0 ticks a second in `FUN_0020F000`, which sizes the charge state's per-tick fill of the Max Power gauge, to 60.0. `[60FPS - ki charge loop]` halves the ki the charge state's handler adds itself once a tick after the charge's first second, through a wrapper at `001EB8D4` that alternates the rounding.
-
-| | Before | After |
-|---|---|---|
-| `+09F8` gained per 60 vsyncs, idle | 210k | 105k, matching 30fps |
-| The game's "one second" | 30 vsyncs | 60 vsyncs |
-| Ki gained per 10 vsyncs, a held charge after its first second | 7950 | 3975 (30fps: 3975) |
-| Charging to Max Power Mode, full Ki | 56 vsyncs | 113 vsyncs (30fps: 112) |
-| Max Power Mode draining from full | ~480 vsyncs | ~1020 vsyncs, the 30fps slope |
-| Blast 1 buffs (After Image Strike, published 15s) | 7.40s | 14.88s (30fps: 14.88s) |
-| Momentum peak after a three-hit rush | 8800 | 16000 (30fps: 15600) |
-| Groups | - | `meter economy`, `max power charge`, `ki charge loop` |
-
-## What the function does in one tick
-
-Ki income by two paths, three more gauges, a `fighter+0xD80 -= 400` drain, and
-the clock the once-per-second blocks run on:
-
-```c
-bVar1 = 0x1d < puVar10[0x4cb] + 1;      /* puVar10[0x4cb] is fighter+0x132C */
-puVar10[0x4cb] = puVar10[0x4cb] + 1;
-if (bVar1) puVar10[0x4cb] = 0;
-...
-if (bVar1) { /* the once-a-second blocks */ }
-```
-
-Every constant in it is authored per 30Hz frame, and `fighter+0x132C` counting
-0..29 is the game's second, so gating the call fixes the rates and the second
-together.
-
-## Results
-
-| after 46 vsyncs, Cell on Rocky Area | `+099C` | `+09F0` | `+09F8` | second |
-|---|---|---|---|---|
-| unpatched 30fps | 94498 | 95520 | 259962 | 14 |
-| 27 groups, no gate | capped | capped | 340761 | 7 |
-| **27 groups + this gate** | **94498** | **95520** | **259962** | **14** |
-
-| Goku (Early), `L2` at full Ki, first add to 30000 | fill | per tick |
-|---|---|---|
-| unpatched 30fps | 112 vsyncs | 535 |
-| 27 groups + meter economy | 56 vsyncs | 535 |
-| **+ max power charge** | **113 vsyncs** | **265** |
-
-| Krillin holding `L2` from 20000 ki, ki per 10 vsyncs | v0-v50 | v50-v180 |
-|---|---|---|
-| unpatched 30fps | 5425 | 3975 |
-| meter economy only | 5425 | 7950 |
-| **+ ki charge loop** | **5425** | **3975** |
-
-Equal at every sample over 60 vsyncs, for both fighters. Spending ki on a move
-is untouched: that runs on the move's own path, not per tick.
-
-## Also in this PR
-
-| file | change |
-|---|---|
-| `docs/rig.md` | adds a seventh trap: `launch` attaches to an emulator already holding port 28110, so a new group name can silently never reach the cheat engine |
-| `docs/findings/meter-economy.md` | the derivation, the gauge offsets, the two measurement shapes that produce false positives here, the Max Power Mode measurements, Momentum, and the buff countdown |
-| `docs/status.md` | v24 (proposed) |
-
-Closes #4
-Closes #20
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-> Seeded from one merge's body, which may describe only one of the changes
-> listed above: #16.
+- **The game's second is a counter.** Each fighter's meter economy counts 0 to 29
+  and fires every once-a-second block when it wraps, so at 60fps "per second"
+  came every half second. One gate on that function fixes ki, the gauges, the
+  drain and the buffs together, instead of a dozen constants.
+- **v27's open `actionFrame` compares are closed.** The vanish dash (13 and 7
+  ticks) and the Sonic Sway window (moves 0x67-0x69, 10 ticks) now count to 26,
+  14 and 20.
+- **The test build was the reference.** v28's exported patch matches the
+  owner's 2026-10-16 test build group for group, apart from the five open PRs
+  above. No two of its 81 non-widescreen groups write the same address.
+- **Three rig traps.** Until 2026-10-12 the rig's `fk` arm ran without the open
+  PRs' groups. The EE's FPU has no `c.lt.s` (`0x3C`) form. CPU behaviour has to be
+  compared over several start phases. `docs/rig.md` now lists 21 traps.
 
 ## Get this version
 

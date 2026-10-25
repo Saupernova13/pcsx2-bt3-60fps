@@ -40,7 +40,7 @@ recovers that version's file.
 | [`v25`](v25-state-phase-timers.md) | 2026-09-30 | 33 | the mid-combo freeze: four phase numbers the phase-timer group gated as if they were clocks | fixed on the user's frozen save state, not yet played\* |
 | [`v26`](v26-cinematic-camera.md) | 2026-10-05 | 38 | transformation cameras, loading and flashes at their real speed; Drain Life's dash gets its full time | confirmed in play (test build) |
 | [`v27`](v27-recovery-windows.md) | 2026-10-11 | 39 | launched and blown-away fighters wait their full 30fps time before they can recover | merged after the owner's play test |
-| [`v28`](v28-meter-economy.md) | 2026-10-25 | 42 | fix(patch): gate the fighter meter economy to even ticks | **DRAFT - not played** |
+| [`v28`](v28-meter-economy.md) | 2026-10-25 | 84 | ki and Max Power, the Perfect Smash, the vanish and Z-Counter windows, combos, the match timer and 39 more groups at their real speed | merged at 99%, all in the owner's 2026-10-16 test build |
 
 Group counts are the groups in each release file. From v16 on, one of them is the
 optional 19.5:9 widescreen group, which ships switched off.
