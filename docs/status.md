@@ -809,6 +809,22 @@ mentioned it. v23 is that file. Its confidence is v22's, star and all.
 
 It is the first version published as a GitHub Release, with the patch attached.
 
+## Proposed - the vanish dash (#162)
+
+Adds `[60FPS - vanish dash]`, two words. In Max Power Mode a direction + `Circle`
+dash ran 13 ticks instead of 13 frames, and the fighter could act after 7 ticks.
+
+| Devilman, rig slot 6 | 30fps | 60fps before | with it |
+|---|---|---|---|
+| dash state lasts | 38 vsyncs | 25 | 38 |
+| travel | 258 units | 148 | 260 |
+| can act after | 14 vsyncs | 7 | 14 |
+
+The dash's first frame does not move: 2 vsyncs at 30fps, 1 at 60fps; 000F26C0
+holds it for 2. The 2 units left are the stop slide's deceleration steps.
+
+**Not confirmed in play.**
+
 ## Proposed - the recovery windows (#158)
 
 Adds `[60FPS - recovery windows]`, two words. A launched or blown-away fighter

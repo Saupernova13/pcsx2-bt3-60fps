@@ -759,3 +759,31 @@ Goku (Early) Max Power, read after every 30fps tick (every second vsync at 60fps
 
 The 1-vsync later birth is the hand-off of #127. The Shenron wish screen's ring
 is untouched (129 vsyncs, `gBtlChars` is 0 there).
+
+## 2026-10-12 - issue #162: the Max Power vanish dash
+
+Action 0x35, `BtlAct_VanishDashHandler`, is queued by `BtlDecide_Main` (mask
+`0x20000000`) on input condition 49 (a direction held, `L2` not held, guard
+pressed) when `BtlAct_TestPoweredSkill(chr, 8)` is true: Max Power Mode (flag 6)
+and param `flags3 & 8` (param pointer at battle object `+0x91C`, `flags3` at
+`+0x18`). Of the rig's slots only slot 6's Devilman has the bit
+(`work/tools-scratch/flags3scan.py`). "Vanish dash" is this repo's label; the wiki
+names no such move.
+
+The dash runs while `actionFrame` < 13 (`001F4714`), then plays its stop
+animation; from `actionFrame` >= 7 (`001F4780`) the fighter may act.
+`[60FPS - vanish dash]` makes them 26 and 14. Rig slot 6, `L2` 420 vsyncs, then
+`Right` held and `Circle` tapped (`vdash.py`, `vdashwin.py`):
+
+| | 30fps | 60fps before | with the group |
+|---|---|---|---|
+| state 0x35 lasts | 38 vsyncs | 25 | 38 |
+| travel | 257.8 units | 148.5 | 260.3 |
+| may act after | 14 vsyncs | 7 | 14 |
+
+`Left` instead of `Right`: 247.9 at 30fps, 250.7 with the group. The dash's first
+frame does not move (`BtlAnim_IsNew`, `001F4578`): 2 vsyncs at 30fps, 1 at 60fps,
+which added a half-step (268.9 units); `000F26C0` also holds it while
+`actionFrame` < 2. The 2.5 units left come from the stop slide's deceleration.
+
+`BtlAct_Action67to69` (`slti 10`) is still without a scene.
