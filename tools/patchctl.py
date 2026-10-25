@@ -273,12 +273,18 @@ BLEND = ["60FPS - motion blend"]
 # update, so it runs at 30Hz and still draws at 60.
 SPIRAL = ["60FPS - spiral effect rate"]
 
+# Ray effects, found 2026-09-29 for issue #103. One effect class draws the light
+# rays of a charging Kamehameha and counts its delay, life, hold and fade once a
+# tick. The game's own freeze check answers "frozen" on odd ticks for that
+# update, so it runs at 30Hz and still draws at 60.
+RAYS = ["60FPS - ray effect rate"]
+
 ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + HOVER + BLAST + BLASTFX + SEQ
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS
                   + SPARES)
 
 PRESETS = {
@@ -338,7 +344,7 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK + SWIRL + BOLT + BLEND + SPIRAL + RAYS),
     # The set without the meter economy, kept so the new group has a named
     # baseline to be diffed against without editing a preset.
     "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
@@ -445,6 +451,11 @@ PRESETS = {
                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the ray effects, so that group has a named baseline.
+    "norays": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the recovery windows, so that group has a named baseline.
     "norecovery": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH

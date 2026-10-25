@@ -940,3 +940,18 @@ drawn every frame.
 | spiral scale reaches 1.1 | v101 | v79 | v102 |
 
 **Not confirmed in play.**
+
+## Proposed - the Kamehameha's charge rays (#103)
+
+Adds `[60FPS - ray effect rate]` (a wrapper at `000F1BF0` and one hook). The
+effect class that draws the light rays of a charging Kamehameha counted its
+delay, life, hold and fade once a tick. The game's own freeze check now answers
+"frozen" on odd ticks for that update, so it runs at 30Hz and is still drawn
+every frame.
+
+| Goku, every open fix on | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| rays' hold 3 -> 0 | v97-v101 | v97-v99 | v97-v101 |
+| rays gone | v103 | v100 | v103 |
+
+**Not confirmed in play.**
