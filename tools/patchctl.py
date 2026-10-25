@@ -133,6 +133,117 @@ RUSHLIMIT = ["60FPS - rushing Blast 2 time limit"]
 # Recovery windows after a launch or blow-away, found 2026-10-10 for issue #158 in BT3-Decompiled.
 RECOVERY = ["60FPS - recovery windows"]
 
+# The fighter meter economy, found 2026-09-16 chasing the "ki charges and drains
+# faster" report. FUN_001E16C0 is one tick of one fighter's whole economy - ki
+# income by two paths, three more gauges, a -400 drain, and a 0..29 counter that
+# fires the once-per-second blocks when it wraps. Every constant in it is per
+# 30Hz frame and that counter IS the game's second, so at 60fps a fighter earns,
+# spends and reaches every per-second milestone twice as fast. It has exactly one
+# caller, so one gate fixes the system rather than a dozen constants.
+ECONOMY = ["60FPS - meter economy"]
+
+# Max Power Mode's charge, found 2026-09-17. Holding L2 at full Ki fills the
+# Max Power gauge from the charge state's handler, outside the economy gate, at
+# an amount FUN_0020F000 derives from seconds * 30.0. That 30.0 becomes 60.0.
+MPMCHARGE = ["60FPS - max power charge"]
+
+# The ki charge loop, found 2026-10-09 for issue #4. Past the charge's start
+# animation, its handler adds ki once a tick at 001EB8D4, outside the economy
+# gate; a wrapper halves each amount, alternating the rounding.
+KICHARGE = ["60FPS - ki charge loop"]
+
+# The smash charge, found 2026-09-16 chasing the "frame perfect attack" report.
+# FUN_001E33E0 adds gp-0x6D80 (0.0444444) to the charge every tick, for all
+# eleven charge states, so at 60fps a smash charges in half the real time - and
+# with it the Perfect Smash release window, which is one tick of timing.
+# The Level 3 flash that cues it pulses on a per-tick counter and fade, so
+# "charge flash" (2026-09-22) puts that pulse back on its 30fps rate.
+SMASH = ["60FPS - smash charge", "60FPS - charge flash"]
+
+# Paralysis, found 2026-09-17. The victim's paralysis is fighter+0xFE0 in
+# ticks, decremented at one site in the fighter update however it was armed.
+# Demon Eye's published 4 seconds read 4.00s at 30fps and 2.00s at 60fps; this
+# decrements on even ticks only and leaves the per-press mash subtraction alone.
+PARALYSIS = ["60FPS - paralysis"]
+
+# Scripted blast events, found 2026-09-17. A blast's controller either relays
+# pulses from the fighter's animation or fires events when its age in ticks
+# equals a scripted number; the second mode ran at half real time, so Demon
+# Eye's beam ended halfway and missed. This compares age / 2 on even ages.
+SCRIPTCLOCK = ["60FPS - blast script clock"]
+
+# Combat timers, found 2026-09-17. The fighter update counts the combo timer,
+# the 50-byte move-repetition memory, and short windows after hitstun, Ground
+# Slash and a Blast 2 cinematic once a tick, so each ran out in half its real
+# time. Each now counts on even ticks only. Since 2026-09-22 also the shake of
+# a hit shrugged off under False Courage and the hurt face after drain damage.
+COMBAT = ["60FPS - combat timers"]
+
+# Projectile life, found 2026-09-21 for issue #43. The same effect-node update
+# counts each projectile's life (node+0x5B4) down once a tick, so with the step
+# halved a blast that misses died at half the range. Counted on even ticks.
+PROJLIFE = ["60FPS - projectile life"]
+
+# The clouds, found 2026-09-21 for issue #52. A global sky object's texture
+# scroll is advanced once a tick by FUN_001350E0, outside the stage's keyframe
+# graph, so stage animation never reached it. The rate is halved at both loads.
+SKY = ["60FPS - sky scroll"]
+
+# Thrown weapons, found 2026-09-21 for issue #54. Devilman's fork is a spawned
+# object on a third sibling class, FUN_00154DE8, that no other travel group hooks;
+# pos += vel once a tick at 001550C4. Halved the way the rock class is.
+WEAPONFLIGHT = ["60FPS - weapon object travel"]
+
+# Defensive input windows, found 2026-09-21 for issue #18. FUN_001DFFE0 counts
+# six press-armed windows down once a tick - the vanish window among them - so
+# at 60fps a vanish or Z-Counter had half its real time. Counted on even ticks,
+# except at the rest value, where re-arming depends on counting every tick.
+DEFENCE = ["60FPS - defence windows"]
+
+# The knockdown tumble, found 2026-09-22 for issue #42. State 216 swaps its
+# tumble for the slowing animation once the per-tick position change drops to a
+# 30Hz-authored speed, and gets an idle fighter up after 90 ticks. At 60fps the
+# first tripped at twice the real speed, so a thrown opponent stopped short and
+# the CPU got up early, and the second came in half the time.
+TUMBLE = ["60FPS - knockdown tumble"]
+
+# The beam charge hold, found 2026-09-22 for issue #72. State 272 leaves a
+# beam's charge hold on the tick after the release. At 60fps that test ran on
+# odd ticks too, so a quickly released beam left one count of charge short and
+# fired early. It now leaves only on an even tick, after at least two counts.
+BEAMCHARGE = ["60FPS - beam charge"]
+
+# The effect-command ramps, found 2026-09-28 for issue #77. FUN_0014FF90 runs a
+# move's scripted effects once a tick and animates each command's scale by a rate
+# per tick, or by a timer against seconds * 30.0, so at 60fps hit flashes grew
+# twice as fast - Dynamic Mess Em Up Punch's filled the screen. Rate and timer step halved.
+FXRAMP = ["60FPS - effect command ramp"]
+
+# Hit feedback, found 2026-09-28 for issue #80. The camera shake counts its time
+# left down by 1/30 s a tick, and the controller rumble times its motors in
+# seconds * 30.0 ticks and pulses on a per-tick phase, so at 60fps both ended in
+# half their time. One data word for the shake, four for the rumble.
+FEEDBACK = ["60FPS - camera shake", "60FPS - controller rumble"]
+
+# Burst effects, found 2026-09-28 for issue #82. Two effect classes - beam-impact
+# bursts and the sparks round Vegeta's energy ball - step delays, fades and
+# random emission once a tick. The game's own freeze check answers "frozen" on
+# odd ticks for those two updates, so they run at 30Hz and still draw at 60.
+BURST = ["60FPS - burst effect rate"]
+
+# The health bar, found 2026-09-28 for issue #84. FUN_0021CD20 drains the red
+# section toward the real health by a speed a tick and counts the bar's shake
+# down a tick, so at 60fps both ran in half their time. The drain speeds are
+# halved and the shake loop runs on even ticks; the function is not gated whole,
+# because it also steps a tween [60FPS - tween duration] already times.
+HUD = ["60FPS - health bar drain", "60FPS - health bar shake"]
+
+# Voice cooldowns, found 2026-09-28 for issue #86. FUN_001DC738 blocks a voice
+# category for table seconds * 30.0 ticks after it plays, and FUN_001DC918 counts
+# them down once a tick, so at 60fps grunts and shouts could repeat after half
+# their time. The 30.0 becomes 60.0.
+VOICE = ["60FPS - voice cooldown"]
+
 # Eye blinks, found 2026-09-28 for issue #90. FUN_0024EB70 re-arms a random
 # 90-179 tick timer and holds the blink image for 3-5 ticks, all counted once a
 # tick, so at 60fps fighters blinked twice as often. Its random branch now runs
@@ -144,7 +255,7 @@ ENABLED_IN_INI = (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES
                   + BLASTDUR + SEQWAIT + PHASE + PURSUIT + CAMERA + MOUTH
                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE
                   + STRUGGLE + BEAMCLASH + STAGE + SOLARFLARE + THROWN + CINECAM
-                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLINK
+                  + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK
                   + SPARES)
 
 PRESETS = {
@@ -204,7 +315,88 @@ PRESETS = {
              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN + CINECAM
-             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + BLINK),
+             + TRANSLOAD + FXTRACK + TRANSFLASH + RUSHLIMIT + RECOVERY + ECONOMY + MPMCHARGE + KICHARGE + SMASH + PARALYSIS + SCRIPTCLOCK + COMBAT + PROJLIFE + SKY + WEAPONFLIGHT + DEFENCE + TUMBLE + BEAMCHARGE + FXRAMP + FEEDBACK + BURST + HUD + VOICE + BLINK),
+    # The set without the meter economy, kept so the new group has a named
+    # baseline to be diffed against without editing a preset.
+    "noeconomy": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the smash charge, so that group has a named A/B baseline.
+    "nosmash": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without paralysis, so that group has a named A/B baseline.
+    "noparalysis": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                    + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                    + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                    + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the script clock, so that group has a named A/B baseline.
+    "noscript": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the combat timers, so that group has a named A/B baseline.
+    "nocombat": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the projectile life, so that group has a named A/B baseline.
+    "noprojlife": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the sky scroll, so that group has a named A/B baseline.
+    "nosky": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the thrown weapons, so that group has a named A/B baseline.
+    "noweapon": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the defence windows, so that group has a named A/B baseline.
+    "nodefence": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                  + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                  + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                  + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the knockdown tumble, so that group has a named baseline.
+    "notumble": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                 + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                 + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the beam charge hold, so that group has a named baseline.
+    "nobeamcharge": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                     + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                     + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                     + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the effect-command ramps, so that group has a named baseline.
+    "noramp": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+               + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+               + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+               + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the shake and rumble, so those groups have a named baseline.
+    "nofeedback": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                   + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                   + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                   + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the burst effects, so that group has a named baseline.
+    "noburst": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the health bar, so those groups have a named baseline.
+    "nohud": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+              + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+              + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+              + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
+    # "full" without the voice cooldowns, so that group has a named baseline.
+    "novoice": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
+                + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
+                + PROJECTILE + OBJFLIGHT + BEAMFLIGHT + SCREENFADE + STRUGGLE
+                + BEAMCLASH + PHASE + STAGE + SOLARFLARE + THROWN),
     # "full" without the eye blinks, so that group has a named baseline.
     "noblink": (SHIPPED + AIRBORNE + EFFECTS + TWEENS + PARTICLES + HOVER
                 + BLAST + BLASTDUR + SEQWAIT + PURSUIT + CAMERA + MOUTH
