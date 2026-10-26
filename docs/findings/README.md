@@ -17,7 +17,7 @@ order. `tools/split_findings.py` does the split and checks nothing was lost.
 | [The fighter state machine and the stuck loop](state-machine.md) | Phase timers inside fighter states, the state 157 and state 93 traps, the rush time limit, the lock-on search and the Max Power shockwave. | 5 |
 | [Projectile, rock and beam travel](projectile-travel.md) | The three movers: effect-node projectiles, spawned objects and travelling beams, the ki blast homing turn and the homing shots of a Barrage Blast 2. | 7 |
 | [Full Power Smash and the Lightning Attack](smash-and-lightning-attack.md) | Hard Knockback and the Dragon Smash Circle hit, five frame counts in one chain. | 6 |
-| [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing, the second clip player behind the mouths, and the smash charge camera bob. | 7 |
+| [The camera and the cut-in mouth](camera-and-mouth.md) | Camera pacing, the second clip player behind the mouths, the smash charge camera bob, and scripted cuts that stepped every other vsync. | 8 |
 | [Rush Struggle and Beam Struggle](struggles.md) | Both stick-rotation contests, their tick clocks and the CPU's synthetic stick. | 2 |
 | [Widescreen](widescreen.md) | The widescreen model and every aspect group. | 2 |
 | [Stage scenery and ambient animation](stage-and-scenery.md) | The stage scene graph, its keyframe tracks, and the ambient props on them. | 2 |
