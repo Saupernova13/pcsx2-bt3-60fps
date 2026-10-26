@@ -742,3 +742,78 @@ pair; it went with v26's cinematic camera (#21), which paced exactly these poses
 and cameras.
 
 Tools: `work/tools-scratch/intro_shots.py`.
+
+## 2026-10-26 - issues #174, #175, #176: three cameras that "look 30fps"
+
+All three were measured per vsync on the camera being drawn (`gBtlCamView`,
+`*(002FEBD0)`: position `+0x220`, rotation `+0x40`), 30fps against the owner's
+test build (every group, `tick grid` included). Two things count as looking
+30fps: the camera holding still on one vsync of two, and the camera moving on
+every vsync but in a fast-slow beat (a chase of a target that moves every other
+vsync). The second is scored as `|a - b| / (a + b)` over consecutive steps: 1 at
+30fps, 0 for even steps.
+
+### The cause: scripted camera cuts counted down on even ticks
+
+A camera cut (`ChrCam_SetCut`, `001C6E78`) stores a length in 30Hz frames in
+`fighter+0x558` (timer) and `+0x55C` (total), and `ChrCam_CalcCut` builds the
+target from `1 - timer/total`. `[60FPS - camera pacing]` counted the timer down
+on even ticks only (`001C5720`), which kept the timing but held the target for
+two vsyncs. The camera then either held too (a cut that drives the eye
+directly) or chased a target that jumped every other vsync.
+
+The fix stores the length doubled in `ChrCam_SetCut` (the one place every cut
+starts; `ChrCam_BlendToCut` and `ChrCam_StartCut` go through it) and counts down
+every tick. Nothing outside `btl_char_cam.c` reads the timer: the ELF's other
+`0x558` / `0x55C` accesses are effect and stage structs.
+
+```
+001C6F60  lw   $a2,0x8($sp)    was $v1: keeps the flags in $v1
+001C6F68  sw   $a2,0x88($s0)
+001C6F8C  sll  $s6,$s6,1       was sw $s6,0x9C($s0)
+001C6F90  sw   $s6,0x9C($s0)   was lw $v1,0xC($sp)
+001C6F94  sw   $s6,0x98($s0)   unchanged
+```
+
+| Scene | 30fps | test build | with the fix |
+|---|---|---|---|
+| Switch-out (`L3`+`R3`, state 243), held vsyncs | 63 of 128 | 34 of 121 | 1 of 121 |
+| Switch-out, beat score | 0.99 | 0.65 | 0.07 |
+| Switch-out, the cut's timer | 89, 89, 88, 88 | 89, 89, 88, 88 | 179, 178, 177 |
+| KO'd team member leaving (state 246), steps | 3.93, 0 | 1.38, 2.76, 1.39, 2.78 | 2.06, 2.07, 2.07, 2.08 |
+| Hell's Storm cut, beat score | 1.00 | 0.09 | 0.03 |
+
+Each cut ends on the same vsync as in the test build (switch v162, Super
+Saiyan v176, Hell's Storm v50), the state timelines are identical, and the
+orientation error against 30fps inside the cuts is unchanged (2.40 / 2.44
+degrees for Goten's Super Saiyan, 3.44 / 3.53 for Hell's Storm). Aligned on
+state 243, the switch camera's path matches 30fps as closely as before (mean
+position error 0.68 / 0.69).
+
+The switch as a whole ends 9 vsyncs before 30fps (state 243 lasts 121 vsyncs
+against 130). That is the leave action's wait for the next member's files,
+polled once a tick, like the transformation loader of 2026-09-22. The fix does
+not change it.
+
+### What did not reproduce
+
+- **The stage fly-over (#174).** Every stage tried (seven) plays three
+  two-key clips of length 199, linearly interpolated, with no step keys
+  (`DemoCamKey.flags & 0x10`). In the test build the camera moves on 698 of 700
+  vsyncs at an even 2.348 a vsync, consecutive screenshots differ on every vsync
+  in the sky, middle and floor bands alike, and the rig holds 60 ticks a second
+  in real time through it. The close-ups, "Ready!" and "Fight!" score 0.00 to
+  0.15 on beats, the same with and without the fix.
+- **The Duel KO camera (#176).** Both the plain KO (state 216, then the demo
+  camera from about v295) and the body-erasing one (2026-10-09) move on every
+  vsync in even steps (beat 0.01). In a team battle, the camera on the KO'd
+  member as they leave (state 246) is a cut and had the beat above; the fix
+  removes it.
+
+The ordinary battle camera following a fighting COM still beats a little in
+some states (0.17 to 0.28 in states 184 and 218); the fix does not change it, so
+it is not the cut.
+
+Tools: `work/tools-scratch/camtrace.py` (per-vsync camera, states and cut
+timer), `introcam.py` (a fresh Duel through the menus; `ANIMCHECK`, `SHOTS`,
+`REALTIME`, `MAPRIGHT` / `MAPDOWN`), `judder.py`, `pathcmp.py`, `vsoff.py`.

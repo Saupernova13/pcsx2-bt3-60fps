@@ -1238,3 +1238,18 @@ ended early and short. The count is now doubled.
 | distance | 220 | 181 | 220 |
 
 **Not confirmed in play.**
+
+## Proposed - scripted camera cuts on every vsync (#175)
+
+Changes `[60FPS - camera pacing]`. A scripted camera cut (the switch-out, a KO'd
+team member leaving, Blast 2 and Ultimate cut-ins, transformations) counted its
+30Hz length down on even ticks, so its target moved every other vsync and the
+camera looked 30fps. The length is now stored doubled and counted every tick.
+
+| | 30fps | 60fps before | 60fps with it |
+|---|---|---|---|
+| switch-out camera, held vsyncs | 63 of 128 | 34 of 121 | 1 of 121 |
+| KO'd member leaving, camera steps | 3.93, 0 | 1.38, 2.76 | 2.06, 2.07 |
+| cut ends (switch, Super Saiyan, Hell's Storm) | - | v162, v176, v50 | v162, v176, v50 |
+
+**Not confirmed in play.**

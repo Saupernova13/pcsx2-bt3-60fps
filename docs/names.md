@@ -60,6 +60,9 @@ from SuperCombo's names to this repo's old terms.
 | poses snapping, ki blasts not chaining | Motion crossfade (no wiki name) | `motion blend`, issue #98 |
 | camera bobbing while charging a smash | Smash charge camera bob (no wiki name) | `camera bob`, issue #106 |
 | camera in attack animations (Perfect Barrier) | The scripted camera in Blast 2 and Ultimate Blast cut-ins | `camera pacing`, issue #21 |
+| the camera looking up at the sky when a character switches out | The member switch (`L3`+`R3`): a scripted camera cut following the leaving fighter up | `camera pacing`, issue #175 |
+| the camera circling a KO'd fighter | In a team battle, the camera cut on the KO'd member as they leave (state 246); in a Duel, the KO's demo camera | `camera pacing` (team battle), issue #176 |
+| the stage fly-over before a battle | The stage's three intro camera clips (`DemoCam_PlayStageAnim`), before the fighters' close-ups | issue #174 |
 | auto taunt when idle | Idle taunt | issue #12, PR #14 |
 | voice lines, grunts and shouts repeating | Voice categories and their cooldowns | `voice cooldown`, issue #86 |
 | speed lines (Hercule's Present Bomb) | Speed-line sprites of the sprite effect class | `sprite effect clock`, issue #8 |
